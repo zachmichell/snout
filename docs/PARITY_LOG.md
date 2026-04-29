@@ -8,9 +8,9 @@ The convention: every helper that runs client-side and must produce the same res
 
 | Helper | Web file | iOS file | Test contract | Status | Last verified |
 |---|---|---|---|---|---|
-| storage-download | `src/lib/storage-download.ts` | `ios/Snout/Utilities/StorageDownload.swift` | `ios/SnoutTests/StorageDownloadTests.swift` (web tests pending) | iOS ported, web tests pending | 2026-04-27 |
-| format | `src/lib/format.ts` | `ios/Snout/Utilities/Format.swift` | `ios/SnoutTests/FormatTests.swift` (web tests pending) | iOS ported, web tests pending | 2026-04-27 |
-| money | `src/lib/money.ts` | `ios/Snout/Utilities/Money.swift` | `ios/SnoutTests/MoneyTests.swift` (web tests pending) | iOS ported, web tests pending | 2026-04-27 |
+| storage-download | `apps/web/src/lib/storage-download.ts` | `apps/ios/Snout/Utilities/StorageDownload.swift` | `apps/ios/SnoutTests/StorageDownloadTests.swift` (web tests pending) | iOS ported, web tests pending | 2026-04-27 |
+| format | `apps/web/src/lib/format.ts` | `apps/ios/Snout/Utilities/Format.swift` | `apps/ios/SnoutTests/FormatTests.swift` (web tests pending) | iOS ported, web tests pending | 2026-04-27 |
+| money | `apps/web/src/lib/money.ts` | `apps/ios/Snout/Utilities/Money.swift` | `apps/ios/SnoutTests/MoneyTests.swift` (web tests pending) | iOS ported, web tests pending | 2026-04-27 |
 
 ## Current state (web-only, awaiting iOS port)
 
@@ -18,13 +18,13 @@ These helpers exist on the web side and are listed in the iOS spec doc as candid
 
 | Web helper | Lines | Notes for the Swift port |
 |---|---|---|
-| `src/lib/storage-download.ts` | ~50 | Trivial; uses URLComponents in Swift. Add a parity test on the web first. |
-| `src/lib/format.ts` | varies | Date formatting maps to DateFormatter; keep locale handling explicit. |
-| `src/lib/care.ts` | static enums | Just port the enum data. Pure tables. |
-| `src/lib/money.ts` | small | Cents to currency string; use NumberFormatter with .currency. |
-| `src/lib/surcharge.ts` | ~70 | Defer until iOS implements payment (v3). |
-| `src/lib/credits.ts` | ~150 | Defer until iOS implements booking (v2). |
-| `src/lib/booking.ts` | ~90 | Defer until iOS implements booking (v2). |
+| `apps/web/src/lib/storage-download.ts` | ~50 | Trivial; uses URLComponents in Swift. Add a parity test on the web first. |
+| `apps/web/src/lib/format.ts` | varies | Date formatting maps to DateFormatter; keep locale handling explicit. |
+| `apps/web/src/lib/care.ts` | static enums | Just port the enum data. Pure tables. |
+| `apps/web/src/lib/money.ts` | small | Cents to currency string; use NumberFormatter with .currency. |
+| `apps/web/src/lib/surcharge.ts` | ~70 | Defer until iOS implements payment (v3). |
+| `apps/web/src/lib/credits.ts` | ~150 | Defer until iOS implements booking (v2). |
+| `apps/web/src/lib/booking.ts` | ~90 | Defer until iOS implements booking (v2). |
 
 ## Parity changes (append top)
 
@@ -32,7 +32,7 @@ _Use this section to log changes to a parity helper when they land. The most rec
 
 ### 2026-04-27 — Initial Swift ports of storage-download, format, money
 
-Created Swift ports of three high-priority helpers as part of the iOS Xcode bootstrap. The Swift sides are covered by XCTest cases in `ios/SnoutTests/`. The TypeScript sides do not yet have a test file under `src/lib/__tests__/`; the next batch should add `storage-download.test.ts`, `format.test.ts`, and `money.test.ts` covering the same input/output pairs.
+Created Swift ports of three high-priority helpers as part of the iOS Xcode bootstrap. The Swift sides are covered by XCTest cases in `apps/ios/SnoutTests/`. The TypeScript sides do not yet have a test file under `apps/web/src/lib/__tests__/`; the next batch should add `storage-download.test.ts`, `format.test.ts`, and `money.test.ts` covering the same input/output pairs.
 
 Notable behavior decisions to keep in sync:
 - `slugifyForFilename`: returns `"file"` for empty, whitespace-only, or all-unsafe input.

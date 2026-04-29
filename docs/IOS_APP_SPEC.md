@@ -2,7 +2,7 @@
 
 Authoritative handoff document for the Xcode build of the Snout pet-parent iOS app. This document describes what to build, what the existing backend already provides, and the boundaries between the iOS layer and the rest of the system.
 
-The intended reader is a Claude Code session running inside the `ios/` directory of this monorepo with read access to the entire repo. That reader has the React/Supabase code as ground truth and uses this document to map iOS responsibilities onto it.
+The intended reader is a Claude Code session running inside the `apps/ios/` directory of this monorepo with read access to the entire repo. That reader has the React/Supabase code as ground truth and uses this document to map iOS responsibilities onto it.
 
 ---
 
@@ -51,7 +51,7 @@ Avoid pulling in heavy SDKs that duplicate what Supabase already provides. Avoid
 
 ### Authoritative source of truth
 
-The Supabase database schema is the source of truth for both web and iOS. The TypeScript types in `src/integrations/supabase/types.ts` are auto-generated from the schema; the equivalent for Swift is the `supabase-swift` SDK plus hand-written model structs that mirror the Postgres tables you read.
+The Supabase database schema is the source of truth for both web and iOS. The TypeScript types in `apps/web/src/integrations/supabase/types.ts` are auto-generated from the schema; the equivalent for Swift is the `supabase-swift` SDK plus hand-written model structs that mirror the Postgres tables you read.
 
 When the schema changes (a migration lands), both apps' types update from the same generator: the web app via `supabase gen types typescript`, the iOS app via either hand-edits (small set of tables) or `supabase gen types swift` once that's stable.
 
@@ -102,8 +102,8 @@ For each feature, the table below names the relevant database tables, edge funct
 | List reservations | `reservations` table, filtered by `primary_owner_id` |
 | Live status updates | Supabase Realtime subscription on `reservations` |
 | Reservation detail | Same table; join `services`, `locations`, `reservation_pets`, `pets` |
-| Status badge styling | `src/components/portal/ReservationStatusBadge.tsx` |
-| Reference React surface | `src/pages/portal-owner/Bookings.tsx` |
+| Status badge styling | `apps/web/src/components/portal/ReservationStatusBadge.tsx` |
+| Reference React surface | `apps/web/src/pages/portal-owner/Bookings.tsx` |
 
 The client-side filter uses `primary_owner_id` (not `owner_id`, which does not exist on this table — see section 11).
 
@@ -112,10 +112,10 @@ The client-side filter uses `primary_owner_id` (not `owner_id`, which does not e
 | Need | Where |
 |---|---|
 | List report cards | `report_cards`, filtered via `useOwnerReportCards` hook |
-| Detail view | `src/pages/portal-owner/ReportCardDetail.tsx` |
+| Detail view | `apps/web/src/pages/portal-owner/ReportCardDetail.tsx` |
 | Photo storage | `report-card-photos` Storage bucket; paths in `report_cards.photo_urls[]` |
 | Signed URLs | `supabase.storage.from("report-card-photos").createSignedUrls(paths, 3600)` |
-| Forced download with filename | Append `?download=<filename>` to the signed URL — see `src/lib/storage-download.ts` |
+| Forced download with filename | Append `?download=<filename>` to the signed URL — see `apps/web/src/lib/storage-download.ts` |
 
 The web app builds filenames as `<pet>-<YYYY-MM-DD>-photo-<idx>.<ext>`. Mirror this convention in Swift.
 
@@ -131,7 +131,7 @@ See Section 7. Different protocol from web (APNS, not Web Push); same notificati
 |---|---|
 | List cameras | `webcams` table, filtered by org and active reservation locations |
 | Player kinds | `source_kind` enum: `hls` / `mp4` / `iframe` |
-| Reference React | `src/components/portal/WebcamPlayer.tsx`, `src/pages/portal-owner/Webcams.tsx` |
+| Reference React | `apps/web/src/components/portal/WebcamPlayer.tsx`, `apps/web/src/pages/portal-owner/Webcams.tsx` |
 | iOS player | `AVPlayerViewController` for hls/mp4; `WKWebView` for iframe |
 
 The owner-side filter logic: only show a camera if it has no `location_id` (org-wide) OR the user has an active reservation (`status` in `confirmed`, `checked_in`) at that location. Mirror exactly.
@@ -142,7 +142,7 @@ The owner-side filter logic: only show a camera if it has no `location_id` (org-
 |---|---|
 | Conversations | `conversations` table (one per owner-org pair) |
 | Messages | `messages` table |
-| Hooks | `src/hooks/useConversations.ts`, `src/hooks/useMessages.ts` |
+| Hooks | `apps/web/src/hooks/useConversations.ts`, `apps/web/src/hooks/useMessages.ts` |
 | Realtime | Subscribe to `messages` channel filtered by `conversation_id` |
 | Send | Insert into `messages` (RLS verifies sender is in the conversation) |
 
@@ -154,7 +154,7 @@ The unread count is computed from `messages.read_at IS NULL AND sender_role != '
 |---|---|
 | Pet list | `pets` joined via `pet_owners` |
 | Vaccination records | `vaccinations` table |
-| Reference React | `src/pages/portal-owner/PetDetail.tsx` |
+| Reference React | `apps/web/src/pages/portal-owner/PetDetail.tsx` |
 | Vaccination doc download | `vaccination-docs` bucket; same `?download=<filename>` pattern |
 
 ---
@@ -164,7 +164,7 @@ The unread count is computed from `messages.read_at IS NULL AND sender_role != '
 The audit's mobile-specific complaints, addressed at the iOS layer:
 
 - **Auto-logout / session loss.** Use `supabase-swift`'s default Keychain session store. Do not roll your own token refresh.
-- **Keyboard re-render and focus jumping.** Use SwiftUI form fields with `.textContentType` (e.g. `.emailAddress`, `.familyName`, `.streetAddressLine1`) and `.keyboardType` modifiers (`.emailAddress`, `.phonePad`, `.numberPad`). The autocomplete attributes on the web side in `src/pages/auth/Login.tsx` and `src/pages/onboarding/Onboarding.tsx` map one-to-one to SwiftUI's `.textContentType` values.
+- **Keyboard re-render and focus jumping.** Use SwiftUI form fields with `.textContentType` (e.g. `.emailAddress`, `.familyName`, `.streetAddressLine1`) and `.keyboardType` modifiers (`.emailAddress`, `.phonePad`, `.numberPad`). The autocomplete attributes on the web side in `apps/web/src/pages/auth/Login.tsx` and `apps/web/src/pages/onboarding/Onboarding.tsx` map one-to-one to SwiftUI's `.textContentType` values.
 - **Pinch zoom on photos.** Use `MagnificationGesture` on a SwiftUI `Image` inside a `ScrollView`. There are reference implementations on GitHub; pick one and ship.
 - **App backgrounding losing form data.** Use `@SceneStorage` for in-progress form state.
 - **Photo and video download.** Use `UIActivityViewController` with the local file URL. The user gets the standard share sheet with "Save to Photos" as one option.
@@ -172,7 +172,7 @@ The audit's mobile-specific complaints, addressed at the iOS layer:
 
 ### Brand and design
 
-The web app's design tokens live in `tailwind.config.ts` and `src/index.css`. The colors, font (Forma DJR for display, Inter for body), and rounded-corner conventions should map to iOS as:
+The web app's design tokens live in `tailwind.config.ts` and `apps/web/src/index.css`. The colors, font (Forma DJR for display, Inter for body), and rounded-corner conventions should map to iOS as:
 
 - Display font: load Forma DJR via `Info.plist` `UIAppFonts`, or fall back to SF Pro Display for v1 and add the custom font in v1.1.
 - Body font: SF Pro is fine.
@@ -236,19 +236,19 @@ The web service worker reads four fields from the push payload: `title`, `body`,
 
 ### What is duplicated and how to keep it in sync
 
-The web app has a small library of pure-logic helpers in `src/lib/` that need Swift equivalents:
+The web app has a small library of pure-logic helpers in `apps/web/src/lib/` that need Swift equivalents:
 
 | TypeScript file | Swift port priority | Notes |
 |---|---|---|
-| `src/lib/storage-download.ts` | High (used in 4.2 photo flows) | Trivial port |
-| `src/lib/format.ts` | High (date/age formatting) | iOS has DateFormatter; map directly |
-| `src/lib/care.ts` | Medium (rating/mood meta for report cards) | Static enums; pure data |
-| `src/lib/credits.ts` | Low | Owner doesn't see credit math directly in v1 |
-| `src/lib/booking.ts` | Low (only needed if v2 books from iOS) | Defer until booking lands |
-| `src/lib/surcharge.ts` | Low (defer until iOS pays) | Defer to v3 |
-| `src/lib/money.ts` | High | Cents math + currency formatting |
+| `apps/web/src/lib/storage-download.ts` | High (used in 4.2 photo flows) | Trivial port |
+| `apps/web/src/lib/format.ts` | High (date/age formatting) | iOS has DateFormatter; map directly |
+| `apps/web/src/lib/care.ts` | Medium (rating/mood meta for report cards) | Static enums; pure data |
+| `apps/web/src/lib/credits.ts` | Low | Owner doesn't see credit math directly in v1 |
+| `apps/web/src/lib/booking.ts` | Low (only needed if v2 books from iOS) | Defer until booking lands |
+| `apps/web/src/lib/surcharge.ts` | Low (defer until iOS pays) | Defer to v3 |
+| `apps/web/src/lib/money.ts` | High | Cents math + currency formatting |
 
-**Convention for new helpers.** When a new pure-logic helper is added on either side, the corresponding port is recorded in `docs/PARITY_LOG.md`. Both implementations should be covered by tests with the same inputs and outputs. The web tests live under `src/lib/__tests__/`; the Swift tests should live under `ios/SnoutTests/`.
+**Convention for new helpers.** When a new pure-logic helper is added on either side, the corresponding port is recorded in `docs/PARITY_LOG.md`. Both implementations should be covered by tests with the same inputs and outputs. The web tests live under `apps/web/src/lib/__tests__/`; the Swift tests should live under `apps/ios/SnoutTests/`.
 
 See `docs/SHARED_LOGIC.md` for the full convention.
 
@@ -263,7 +263,7 @@ See `docs/SHARED_LOGIC.md` for the full convention.
 
 ## 9. Repo layout for the Xcode project
 
-The iOS project should live in `ios/` at the monorepo root. Recommended structure:
+The iOS project should live in `apps/ios/` at the monorepo root. Recommended structure:
 
 ```
 ios/
@@ -274,17 +274,17 @@ ios/
     Models/                  # Swift structs mirroring Postgres tables
     Views/                   # SwiftUI views, organized by feature
     Services/                # Supabase clients, push handlers, etc.
-    Utilities/               # Ports of src/lib/* helpers
+    Utilities/               # Ports of apps/web/src/lib/* helpers
     Resources/               # Assets, Info.plist, config
   SnoutTests/                # Unit tests
   SnoutUITests/              # UI tests
 ```
 
-The `ios/` directory is `.gitignore`-friendly for transient build outputs (`build/`, `*.xcworkspace/xcuserdata/`, `DerivedData/`) but tracks the project file, sources, tests, and assets.
+The `apps/ios/` directory is `.gitignore`-friendly for transient build outputs (`build/`, `*.xcworkspace/xcuserdata/`, `DerivedData/`) but tracks the project file, sources, tests, and assets.
 
-A Claude Code session running with cwd `/Users/zachmichell/fella-fetch-hub` (the repo root) can read both the React/Supabase code and the Swift code, which is exactly the cross-app awareness you want.
+A Claude Code session running with cwd `/Users/zachmichell/snout` (the repo root) can read both the React/Supabase code and the Swift code, which is exactly the cross-app awareness you want.
 
-A Claude Code session running with cwd `/Users/zachmichell/fella-fetch-hub/ios` can read both directions equally well; relative paths upward (`../src/lib/storage-download.ts`) are accessible.
+A Claude Code session running with cwd `/Users/zachmichell/snout` can read both directions equally well across `apps/web/` and `apps/ios/`. Relative paths from `apps/ios/` upward (`../web/src/lib/storage-download.ts`) are accessible if needed.
 
 ---
 
@@ -298,7 +298,7 @@ Each pure-logic helper that gets ported to Swift must have:
 Example header for `SnoutTests/StorageDownloadTests.swift`:
 
 ```swift
-// Parity contract: src/lib/__tests__/storage-download.test.ts
+// Parity contract: apps/web/src/lib/__tests__/storage-download.test.ts
 // Both implementations must satisfy the same inputs and outputs.
 ```
 
@@ -322,7 +322,7 @@ A few things in the database that are easy to miss without context:
 
 These are deferred but worth knowing about so v1 doesn't paint into a corner:
 
-- **Booking from iOS.** The web booking wizard is in `src/components/portal-owner/booking-wizard/`. When v2 picks this up, Swift implements an equivalent four-step flow against the same `reservations` table.
+- **Booking from iOS.** The web booking wizard is in `apps/web/src/components/portal-owner/booking-wizard/`. When v2 picks this up, Swift implements an equivalent four-step flow against the same `reservations` table.
 - **Paying invoices from iOS.** Today payment links open Safari. v3 should embed Stripe iOS SDK or Helcim's iOS SDK depending on the org's processor. The `useCreateCheckoutSession` hook on web is the model; the iOS equivalent calls the same edge functions.
 - **In-app webcam fullscreen with rotation lock.** AVPlayerViewController handles fullscreen; rotation lock requires overriding `UIViewController.supportedInterfaceOrientations` only for the camera screen.
 - **Apple Wallet integration.** A vaccination record could be exposed as a Wallet pass. Not in scope; mentioned only because the data model already has the records.
@@ -341,16 +341,16 @@ These should be resolved early in the iOS build, not assumed:
 
 ---
 
-## 14. Reading order for a fresh Claude Code session in `ios/`
+## 14. Reading order for a fresh Claude Code session in `apps/ios/`
 
 If I were a new Claude Code session walking into this directory cold, this is the reading order I would follow:
 
 1. This file.
 2. `docs/SHARED_LOGIC.md`.
 3. `docs/PARITY_LOG.md` (to see what's already been ported and what hasn't).
-4. `src/integrations/supabase/types.ts` (skim for relevant tables).
-5. `src/hooks/useAuth.ts` (auth flow).
+4. `apps/web/src/integrations/supabase/types.ts` (skim for relevant tables).
+5. `apps/web/src/hooks/useAuth.ts` (auth flow).
 6. The web component listed in Section 4 for whatever feature you're implementing.
-7. The corresponding TypeScript helper in `src/lib/` if any.
+7. The corresponding TypeScript helper in `apps/web/src/lib/` if any.
 
 That order takes about 30 minutes and produces enough context to start writing Swift confidently.

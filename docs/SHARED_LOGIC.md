@@ -43,9 +43,9 @@ Examples that genuinely need this:
 
 For each of these, the rule is:
 
-1. **Single test contract.** The TypeScript test file under `src/lib/__tests__/` and the Swift test file under `ios/SnoutTests/` cover the same input/output pairs. Both must pass before either implementation ships.
+1. **Single test contract.** The TypeScript test file under `apps/web/src/lib/__tests__/` and the Swift test file under `apps/ios/SnoutTests/` cover the same input/output pairs. Both must pass before either implementation ships.
 
-2. **Cross-reference comment at the top of each implementation file.** The TS file says `// Swift parity: ios/Snout/Utilities/StorageDownload.swift`. The Swift file says `// Web parity: src/lib/storage-download.ts`. A grep for "parity:" finds every paired implementation in the repo.
+2. **Cross-reference comment at the top of each implementation file.** The TS file says `// Swift parity: apps/ios/Snout/Utilities/StorageDownload.swift`. The Swift file says `// Web parity: apps/web/src/lib/storage-download.ts`. A grep for "parity:" finds every paired implementation in the repo.
 
 3. **Update both when the rule changes.** A PR that changes one implementation must also change the other, plus update the test contract on both sides. The PR description names both files explicitly.
 
@@ -78,7 +78,7 @@ The credit ledger is the hardest case because it has both server-authoritative c
 The split:
 
 - `consume_credits` and friends: Postgres functions. Authoritative.
-- `calculateCredits` in `src/lib/credits.ts`: pure preview math. Duplicated in Swift when the iOS app implements booking. Same test contract.
+- `calculateCredits` in `apps/web/src/lib/credits.ts`: pure preview math. Duplicated in Swift when the iOS app implements booking. Same test contract.
 
 The preview is allowed to be slightly optimistic (it doesn't lock rows). The actual consumption at submit time goes through the SQL function and is the source of truth. If the preview was wrong by a cent because of a race, the SQL function returns the truth and the UI shows the corrected number.
 
