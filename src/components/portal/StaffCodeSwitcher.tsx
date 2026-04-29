@@ -2,35 +2,53 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserCircle2, LogOut } from "lucide-react";
-import { useStaffCodes, useTouchStaffCodeUsed } from "@/hooks/useStaffCodes";
+import { useStaffCodes, useVerifyStaffPin } from "@/hooks/useStaffCodes";
 import { useActiveStaff } from "@/contexts/StaffCodeContext";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
-export default function StaffCodeSwitcher() {
+export default function StaffCodeSwitcher({ compact = false }: { compact?: boolean }) {
   const { activeStaff, setActiveStaff, clearActiveStaff } = useActiveStaff();
+  const { membership } = useAuth();
   const { data: codes = [] } = useStaffCodes();
-  const touch = useTouchStaffCodeUsed();
+  const verify = useVerifyStaffPin();
   const [open, setOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError(null);
-    const match = codes.find((c) => c.is_active && c.pin_code === pin);
-    if (!match) {
-      setError("Invalid PIN");
+    if (!membership?.organization_id) {
+      setError("No organization");
       return;
     }
-    setActiveStaff({
-      id: match.id,
-      display_name: match.display_name,
-      role: match.role,
-    });
-    touch.mutate(match.id);
-    toast.success(`Welcome, ${match.display_name}`);
-    setPin("");
-    setOpen(false);
+    try {
+      const matchedId = await verify.mutateAsync({
+        org_id: membership.organization_id,
+        pin,
+      });
+      if (!matchedId) {
+        setError("Invalid PIN");
+        return;
+      }
+      const match = codes.find((c) => c.id === matchedId);
+      if (!match) {
+        setError("Code not found — try again");
+        return;
+      }
+      setActiveStaff({
+        id: match.id,
+        display_name: match.display_name,
+        role: match.role,
+      });
+      toast.success(`Welcome, ${match.display_name}`);
+      setPin("");
+      setOpen(false);
+    } catch (e: any) {
+      setError(e?.message ?? "PIN verification failed");
+    }
   };
 
   const handleSignOut = () => {
@@ -40,18 +58,33 @@ export default function StaffCodeSwitcher() {
     toast.info("Staff session ended");
   };
 
+  const label = activeStaff?.display_name ?? "Sign in with PIN";
+
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-surface"
-        aria-label="Switch staff"
-      >
-        <UserCircle2 className="h-4 w-4 text-text-secondary" />
-        <span className="max-w-[140px] truncate">
-          {activeStaff?.display_name ?? "Sign in with PIN"}
-        </span>
-      </button>
+      {compact ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-primary-foreground transition-colors"
+              aria-label={label}
+            >
+              <UserCircle2 className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{label}</TooltipContent>
+        </Tooltip>
+      ) : (
+        <button
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-primary-foreground"
+          aria-label="Switch staff"
+        >
+          <UserCircle2 className="h-4 w-4 shrink-0 text-sidebar-foreground/70" />
+          <span className="flex-1 truncate text-left">{label}</span>
+        </button>
+      )}
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setPin(""); setError(null); } }}>
         <DialogContent className="sm:max-w-md">

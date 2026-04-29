@@ -139,7 +139,12 @@ export default function Lodging() {
       if (locationId) q = q.eq("location_id", locationId);
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as ResvRow[];
+      // Supabase's generated type narrows the joined pets row to a single
+      // object, but PostgREST returns the array shape that ResvRow models.
+      // Cast through unknown so the structural mismatch in the generated
+      // types doesn't trip the typechecker on what is actually correct
+      // runtime data.
+      return (data ?? []) as unknown as ResvRow[];
     },
   });
 

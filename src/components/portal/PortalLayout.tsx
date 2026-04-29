@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import Sidebar from "./Sidebar";
-import LocationSwitcher from "./LocationSwitcher";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import PausedOverlay from "./billing/PausedOverlay";
 import PastDueBanner from "./billing/PastDueBanner";
 import TrialBanner from "./billing/TrialBanner";
-import StaffCodeSwitcher from "./StaffCodeSwitcher";
+import SupportWidget from "./support/SupportWidget";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const { membership } = useAuth();
@@ -40,18 +39,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <main className="flex-1 overflow-y-auto">
         {sub?.isPastDue && <PastDueBanner />}
         {showTrialBanner && <TrialBanner daysRemaining={sub.trialDaysRemaining} />}
-        <div className="flex items-center justify-between gap-3 border-b border-border-subtle bg-surface px-8 py-2.5">
-          <div className="text-xs text-text-tertiary truncate">
-            {orgName ?? ""}
-          </div>
-          <div className="flex items-center gap-3">
-            <StaffCodeSwitcher />
-            <LocationSwitcher />
-          </div>
-        </div>
         {children}
       </main>
       {showPausedOverlay && <PausedOverlay />}
+      {/* Support widget — floats bottom-right on every staff portal page.
+          Suppressed during the paused overlay since the operator can't
+          interact with the rest of the UI anyway. */}
+      {!showPausedOverlay && <SupportWidget />}
     </div>
   );
 }

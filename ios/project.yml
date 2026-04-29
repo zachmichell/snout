@@ -1,0 +1,111 @@
+name: Snout
+options:
+  bundleIdPrefix: app.snout
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  developmentLanguage: en
+  xcodeVersion: "16.0"
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+packages:
+  Supabase:
+    url: https://github.com/supabase-community/supabase-swift
+    from: 2.5.1
+targets:
+  Snout:
+    type: application
+    platform: iOS
+    sources:
+      - path: Snout
+    resources:
+      - path: Snout/Resources/Assets.xcassets
+    info:
+      path: Snout/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Snout
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: "AccentColor"
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+        NSCameraUsageDescription: "Snout needs camera access if you ever want to attach a photo to a message."
+        NSPhotoLibraryUsageDescription: "Snout saves report card photos to your library when you tap Save."
+        NSUserNotificationsUsageDescription: "Snout sends you report cards, photos, and booking updates from your facility."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.snout.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        # Until a paid Apple Developer team is set up, skip signing entirely.
+        # When you do add a team, replace these with DEVELOPMENT_TEAM: "<TEAMID>"
+        # and remove the three lines below.
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+    dependencies:
+      - package: Supabase
+        product: Supabase
+  SnoutTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: SnoutTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.snout.ios.tests
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Snout.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Snout
+    dependencies:
+      - target: Snout
+  SnoutUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: SnoutUITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.snout.ios.uitests
+        TEST_TARGET_NAME: Snout
+    dependencies:
+      - target: Snout
+schemes:
+  Snout:
+    build:
+      targets:
+        Snout: all
+        SnoutTests: [test]
+        SnoutUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SnoutTests
+        - SnoutUITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

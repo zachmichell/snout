@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { VACCINE_TYPES } from "@/lib/vaccines";
+import { logActivity } from "@/lib/activity";
 
 const MAX_DOC_BYTES = 10 * 1024 * 1024;
 const ACCEPTED_DOC = ["application/pdf", "image/jpeg", "image/png"];
@@ -40,6 +41,11 @@ function extractStoragePath(url: string | null): string | null {
   if (!url) return null;
   const m = url.match(/\/vaccination-docs\/(.+)$/);
   return m ? m[1].split("?")[0] : null;
+}
+
+async function fetchPetName(petId: string): Promise<string | null> {
+  const { data } = await supabase.from("pets").select("name").eq("id", petId).maybeSingle();
+  return data?.name ?? null;
 }
 
 export default function VaccinationFormDialog({
@@ -122,21 +128,51 @@ export default function VaccinationFormDialog({
         verified_by_user_id: null,
       };
 
+      let vaccinationId: string | null = existing?.id ?? null;
       if (existing) {
         const { error } = await supabase
           .from("vaccinations")
           .update(payload)
           .eq("id", existing.id);
         if (error) throw error;
-        toast.success("Record updated — pending staff verification");
+        toast.success("Record updated, pending staff verification");
       } else {
-        const { error } = await supabase.from("vaccinations").insert({
-          ...payload,
-          pet_id: petId,
-          organization_id: organizationId,
-        });
+        const { data, error } = await supabase
+          .from("vaccinations")
+          .insert({
+            ...payload,
+            pet_id: petId,
+            organization_id: organizationId,
+          })
+          .select("id")
+          .single();
         if (error) throw error;
-        toast.success("Vaccination record added — pending staff verification");
+        vaccinationId = data?.id ?? null;
+        toast.success("Vaccination record added, pending staff verification");
+      }
+
+      // Customer-side upload audit trail. Operators read this in the Pack
+      // View "Recent customer uploads" surface and the Audit Log so a silent
+      // upload cannot fail to reach staff.
+      try {
+        const petName = await fetchPetName(petId);
+        await logActivity({
+          organization_id: organizationId,
+          action: existing ? "updated" : "uploaded",
+          entity_type: "vaccination",
+          entity_id: vaccinationId,
+          metadata: {
+            pet_id: petId,
+            pet_name: petName,
+            vaccine_type: vaccineType,
+            has_document: !!file,
+            summary: `${petName ?? "Pet"}: ${vaccineType} vaccination ${existing ? "updated" : "uploaded"}`,
+          },
+          actor: { kind: "owner", label: "Owner" },
+        });
+      } catch (logErr) {
+        // Logging must never block the upload itself.
+        console.warn("activity_log write failed", logErr);
       }
 
       qc.invalidateQueries({ queryKey: ["pet-vaccinations", petId] });

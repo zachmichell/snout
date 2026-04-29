@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { createInvoiceForReservation } from "@/lib/invoice";
+import { pgErrorToMessage } from "@/lib/db-errors";
 
 const INVALIDATE_KEYS = [
   "checkin-board",
@@ -76,7 +77,7 @@ export function useCheckIn() {
       toast.success(`${params.petName ?? "Pet"} checked in`);
       invalidateAll(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Check-in failed"),
+    onError: (e: any) => toast.error(pgErrorToMessage(e, "Check-in failed")),
   });
 }
 
@@ -129,7 +130,7 @@ export function useCheckOut() {
       }
       invalidateAll(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Check-out failed"),
+    onError: (e: any) => toast.error(pgErrorToMessage(e, "Check-out failed")),
   });
 }
 
@@ -158,6 +159,6 @@ export function useMarkNoShow() {
       toast.success(`${params.petName ?? "Pet"} marked no-show`);
       invalidateAll(qc);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Could not mark no-show"),
+    onError: (e: any) => toast.error(pgErrorToMessage(e, "Could not mark no-show")),
   });
 }

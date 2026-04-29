@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import Onboarding from "./pages/onboarding/Onboarding";
+import HelcimCheckout from "./pages/pay/HelcimCheckout";
 import Dashboard from "./pages/portal/Dashboard";
 import OwnersList from "./pages/portal/owners/OwnersList";
 import OwnerForm from "./pages/portal/owners/OwnerForm";
@@ -49,6 +50,7 @@ import IncidentDetail from "./pages/portal/incidents/IncidentDetail";
 import StaffMessages from "./pages/portal/messages/Messages";
 import OwnerMessages from "./pages/portal-owner/Messages";
 import OwnerReportCards from "./pages/portal-owner/ReportCards";
+import OwnerWebcams from "./pages/portal-owner/Webcams";
 import OwnerReportCardDetail from "./pages/portal-owner/ReportCardDetail";
 import OwnerDashboard from "./pages/portal-owner/Dashboard";
 import OwnerAccount from "./pages/portal-owner/Account";
@@ -126,6 +128,9 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            {/* Public Helcim checkout — used by pet owners following an invoice link.
+                No auth required; the checkoutToken in the URL gates payment ability. */}
+            <Route path="/pay/helcim/:invoiceId" element={<HelcimCheckout />} />
             <Route
               path="/onboarding"
               element={
@@ -218,6 +223,7 @@ const App = () => (
             <Route path="/portal/history" element={customer(<OwnerServiceHistory />)} />
             <Route path="/portal/classes" element={customer(<OwnerClasses />)} />
             <Route path="/portal/agreements" element={customer(<OwnerAgreements />)} />
+            <Route path="/portal/webcams" element={customer(<OwnerWebcams />)} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

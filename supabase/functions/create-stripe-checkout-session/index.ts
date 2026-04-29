@@ -45,7 +45,10 @@ Deno.serve(async (req) => {
       .eq("id", invoiceId)
       .is("deleted_at", null)
       .maybeSingle();
-    if (invErr) return json({ error: invErr.message }, 500);
+    if (invErr) {
+      console.error("create-stripe-checkout-session invoice lookup error:", invErr);
+      return json({ error: "Failed to load invoice" }, 500);
+    }
     if (!invoice) return json({ error: "Invoice not found" }, 404);
     if (invoice.status === "paid") {
       return json({ error: "Invoice already paid" }, 409);
@@ -118,8 +121,9 @@ Deno.serve(async (req) => {
 
     return json({ checkout_session_id: session.id, checkout_url: session.url }, 200);
   } catch (err) {
-    console.error("create-stripe-checkout-session error", err);
-    return json({ error: (err as Error).message }, 500);
+    const errorId = crypto.randomUUID().slice(0, 8);
+    console.error(`create-stripe-checkout-session error [${errorId}]:`, err);
+    return json({ error: "Internal error", error_id: errorId }, 500);
   }
 });
 

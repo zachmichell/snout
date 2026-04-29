@@ -177,8 +177,9 @@ Deno.serve(async (req) => {
 
     return json({ checkout_url: session.url, session_id: session.id });
   } catch (e: any) {
-    console.error("create-billing-checkout error", e);
-    return json({ error: e.message ?? "Internal error" }, 500);
+    const errorId = crypto.randomUUID().slice(0, 8);
+    console.error(`create-billing-checkout error [${errorId}]:`, e);
+    return json({ error: "Internal error", error_id: errorId }, 500);
   }
 });
 

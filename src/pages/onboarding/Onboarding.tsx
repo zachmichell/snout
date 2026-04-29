@@ -59,30 +59,22 @@ export default function Onboarding() {
     const currency = CURRENCY_BY_COUNTRY[country];
     const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: org, error: orgErr } = await supabase
-      .from("organizations")
-      .insert({ name, slug, country, currency, timezone })
-      .select()
-      .single();
-
-    if (orgErr || !org) {
+    // Atomic org + owner-membership creation in a single transaction.
+    // Avoids the INSERT-RETURNING + SELECT-policy issue and closes the
+    // race between org creation and membership assignment.
+    const { data: newOrgId, error: orgErr } = await supabase.rpc(
+      "create_organization_with_owner",
+      { _name: name, _slug: slug, _country: country, _currency: currency, _timezone: timezone },
+    );
+    if (orgErr || !newOrgId) {
       setSubmitting(false);
       return toast.error(orgErr?.message ?? "Failed to create organization");
-    }
-
-    const { error: memErr } = await supabase.rpc("create_membership", {
-      _org_id: org.id,
-      _role: "owner",
-    });
-    if (memErr) {
-      setSubmitting(false);
-      return toast.error(memErr.message);
     }
 
     const { data: loc, error: locErr } = await supabase
       .from("locations")
       .insert({
-        organization_id: org.id,
+        organization_id: newOrgId,
         name: name,
         country,
         timezone,
@@ -96,7 +88,7 @@ export default function Onboarding() {
     }
 
     const { error: subErr } = await supabase.from("subscriptions").insert({
-      organization_id: org.id,
+      organization_id: newOrgId,
       status: "trialing",
       trial_ends_at: trialEndsAt,
     });
@@ -105,7 +97,7 @@ export default function Onboarding() {
       return toast.error(subErr.message);
     }
 
-    setOrgId(org.id);
+    setOrgId(newOrgId);
     setLocationId(loc.id);
     setEmail(user.email ?? "");
     await refresh();
@@ -175,7 +167,16 @@ export default function Onboarding() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="name">Business name</Label>
-                <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sunny Paws Daycare" />
+                <Input
+                  id="name"
+                  name="organization"
+                  autoComplete="organization"
+                  autoCapitalize="words"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Sunny Paws Daycare"
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -231,31 +232,77 @@ export default function Onboarding() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="street">Street address</Label>
-                <Input id="street" value={street} onChange={(e) => setStreet(e.target.value)} />
+                <Input
+                  id="street"
+                  name="street-address"
+                  autoComplete="street-address"
+                  autoCapitalize="words"
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="city">City</Label>
-                  <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} />
+                  <Input
+                    id="city"
+                    name="city"
+                    autoComplete="address-level2"
+                    autoCapitalize="words"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="state">{country === "CA" ? "Province" : "State"}</Label>
-                  <Input id="state" value={stateProvince} onChange={(e) => setStateProvince(e.target.value)} />
+                  <Input
+                    id="state"
+                    name="state"
+                    autoComplete="address-level1"
+                    autoCapitalize="words"
+                    value={stateProvince}
+                    onChange={(e) => setStateProvince(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="postal">{country === "CA" ? "Postal code" : "ZIP code"}</Label>
-                  <Input id="postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
+                  <Input
+                    id="postal"
+                    name="postal-code"
+                    autoComplete="postal-code"
+                    autoCapitalize="characters"
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <Input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="loc-email">Location email</Label>
-                <Input id="loc-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input
+                  id="loc-email"
+                  name="location-email"
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
 
               <div className="flex gap-3">

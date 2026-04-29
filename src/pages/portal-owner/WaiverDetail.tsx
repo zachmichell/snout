@@ -46,14 +46,27 @@ export default function OwnerWaiverDetail() {
         user_agent: navigator.userAgent,
       });
       if (insertErr) throw insertErr;
-      await supabase.from("activity_log").insert({
-        organization_id: membership.organization_id,
-        entity_type: "waiver_signature",
-        entity_id: waiver.id,
-        action: "signed",
-        actor_id: owner.profile_id,
-        metadata: { waiver_version: waiver.version, method: signature.method } as any,
-      });
+
+      try {
+        const { logActivity } = await import("@/lib/activity");
+        const ownerName = `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim() || "Owner";
+        await logActivity({
+          organization_id: membership.organization_id,
+          entity_type: "waiver_signature",
+          entity_id: waiver.id,
+          action: "signed",
+          metadata: {
+            owner_id: owner.id,
+            waiver_id: waiver.id,
+            waiver_version: waiver.version,
+            method: signature.method,
+            summary: `${ownerName} signed waiver: ${waiver.title ?? waiver.id}`,
+          },
+          actor: { kind: "owner", label: "Owner" },
+        });
+      } catch (logErr) {
+        console.warn("activity_log write failed", logErr);
+      }
     },
     onSuccess: () => {
       toast.success("Waiver signed successfully");

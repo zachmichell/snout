@@ -21,6 +21,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import Logo from "./Logo";
+import StaffCodeSwitcher from "./StaffCodeSwitcher";
+import LocationSwitcher from "./LocationSwitcher";
 import { useAuth } from "@/hooks/useAuth";
 import { useStaffUnreadCount } from "@/hooks/useConversations";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -34,7 +36,7 @@ const sections: Array<{
 }> = [
   {
     label: "Overview",
-    items: [{ to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" }],
+    items: [{ to: "/dashboard", icon: LayoutDashboard, label: "Pack View" }],
   },
   {
     label: "Operations",
@@ -173,6 +175,11 @@ export default function Sidebar({ orgName }: { orgName?: string | null }) {
             </div>
           ))}
         </nav>
+
+        <div className={`border-t border-sidebar-border ${collapsed ? "px-2 py-3 flex justify-center" : "px-3 py-3 space-y-2"}`}>
+          <StaffCodeSwitcher compact={collapsed} />
+          {!collapsed && <LocationSwitcher />}
+        </div>
 
         <div className="border-t border-sidebar-border px-3 py-3">
           <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-3"} rounded-md px-2 py-2`}>

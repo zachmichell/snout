@@ -58,8 +58,32 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
   const [sociability, setSociability] = useState<string>("");
   const [summary, setSummary] = useState<string>("");
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoSignedUrls, setPhotoSignedUrls] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // Resolve signed display URLs whenever the path list changes.
+  useEffect(() => {
+    let cancelled = false;
+    if (photos.length === 0) {
+      setPhotoSignedUrls({});
+      return;
+    }
+    (async () => {
+      const { data, error } = await supabase.storage
+        .from("report-card-photos")
+        .createSignedUrls(photos, 3600);
+      if (cancelled || error || !data) return;
+      const map: Record<string, string> = {};
+      data.forEach((d, i) => {
+        if (d.signedUrl) map[photos[i]] = d.signedUrl;
+      });
+      setPhotoSignedUrls(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [photos]);
 
   // Hydrate when dialog opens
   useEffect(() => {
@@ -91,7 +115,7 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
     if (!membership?.organization_id) return toast.error("Missing organization");
     if (photos.length + files.length > MAX_PHOTOS) return toast.error(`Max ${MAX_PHOTOS} photos`);
     setUploading(true);
-    const newUrls: string[] = [];
+    const newPaths: string[] = [];
     for (const file of Array.from(files)) {
       const ext = file.name.split(".").pop() ?? "jpg";
       const path = `${membership.organization_id}/${petId}/${reservationId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
@@ -100,14 +124,13 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
         toast.error(error.message);
         continue;
       }
-      const { data } = supabase.storage.from("report-card-photos").getPublicUrl(path);
-      newUrls.push(data.publicUrl);
+      newPaths.push(path);
     }
-    setPhotos((p) => [...p, ...newUrls]);
+    setPhotos((p) => [...p, ...newPaths]);
     setUploading(false);
   };
 
-  const removePhoto = (url: string) => setPhotos((p) => p.filter((u) => u !== url));
+  const removePhoto = (path: string) => setPhotos((p) => p.filter((u) => u !== path));
 
   const save = async (publish: boolean) => {
     if (!membership?.organization_id) return toast.error("Missing organization");
@@ -152,11 +175,19 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
         if (resv?.primary_owner_id) {
           const { data: owner } = await supabase
             .from("owners")
-            .select("email")
+            .select("id, email")
             .eq("id", resv.primary_owner_id)
             .maybeSingle();
           if (owner?.email) {
             const ratingOpt = RATING_OPTIONS.find((o) => o.value === rating);
+            // Sign the first photo for a 7-day window so the inbox <img> renders.
+            let emailPhotoUrl: string | null = null;
+            if (photos[0]) {
+              const { data: signed } = await supabase.storage
+                .from("report-card-photos")
+                .createSignedUrl(photos[0], 60 * 60 * 24 * 7);
+              emailPhotoUrl = signed?.signedUrl ?? null;
+            }
             sendReportCardPublished({
               organization_id: membership.organization_id,
               to: owner.email,
@@ -164,8 +195,9 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
               rating: ratingOpt?.label ?? rating ?? null,
               rating_emoji: ratingOpt?.emoji ?? null,
               mood_summary: summary || null,
-              photo_url: photos[0] ?? null,
+              photo_url: emailPhotoUrl,
               reservation_id: reservationId,
+              owner_id: owner.id,
             }).catch((e) => console.warn("report card email failed:", e));
           }
         }
@@ -239,12 +271,12 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
 
           <Section label={`Photos (${photos.length}/${MAX_PHOTOS})`}>
             <div className="flex flex-wrap gap-2">
-              {photos.map((url) => (
-                <div key={url} className="relative h-20 w-20">
-                  <img src={url} alt="" className="h-full w-full rounded-md object-cover" />
+              {photos.map((path) => (
+                <div key={path} className="relative h-20 w-20">
+                  <img src={photoSignedUrls[path] ?? ""} alt="" className="h-full w-full rounded-md object-cover" />
                   <button
                     type="button"
-                    onClick={() => removePhoto(url)}
+                    onClick={() => removePhoto(path)}
                     className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground p-1 text-background hover:opacity-90"
                   >
                     <X className="h-3 w-3" />

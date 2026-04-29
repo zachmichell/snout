@@ -90,17 +90,41 @@ export default function OwnerAgreements() {
         date: new Date().toLocaleDateString(),
         business_name: org?.name ?? "",
       });
-      const { error } = await supabase.from("signed_agreements").insert({
-        organization_id: orgId,
-        template_id: signing.id,
-        template_version: signing.version ?? 1,
-        owner_id: owner.id,
-        signer_name: signerName,
-        signature_data: signatureData,
-        rendered_body: renderedBody,
-        user_agent: navigator.userAgent,
-      });
+      const { data: inserted, error } = await supabase
+        .from("signed_agreements")
+        .insert({
+          organization_id: orgId,
+          template_id: signing.id,
+          template_version: signing.version ?? 1,
+          owner_id: owner.id,
+          signer_name: signerName,
+          signature_data: signatureData,
+          rendered_body: renderedBody,
+          user_agent: navigator.userAgent,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+
+      try {
+        const { logActivity } = await import("@/lib/activity");
+        await logActivity({
+          organization_id: orgId,
+          action: "signed",
+          entity_type: "agreement",
+          entity_id: inserted?.id ?? null,
+          metadata: {
+            owner_id: owner.id,
+            template_id: signing.id,
+            template_name: signing.name ?? null,
+            signer_name: signerName,
+            summary: `${signerName} signed: ${signing.name ?? "agreement"}`,
+          },
+          actor: { kind: "owner", label: "Owner" },
+        });
+      } catch (logErr) {
+        console.warn("activity_log write failed", logErr);
+      }
     },
     onSuccess: () => {
       toast.success("Agreement signed — thank you!");

@@ -20,6 +20,7 @@ const navItems = [
   { to: "/portal/bookings", label: "Bookings" },
   { to: "/portal/history", label: "History" },
   { to: "/portal/report-cards", label: "Report Cards" },
+  { to: "/portal/webcams", label: "Live Cameras" },
   { to: "/portal/classes", label: "Classes" },
   { to: "/portal/messages", label: "Messages", badge: "messages" as const },
   { to: "/portal/invoices", label: "Invoices" },

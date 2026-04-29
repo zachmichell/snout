@@ -29,15 +29,17 @@ export function computeQuantity(durationType: string | null | undefined, startIS
   }
 }
 
-/** Generate the next sequential invoice number for an org, e.g. INV-0001. */
+/**
+ * Generate the next sequential invoice number for an org, e.g. INV-0001.
+ * Delegates to an RPC that atomically bumps a per-org counter under a row
+ * lock, so concurrent callers cannot collide. See migration
+ * 20260424130100_atomic_invoice_numbering.sql.
+ */
 export async function nextInvoiceNumber(orgId: string): Promise<string> {
-  const { count, error } = await supabase
-    .from("invoices")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", orgId);
+  const { data, error } = await supabase.rpc("next_invoice_number", { _org_id: orgId });
   if (error) throw error;
-  const next = (count ?? 0) + 1;
-  return `INV-${String(next).padStart(4, "0")}`;
+  if (!data) throw new Error("Failed to allocate invoice number");
+  return data as string;
 }
 
 export type CreatedInvoice = {
@@ -119,7 +121,29 @@ export async function createInvoiceForReservation(reservationId: string): Promis
     })
     .select("id, invoice_number")
     .single();
-  if (invErr) throw invErr;
+  if (invErr) {
+    // Another caller won the race (uniq_invoices_reservation_live). Re-read
+    // and return the winner's invoice; our allocated number is discarded.
+    //
+    // EXPECTED SIDE EFFECT: gaps in the invoice number sequence. The counter
+    // bump inside next_invoice_number() already committed, so the loser's
+    // number (e.g. INV-0002) is permanently skipped. This is deliberate and
+    // legally fine — invoice sequences require uniqueness, not contiguity.
+    // Don't "fix" gaps by resetting the counter.
+    if (invErr.code === "23505") {
+      const { data: raced, error: racedErr } = await supabase
+        .from("invoices")
+        .select("id, invoice_number")
+        .eq("reservation_id", reservationId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (racedErr) throw racedErr;
+      if (raced) {
+        return { id: raced.id, invoice_number: raced.invoice_number, alreadyExisted: true };
+      }
+    }
+    throw invErr;
+  }
 
   // Insert one line per pet (or one generic line if no pets)
   const lines = (pets.length > 0 ? pets : [{ id: null, name: null }]).map((p) => ({

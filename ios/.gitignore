@@ -1,0 +1,29 @@
+# Build products and derived data
+build/
+DerivedData/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# xcodegen output — regenerated from project.yml on every dev's machine
+Snout.xcodeproj/
+
+# Local secrets — committed as Config.example.plist instead
+Snout/Resources/Config.plist
+GoogleService-Info.plist
+
+# Apple cruft
+.DS_Store
+xcuserdata/
+*.xcuserstate
+
+# Swift Package Manager artifacts (resolved dependencies cached locally)
+.swiftpm/
+.build/
+Package.resolved
+
+# fastlane (future)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output

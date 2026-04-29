@@ -76,8 +76,9 @@ Deno.serve(async (req) => {
       },
     }, 200);
   } catch (err) {
-    console.error("stripe-connect-status error", err);
-    return json({ error: (err as Error).message }, 500);
+    const errorId = crypto.randomUUID().slice(0, 8);
+    console.error(`stripe-connect-status error [${errorId}]:`, err);
+    return json({ error: "Internal error", error_id: errorId }, 500);
   }
 });
 

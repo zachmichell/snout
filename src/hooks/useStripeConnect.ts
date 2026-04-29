@@ -83,15 +83,45 @@ export function useDisconnectStripe() {
   });
 }
 
+// Processor-aware checkout dispatcher. Reads the org's payment_processor
+// directly so the hook can be called from any context (POS, invoice
+// detail) without each caller having to thread the processor through.
+// Falls back to Stripe when the org is unconfigured, since the existing
+// codebase assumed Stripe everywhere prior to 3.3.
 export function useCreateCheckoutSession() {
   return useMutation({
     mutationFn: async (invoiceId: string) => {
-      const { data, error } = await supabase.functions.invoke(
-        "create-stripe-checkout-session",
-        { body: { invoice_id: invoiceId, base_url: window.location.origin } },
-      );
+      const { data: invoice, error: invErr } = await supabase
+        .from("invoices")
+        .select("organization_id")
+        .eq("id", invoiceId)
+        .maybeSingle();
+      if (invErr) throw invErr;
+
+      let processor: "stripe" | "helcim" = "stripe";
+      if (invoice?.organization_id) {
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("payment_processor")
+          .eq("id", invoice.organization_id)
+          .maybeSingle();
+        processor =
+          (org?.payment_processor as "stripe" | "helcim" | undefined) ?? "stripe";
+      }
+
+      const fnName =
+        processor === "helcim"
+          ? "create-helcim-checkout-session"
+          : "create-stripe-checkout-session";
+
+      const { data, error } = await supabase.functions.invoke(fnName, {
+        body: { invoice_id: invoiceId, base_url: window.location.origin },
+      });
       if (error) throw error;
-      return data as { checkout_session_id: string; checkout_url: string };
+      return {
+        ...(data as { checkout_session_id: string; checkout_url: string }),
+        processor,
+      };
     },
   });
 }

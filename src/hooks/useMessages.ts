@@ -20,13 +20,16 @@ export function useMessages(conversationId?: string) {
     queryKey: ["messages", conversationId],
     enabled: !!conversationId,
     queryFn: async () => {
+      // Load the most-recent N messages, then reverse so the UI still
+      // renders oldest → newest. Full history paging is a follow-up.
       const { data, error } = await supabase
         .from("messages")
-        .select("*")
+        .select("id, conversation_id, sender_type, sender_id, body, read_at, created_at")
         .eq("conversation_id", conversationId!)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(200);
       if (error) throw error;
-      return (data ?? []) as MessageRow[];
+      return ((data ?? []) as MessageRow[]).reverse();
     },
   });
 

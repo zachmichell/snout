@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,6 +58,24 @@ export default function StepPets({
     });
   };
 
+  // Auto-select when the owner has exactly one pet — the typical case.
+  // Saves a tap on a step that otherwise demands one. We only run this
+  // once per pets-load to avoid undoing manual deselections.
+  const autoSelected = useRef(false);
+  useEffect(() => {
+    if (autoSelected.current) return;
+    if (pets.length === 1 && state.pets.length === 0) {
+      autoSelected.current = true;
+      setState((s) => ({ ...s, pets: [pets[0]] }));
+    }
+  }, [pets, state.pets.length, setState]);
+
+  const selectAll = () => {
+    const allowed = max ? pets.slice(0, max) : pets;
+    setState((s) => ({ ...s, pets: allowed }));
+  };
+
+  const allSelected = pets.length > 0 && state.pets.length === Math.min(pets.length, max ?? pets.length);
   const hasExpired = state.pets.some((p) => p.vaxStatus === "expired");
 
   return (
@@ -72,6 +91,22 @@ export default function StepPets({
         <p className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
           You don't have any pets on file. Contact your facility to add your pets.
         </p>
+      )}
+
+      {pets.length > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {state.pets.length} of {pets.length} selected
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => (allSelected ? setState((s) => ({ ...s, pets: [] })) : selectAll())}
+            className="h-7 text-xs"
+          >
+            {allSelected ? "Clear all" : "Select all"}
+          </Button>
+        </div>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">

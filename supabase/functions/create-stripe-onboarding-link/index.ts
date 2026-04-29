@@ -104,8 +104,9 @@ Deno.serve(async (req) => {
 
     return json({ url: link.url, account_id: stripeAccountId, status: "pending" }, 200);
   } catch (err) {
-    console.error("create-stripe-onboarding-link error", err);
-    return json({ error: (err as Error).message }, 500);
+    const errorId = crypto.randomUUID().slice(0, 8);
+    console.error(`create-stripe-onboarding-link error [${errorId}]:`, err);
+    return json({ error: "Internal error", error_id: errorId }, 500);
   }
 });
 

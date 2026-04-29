@@ -1,0 +1,59 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm test
+      # Lint is intentionally not gated yet. The repo carries pre-existing
+      # eslint errors that need their own cleanup batch before lint can
+      # block PRs. Track that separately.
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Capture Supabase env
+        id: supabase
+        run: |
+          API_URL=$(supabase status -o env | grep '^API_URL=' | cut -d= -f2- | tr -d '"')
+          SERVICE_KEY=$(supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2- | tr -d '"')
+          echo "url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "::add-mask::$SERVICE_KEY"
+          echo "key=$SERVICE_KEY" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+
+      - name: Run integration tests
+        env:
+          SUPABASE_TEST_URL: ${{ steps.supabase.outputs.url }}
+          SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ steps.supabase.outputs.key }}
+        run: npm run test:integration
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup

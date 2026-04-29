@@ -22,6 +22,12 @@ import { useLocationFilter } from "@/contexts/LocationContext";
 import { formatCentsShort, parseDollarsToCents, centsToDollarString } from "@/lib/money";
 import { nextInvoiceNumber } from "@/lib/invoice";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
+import {
+  calculateSurchargeCents,
+  surchargeApplies,
+  DEFAULT_SURCHARGE_SETTINGS,
+  type SurchargeSettings,
+} from "@/lib/surcharge";
 
 type Item = {
   id: string;
@@ -50,7 +56,7 @@ export default function PosCart() {
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
   const [storeCreditInput, setStoreCreditInput] = useState("0.00");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "check" | "other" | "card" | "card_on_file">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "check" | "other" | "card" | "card_debit" | "card_on_file">("cash");
   const [notes, setNotes] = useState("");
   const [tab, setTab] = useState<"services" | "products" | "packages">("products");
 
@@ -150,6 +156,24 @@ export default function PosCart() {
     },
   });
 
+  // Surcharge config for this org. Falls back to the default off-state when no
+  // row exists, so an org without surcharge configured behaves exactly as before.
+  const { data: surchargeSettings = DEFAULT_SURCHARGE_SETTINGS } = useQuery<SurchargeSettings>({
+    queryKey: ["pos-surcharge-settings", orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("surcharge_settings")
+        .select(
+          "enabled, rate_basis_points, applies_to_credit_only, customer_notice_text, registered_with_card_networks",
+        )
+        .eq("organization_id", orgId!)
+        .is("deleted_at", null)
+        .maybeSingle();
+      return (data as SurchargeSettings | null) ?? DEFAULT_SURCHARGE_SETTINGS;
+    },
+  });
+
   const { data: taxRules = [] } = useQuery({
     queryKey: ["pos-tax-rules", orgId, locationId],
     enabled: !!orgId,
@@ -182,9 +206,31 @@ export default function PosCart() {
       selectedOwner?.store_credit_cents ?? 0,
       beforeCredit,
     );
-    const total = Math.max(0, beforeCredit - creditCents);
-    return { subtotal, discount, tax, creditCents, total };
-  }, [items, appliedPromo, taxRules, storeCreditInput, selectedOwner]);
+    // Pre-surcharge amount the customer is being charged.
+    const cardChargeable = Math.max(0, beforeCredit - creditCents);
+
+    // Surcharge applies only on the card portion. The UI distinguishes
+    // credit and debit; cash / check / other never surcharge.
+    const cardFunding =
+      paymentMethod === "card" || paymentMethod === "card_on_file"
+        ? "credit"
+        : paymentMethod === "card_debit"
+          ? "debit"
+          : null;
+    const surcharge = surchargeApplies({
+      settings: surchargeSettings,
+      payment_method: cardFunding ? "card" : (paymentMethod as string),
+      card_funding: cardFunding,
+    })
+      ? calculateSurchargeCents({
+          amount_cents: cardChargeable,
+          rate_basis_points: surchargeSettings.rate_basis_points,
+        })
+      : 0;
+
+    const total = cardChargeable + surcharge;
+    return { subtotal, discount, tax, creditCents, surcharge, total };
+  }, [items, appliedPromo, taxRules, storeCreditInput, selectedOwner, paymentMethod, surchargeSettings]);
 
   const addItem = (kind: "service" | "product" | "package", entity: any) => {
     const newItem: Item = {
@@ -279,6 +325,7 @@ export default function PosCart() {
         invoice_number: invoiceNumber,
         subtotal_cents: totals.subtotal,
         tax_cents: totals.tax,
+        surcharge_cents: totals.surcharge,
         total_cents: totals.total,
         amount_paid_cents: totals.total,
         cashier_user_id: user?.id ?? null,
@@ -290,19 +337,34 @@ export default function PosCart() {
       if (invErr) throw invErr;
 
       // Lines
-      const lineRows = items.map((i) => ({
+      const lineRows: any[] = items.map((i) => ({
         organization_id: orgId, invoice_id: inv.id,
         service_id: i.service_id,
         description: i.name, quantity: i.quantity,
         unit_price_cents: i.unit_price_cents,
         line_total_cents: i.line_total_cents,
+        line_type: "item",
       }));
+      if (totals.surcharge > 0) {
+        lineRows.push({
+          organization_id: orgId,
+          invoice_id: inv.id,
+          service_id: null,
+          description: "Credit-card surcharge",
+          quantity: 1,
+          unit_price_cents: totals.surcharge,
+          line_total_cents: totals.surcharge,
+          line_type: "surcharge",
+        });
+      }
       await supabase.from("invoice_lines").insert(lineRows);
 
       // Payment row (map UI methods to DB enum: card / card_on_file -> card, cash/check/other -> in_person)
       if (totals.total > 0) {
         const dbMethod: "card" | "in_person" =
-          paymentMethod === "card" || paymentMethod === "card_on_file" ? "card" : "in_person";
+          paymentMethod === "card" || paymentMethod === "card_debit" || paymentMethod === "card_on_file"
+            ? "card"
+            : "in_person";
         await supabase.from("payments").insert({
           organization_id: orgId!, invoice_id: inv.id,
           amount_cents: totals.total, currency,
@@ -506,10 +568,21 @@ export default function PosCart() {
               {totals.discount > 0 && <Row label="Discount" value={`−${formatCentsShort(totals.discount)}`} />}
               <Row label="Tax" value={formatCentsShort(totals.tax)} />
               {totals.creditCents > 0 && <Row label="Store credit" value={`−${formatCentsShort(totals.creditCents)}`} />}
+              {totals.surcharge > 0 && (
+                <Row
+                  label={`Surcharge (${(surchargeSettings.rate_basis_points / 100).toFixed(1)}%)`}
+                  value={formatCentsShort(totals.surcharge)}
+                />
+              )}
               <div className="flex justify-between pt-2 border-t border-border-subtle">
                 <span className="font-display text-base">Total</span>
                 <span className="font-display text-base font-semibold">{formatCentsShort(totals.total)}</span>
               </div>
+              {surchargeSettings.enabled && surchargeSettings.customer_notice_text && totals.surcharge > 0 && (
+                <p className="pt-1 text-[11px] text-text-tertiary">
+                  {surchargeSettings.customer_notice_text}
+                </p>
+              )}
             </div>
 
             {/* Payment method */}
@@ -525,7 +598,8 @@ export default function PosCart() {
                   )}
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="check">Check</SelectItem>
-                  <SelectItem value="card">Card (recorded)</SelectItem>
+                  <SelectItem value="card">Credit card (recorded)</SelectItem>
+                  <SelectItem value="card_debit">Debit card (recorded)</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>

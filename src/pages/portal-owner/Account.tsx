@@ -230,24 +230,44 @@ export default function OwnerAccount() {
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <Field label="First name">
             <Input
+              name="given-name"
+              autoComplete="given-name"
+              autoCapitalize="words"
               value={profileForm.first_name}
               onChange={(e) => setProfileForm({ ...profileForm, first_name: e.target.value })}
             />
           </Field>
           <Field label="Last name">
             <Input
+              name="family-name"
+              autoComplete="family-name"
+              autoCapitalize="words"
               value={profileForm.last_name}
               onChange={(e) => setProfileForm({ ...profileForm, last_name: e.target.value })}
             />
           </Field>
           <Field label="Email">
-            <Input value={profile?.email ?? ""} readOnly className="bg-muted/50" />
+            <Input
+              name="email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              autoCapitalize="off"
+              spellCheck={false}
+              value={profile?.email ?? ""}
+              readOnly
+              className="bg-muted/50"
+            />
             <p className="mt-1 text-xs text-muted-foreground">
               Contact {org?.name ?? "your provider"} to update your email
             </p>
           </Field>
           <Field label="Phone">
             <Input
+              name="tel"
+              type="tel"
+              autoComplete="tel"
+              inputMode="tel"
               value={profileForm.phone}
               onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
             />
@@ -284,21 +304,36 @@ export default function OwnerAccount() {
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <Field label="Street address" className="sm:col-span-2">
                 <Input
+                  name="street-address"
+                  autoComplete="street-address"
+                  autoCapitalize="words"
                   value={addr.street_address}
                   onChange={(e) => setAddr({ ...addr, street_address: e.target.value })}
                 />
               </Field>
               <Field label="City">
-                <Input value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
+                <Input
+                  name="address-level2"
+                  autoComplete="address-level2"
+                  autoCapitalize="words"
+                  value={addr.city}
+                  onChange={(e) => setAddr({ ...addr, city: e.target.value })}
+                />
               </Field>
               <Field label="State / Province">
                 <Input
+                  name="address-level1"
+                  autoComplete="address-level1"
+                  autoCapitalize="words"
                   value={addr.state_province}
                   onChange={(e) => setAddr({ ...addr, state_province: e.target.value })}
                 />
               </Field>
               <Field label="Postal code">
                 <Input
+                  name="postal-code"
+                  autoComplete="postal-code"
+                  autoCapitalize="characters"
                   value={addr.postal_code}
                   onChange={(e) => setAddr({ ...addr, postal_code: e.target.value })}
                 />

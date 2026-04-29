@@ -30,6 +30,11 @@ import { usePetFeeding } from "@/hooks/usePetFeeding";
 import VaccinationStatusBadge, {
   vaccinationRecordStatus,
 } from "@/components/portal-owner/VaccinationStatusBadge";
+import {
+  extensionFromPath,
+  slugifyForFilename,
+  withDownloadFilename,
+} from "@/lib/storage-download";
 
 function extractStoragePath(url: string | null): string | null {
   if (!url) return null;
@@ -38,10 +43,30 @@ function extractStoragePath(url: string | null): string | null {
   return m ? m[1].split("?")[0] : null;
 }
 
-function VaxDocLink({ value }: { value: string | null }) {
+function VaxDocLink({
+  value,
+  filenameHint,
+}: {
+  value: string | null;
+  filenameHint?: { petName?: string | null; vaccineType?: string | null; administeredOn?: string | null };
+}) {
   const [busy, setBusy] = useState(false);
   if (!value) return <span className="text-xs text-muted-foreground">No document uploaded</span>;
-  const open = async () => {
+
+  // Build a meaningful filename so a saved doc lands in the user's
+  // Files / Downloads folder as something they can recognize months
+  // later when their vet asks for it.
+  const filename = (() => {
+    const parts: string[] = [];
+    if (filenameHint?.petName) parts.push(slugifyForFilename(filenameHint.petName));
+    if (filenameHint?.vaccineType) parts.push(slugifyForFilename(filenameHint.vaccineType));
+    if (filenameHint?.administeredOn) parts.push(filenameHint.administeredOn);
+    if (parts.length === 0) parts.push("vaccination-document");
+    const ext = extensionFromPath(value, "pdf");
+    return `${parts.join("-")}.${ext}`;
+  })();
+
+  const openInline = async () => {
     const path = extractStoragePath(value);
     if (!path) return;
     setBusy(true);
@@ -55,15 +80,53 @@ function VaxDocLink({ value }: { value: string | null }) {
     }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
+
+  const downloadDoc = async () => {
+    const path = extractStoragePath(value);
+    if (!path) return;
+    setBusy(true);
+    const { data, error } = await supabase.storage
+      .from("vaccination-docs")
+      .createSignedUrl(path, 60);
+    setBusy(false);
+    if (error || !data?.signedUrl) {
+      toast.error("Could not download document");
+      return;
+    }
+    // Use a synthetic anchor so we can carry both the forced filename
+    // (via the URL's download param) AND the HTML download attribute,
+    // for browsers that respect the latter on cross-origin URLs only
+    // when paired with the former.
+    const url = withDownloadFilename(data.signedUrl, filename);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   return (
-    <button
-      type="button"
-      onClick={open}
-      disabled={busy}
-      className="inline-flex items-center gap-1 text-xs font-medium text-primary-hover hover:underline"
-    >
-      <FileText className="h-3.5 w-3.5" /> {busy ? "Opening…" : "View document"}
-    </button>
+    <span className="inline-flex items-center gap-2">
+      <button
+        type="button"
+        onClick={openInline}
+        disabled={busy}
+        className="inline-flex items-center gap-1 text-xs font-medium text-primary-hover hover:underline"
+      >
+        <FileText className="h-3.5 w-3.5" /> {busy ? "Opening…" : "View"}
+      </button>
+      <button
+        type="button"
+        onClick={downloadDoc}
+        disabled={busy}
+        className="inline-flex items-center gap-1 text-xs font-medium text-primary-hover hover:underline"
+        aria-label={`Download ${filename}`}
+      >
+        Download
+      </button>
+    </span>
   );
 }
 
@@ -420,7 +483,14 @@ export default function OwnerPetDetail() {
                       )}
                     </dl>
                     <div className="mt-2">
-                      <VaxDocLink value={v.document_url} />
+                      <VaxDocLink
+                        value={v.document_url}
+                        filenameHint={{
+                          petName: pet?.name,
+                          vaccineType: formatVaccineType(v.vaccine_type),
+                          administeredOn: v.administered_on,
+                        }}
+                      />
                     </div>
                   </div>
                   <div className="flex gap-1">

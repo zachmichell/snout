@@ -28,13 +28,17 @@ export function useStaffConversations() {
     queryKey: ["staff-conversations", orgId],
     enabled: !!orgId,
     queryFn: async () => {
+      // Cap: the staff inbox renders the most recent N threads. Orgs that
+      // grow past this need a search + pagination UI (tracked follow-up);
+      // until then the cap keeps the realtime refetch tractable.
       const { data: convs, error } = await supabase
         .from("conversations")
         .select(
           `id, organization_id, owner_id, last_message_at, last_message_preview, unread_staff, unread_owner`,
         )
         .eq("organization_id", orgId!)
-        .order("last_message_at", { ascending: false, nullsFirst: false });
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .limit(100);
       if (error) throw error;
       const ownerIds = Array.from(new Set((convs ?? []).map((c) => c.owner_id)));
       let ownersById: Record<string, ConversationRow["owner"]> = {};

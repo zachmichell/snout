@@ -7,11 +7,12 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, EyeOff, Plus, Pencil, Trash2, Shuffle } from "lucide-react";
+import { Plus, Pencil, Trash2, Shuffle } from "lucide-react";
 import {
   useStaffCodes,
   useCreateStaffCode,
   useUpdateStaffCode,
+  useUpdateStaffCodePin,
   useDeleteStaffCode,
   type StaffCode,
 } from "@/hooks/useStaffCodes";
@@ -34,11 +35,11 @@ export default function StaffCodesTab() {
   const { data: codes = [], isLoading } = useStaffCodes();
   const create = useCreateStaffCode();
   const update = useUpdateStaffCode();
+  const updatePin = useUpdateStaffCodePin();
   const remove = useDeleteStaffCode();
 
   const [editing, setEditing] = useState<StaffCode | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
 
   const [form, setForm] = useState({
     display_name: "",
@@ -52,9 +53,11 @@ export default function StaffCodesTab() {
     setShowForm(true);
   };
 
+  // Edit leaves PIN blank — PIN hashes live server-side now, so there's
+  // no plaintext to pre-fill. Filling it in and saving rotates the PIN.
   const openEdit = (c: StaffCode) => {
     setEditing(c);
-    setForm({ display_name: c.display_name, pin_code: c.pin_code, role: c.role });
+    setForm({ display_name: c.display_name, pin_code: "", role: c.role });
     setShowForm(true);
   };
 
@@ -63,13 +66,24 @@ export default function StaffCodesTab() {
       toast.error("Name is required");
       return;
     }
-    if (!/^\d{4,6}$/.test(form.pin_code)) {
-      toast.error("PIN must be 4-6 digits");
-      return;
+    // On create, PIN is required. On edit, empty PIN means "don't change".
+    const wantsPinChange = form.pin_code.length > 0;
+    if (!editing || wantsPinChange) {
+      if (!/^\d{4,6}$/.test(form.pin_code)) {
+        toast.error("PIN must be 4-6 digits");
+        return;
+      }
     }
     try {
       if (editing) {
-        await update.mutateAsync({ id: editing.id, ...form });
+        await update.mutateAsync({
+          id: editing.id,
+          display_name: form.display_name,
+          role: form.role,
+        });
+        if (wantsPinChange) {
+          await updatePin.mutateAsync({ id: editing.id, pin_code: form.pin_code });
+        }
         toast.success("Staff code updated");
       } else {
         await create.mutateAsync(form);
@@ -77,12 +91,7 @@ export default function StaffCodesTab() {
       }
       setShowForm(false);
     } catch (e: any) {
-      const msg = e?.message ?? "Failed to save";
-      if (msg.includes("duplicate")) {
-        toast.error("That PIN is already in use");
-      } else {
-        toast.error(msg);
-      }
+      toast.error(e?.message ?? "Failed to save");
     }
   };
 
@@ -143,17 +152,7 @@ export default function StaffCodesTab() {
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.display_name}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2 font-mono">
-                      <span>{revealed[c.id] ? c.pin_code : "••••"}</span>
-                      <button
-                        type="button"
-                        onClick={() => setRevealed((r) => ({ ...r, [c.id]: !r[c.id] }))}
-                        className="text-text-tertiary hover:text-foreground"
-                        aria-label="Toggle PIN visibility"
-                      >
-                        {revealed[c.id] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                      </button>
-                    </div>
+                    <span className="font-mono text-text-tertiary">••••</span>
                   </TableCell>
                   <TableCell className="capitalize">{c.role}</TableCell>
                   <TableCell>
@@ -195,7 +194,14 @@ export default function StaffCodesTab() {
               />
             </div>
             <div>
-              <Label htmlFor="pin">PIN (4-6 digits)</Label>
+              <Label htmlFor="pin">
+                PIN (4-6 digits)
+                {editing && (
+                  <span className="ml-2 text-xs font-normal text-text-tertiary">
+                    Leave blank to keep the current PIN
+                  </span>
+                )}
+              </Label>
               <div className="flex gap-2">
                 <Input
                   id="pin"

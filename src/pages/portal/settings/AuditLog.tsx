@@ -12,8 +12,42 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatDateTime } from "@/lib/money";
 import { downloadCsv, toCsv } from "@/lib/csv";
 
-const ACTIONS = ["created", "updated", "cancelled", "deleted", "checked_in", "checked_out", "paid", "refunded", "imported", "merged"];
-const ENTITIES = ["reservation", "invoice", "payment", "pet", "owner", "settings", "import", "merge", "service", "checkin", "checkout"];
+const ACTIONS = [
+  "created",
+  "updated",
+  "confirmed",
+  "cancelled",
+  "deleted",
+  "checked_in",
+  "checked_out",
+  "no_show",
+  "commented",
+  "uploaded",
+  "photo_uploaded",
+  "signed",
+  "paid",
+  "refunded",
+  "imported",
+  "merged",
+];
+const ENTITIES = [
+  "reservation",
+  "invoice",
+  "payment",
+  "pet",
+  "owner",
+  "vaccination",
+  "agreement",
+  "waiver_signature",
+  "document",
+  "settings",
+  "import",
+  "merge",
+  "service",
+  "checkin",
+  "checkout",
+];
+const ACTOR_KINDS = ["staff", "owner", "system"];
 
 export default function AuditLog() {
   const { membership } = useAuth();
@@ -21,6 +55,7 @@ export default function AuditLog() {
   const [action, setAction] = useState<string>("all");
   const [entity, setEntity] = useState<string>("all");
   const [actorId, setActorId] = useState<string>("all");
+  const [actorKind, setActorKind] = useState<string>("all");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
 
@@ -38,7 +73,7 @@ export default function AuditLog() {
   });
 
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["audit-log", orgId, action, entity, actorId, from, to],
+    queryKey: ["audit-log", orgId, action, entity, actorId, actorKind, from, to],
     enabled: !!orgId,
     queryFn: async () => {
       let q = supabase
@@ -54,7 +89,15 @@ export default function AuditLog() {
       if (to) q = q.lte("created_at", new Date(to + "T23:59:59").toISOString());
       const { data, error } = await q;
       if (error) throw error;
-      return data ?? [];
+      // metadata.actor_kind lives in jsonb so the filter happens client-side
+      // until we promote actor_kind to a top-level column.
+      let filtered = data ?? [];
+      if (actorKind !== "all") {
+        filtered = filtered.filter(
+          (r: any) => (r.metadata?.actor_kind ?? "system") === actorKind,
+        );
+      }
+      return filtered;
     },
   });
 
@@ -62,7 +105,7 @@ export default function AuditLog() {
     const csv = toCsv(
       rows.map((r: any) => ({
         timestamp: r.created_at,
-        actor: r.profiles ? `${r.profiles.first_name ?? ""} ${r.profiles.last_name ?? ""}`.trim() || r.profiles.email : "system",
+        actor: actorDisplay(r),
         action: r.action,
         entity_type: r.entity_type,
         entity_id: r.entity_id ?? "",
@@ -102,6 +145,16 @@ export default function AuditLog() {
                 <SelectContent>
                   <SelectItem value="all">All entities</SelectItem>
                   {ENTITIES.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold text-text-secondary">Actor type</label>
+              <Select value={actorKind} onValueChange={setActorKind}>
+                <SelectTrigger className="w-36 bg-background"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Anyone</SelectItem>
+                  {ACTOR_KINDS.map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -152,7 +205,7 @@ export default function AuditLog() {
                     <tr key={r.id} className="border-t border-border-subtle hover:bg-background">
                       <td className="px-[18px] py-[14px] whitespace-nowrap text-text-secondary">{formatDateTime(r.created_at)}</td>
                       <td className="px-[18px] py-[14px] text-text-secondary">
-                        {r.profiles ? (`${r.profiles.first_name ?? ""} ${r.profiles.last_name ?? ""}`.trim() || r.profiles.email) : <span className="text-text-tertiary">system</span>}
+                        {actorDisplayElement(r)}
                       </td>
                       <td className="px-[18px] py-[14px]">
                         <span className="inline-flex items-center rounded-pill bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary capitalize">
@@ -176,4 +229,23 @@ export default function AuditLog() {
       </div>
     </PortalLayout>
   );
+}
+
+function actorDisplay(row: any): string {
+  // Prefer a joined profile (the staff who acted under their org-level
+  // session), fall back to the actor_label captured in metadata (which is
+  // the active staff PIN or 'Owner' or 'System' from useLogActivity).
+  if (row.profiles) {
+    const name = `${row.profiles.first_name ?? ""} ${row.profiles.last_name ?? ""}`.trim();
+    return name || row.profiles.email || "Staff";
+  }
+  return row.metadata?.actor_label ?? "System";
+}
+
+function actorDisplayElement(row: any) {
+  const text = actorDisplay(row);
+  if (!row.profiles && !row.metadata?.actor_label) {
+    return <span className="text-text-tertiary">system</span>;
+  }
+  return text;
 }

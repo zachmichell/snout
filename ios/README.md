@@ -1,0 +1,156 @@
+# Snout iOS
+
+Native iOS app for Snout pet parents. Lives in this monorepo so the iOS Xcode build and the existing React/Supabase web app share a single source of truth: the Postgres schema, the edge functions, the design tokens, and the parity log.
+
+## First-time setup
+
+1. **Open this directory in Claude Code.** Run `claude` from `/Users/zachmichell/fella-fetch-hub`. The CLI session can read both the iOS sources here and the web sources at the repo root, which is exactly the cross-app awareness the project depends on.
+2. **Create the Xcode project.** From this directory: `File > New > Project` in Xcode, choose iOS App, name `Snout`, organization `Snout`, interface SwiftUI, language Swift, save inside `ios/`. The result lives at `ios/Snout.xcodeproj`.
+3. **Read `../docs/IOS_APP_SPEC.md` end to end.** It is the authoritative handoff document.
+4. **Read `../docs/SHARED_LOGIC.md`.** This is the convention for keeping web and iOS code in sync over time.
+5. **Skim `../docs/PARITY_LOG.md`.** It tells you which helpers are already shared and which are pending.
+
+## Dependencies to add via Swift Package Manager
+
+In Xcode, `File > Add Package Dependencies`:
+
+- `https://github.com/supabase-community/supabase-swift` (Auth, PostgREST, Realtime, Storage, Functions)
+- `https://github.com/firebase/firebase-ios-sdk` (only the `FirebaseMessaging` product, for FCM-bridged APNS push)
+
+Native frameworks (no SPM needed): `AVKit`, `WebKit`, `UserNotifications`, `AuthenticationServices`.
+
+## Configuration
+
+Add to `Snout/Resources/Config.plist` (gitignored, do not commit):
+
+```xml
+<plist version="1.0">
+<dict>
+    <key>SUPABASE_URL</key>
+    <string>https://empdnuzfjgfnphwauhah.supabase.co</string>
+    <key>SUPABASE_ANON_KEY</key>
+    <string>YOUR_ANON_KEY_HERE</string>
+</dict>
+</plist>
+```
+
+Add a `Config.example.plist` (committed) with placeholder values so a new dev knows what's expected.
+
+For Firebase: add the `GoogleService-Info.plist` from the Firebase console for the iOS app. Also gitignored.
+
+## Running
+
+- Simulator: select an iPhone simulator and Cmd+R.
+- Device: enable developer mode, plug in, select the device, Cmd+R. First run will require Apple Developer team selection in Signing & Capabilities.
+- TestFlight builds: Archive in Xcode, upload via Organizer, distribute via App Store Connect.
+
+## Project layout (target state, not initial scaffold)
+
+```
+ios/
+  README.md                       # This file
+  Snout.xcodeproj/                # Xcode project
+  Snout/                          # App target
+    SnoutApp.swift                # @main entry point; SupabaseClient bootstrap
+    AppDelegate.swift             # Push registration callbacks
+    Models/
+      Profile.swift
+      Owner.swift
+      Pet.swift
+      Reservation.swift
+      ReportCard.swift
+      Webcam.swift
+      Conversation.swift
+      Message.swift
+    Services/
+      SupabaseClient.swift        # Singleton wrapper
+      AuthService.swift           # Sign in / out, Apple Sign In
+      PushService.swift           # APNS + FCM registration
+      DownloadService.swift       # Signed URL fetch + UIActivityViewController
+    Views/
+      RootView.swift              # Auth-gated top level
+      Auth/
+        SignInView.swift
+      Dashboard/
+        DashboardView.swift
+        EnableNotificationsCard.swift
+      Reservations/
+        ReservationListView.swift
+        ReservationDetailView.swift
+      ReportCards/
+        ReportCardListView.swift
+        ReportCardDetailView.swift
+        PhotoLightboxView.swift
+      Webcams/
+        WebcamListView.swift
+        WebcamPlayerView.swift   # AVPlayerViewController for hls/mp4
+      Messages/
+        ConversationListView.swift
+        ConversationView.swift
+    Utilities/
+      StorageDownload.swift       # Port of src/lib/storage-download.ts
+      DateFormatting.swift
+      MoneyFormatting.swift
+      ActivityKit/
+        ReservationActivity.swift # Live Activity attributes
+    Resources/
+      Assets.xcassets/
+      Info.plist
+      Config.example.plist
+  SnoutTests/
+    StorageDownloadTests.swift    # Parity contract: src/lib/__tests__/storage-download.test.ts
+    DateFormattingTests.swift
+    MoneyFormattingTests.swift
+  SnoutUITests/
+    DashboardUITests.swift
+```
+
+## Sign in with Apple
+
+Required by Apple when offering third-party sign-in. Configuration:
+
+1. In Xcode, target Capabilities, add "Sign in with Apple".
+2. In the Apple Developer console, create a Services ID, link to your bundle id, configure return URL.
+3. In Supabase dashboard, Auth > Providers > Apple, paste Services ID, Team ID, Key ID, and the .p8 private key contents.
+4. In `AuthService.swift`, call `supabase.auth.signInWithIdToken(provider: .apple, idToken: appleIdToken, nonce: nonce)`.
+
+## Push notifications
+
+iOS uses APNS, but our backend speaks FCM (which bridges to APNS automatically). The flow:
+
+1. Request notification permission via `UNUserNotificationCenter.requestAuthorization`.
+2. Register for remote notifications via `UIApplication.shared.registerForRemoteNotifications()`.
+3. In `application(_:didRegisterForRemoteNotificationsWithDeviceToken:)`, call `Messaging.messaging().apnsToken = deviceToken`.
+4. In `MessagingDelegate.messaging(_:didReceiveRegistrationToken:)`, POST the FCM token to the `register-device-token` edge function with the user's bearer token.
+5. In `UNUserNotificationCenterDelegate.userNotificationCenter(_:didReceive:withCompletionHandler:)`, route the user to the screen named in `userInfo["url"]`.
+
+The `register-device-token` edge function does not exist yet. It's part of the iOS-push-bridge batch the backend team will add when iOS push needs to actually deliver. Until then, registration succeeds locally but pushes won't fan out.
+
+## Brand and design
+
+Pull design tokens from the web app:
+
+- **Accent color hex:** see `tailwind.config.ts` `colors.accent.DEFAULT` in the repo root.
+- **Typography:** Forma DJR for display headings, SF Pro Text for body. Add Forma DJR via Info.plist `UIAppFonts` once licensing is confirmed; fall back to SF Pro Display until then.
+- **Corner radii:** card 8pt, tile 16pt, hero 20pt.
+- **Spacing scale:** 4 / 8 / 12 / 16 / 24 / 32. Mirror the web's Tailwind spacing.
+
+## What lives outside this directory
+
+- The Postgres schema (in `supabase/migrations/` at the repo root) is authoritative for both apps.
+- Edge functions (in `supabase/functions/` at the repo root) are called by both apps.
+- Pure-logic helpers in `src/lib/` have iOS counterparts in `ios/Snout/Utilities/` and pair via `docs/PARITY_LOG.md`.
+
+When you add a new database table, migration, or edge function, do it from the repo root via the `supabase` CLI or the Supabase MCP. The change shows up on both sides automatically.
+
+## What lives only here
+
+- SwiftUI views.
+- iOS-specific routing and navigation.
+- ActivityKit Live Activities.
+- AVKit video players.
+- Anything UIKit / SwiftUI specific.
+
+## When in doubt
+
+Read `../docs/IOS_APP_SPEC.md` again. If the answer isn't there, it's an open question that should be resolved with the team before assuming.

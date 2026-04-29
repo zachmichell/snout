@@ -3,6 +3,7 @@ import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { speciesIcon } from "@/lib/format";
+import { logActivity } from "@/lib/activity";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
@@ -47,6 +48,29 @@ export default function PetPhotoUpload({
         .update({ photo_url: url })
         .eq("id", petId);
       if (updErr) throw updErr;
+
+      try {
+        const { data: pet } = await supabase
+          .from("pets")
+          .select("name")
+          .eq("id", petId)
+          .maybeSingle();
+        await logActivity({
+          organization_id: organizationId,
+          action: "photo_uploaded",
+          entity_type: "pet",
+          entity_id: petId,
+          metadata: {
+            pet_id: petId,
+            pet_name: pet?.name ?? null,
+            summary: `${pet?.name ?? "Pet"}: photo uploaded`,
+          },
+          actor: { kind: "owner", label: "Owner" },
+        });
+      } catch (logErr) {
+        console.warn("activity_log write failed", logErr);
+      }
+
       onUploaded(url);
       toast.success("Photo updated");
     } catch (e: any) {

@@ -19,10 +19,10 @@ export default function LocationSwitcher() {
   return (
     <Select value={selectedLocationId} onValueChange={(v) => setSelectedLocationId(v as any)}>
       <SelectTrigger
-        className="h-9 w-[200px] gap-2 bg-card text-sm"
+        className="h-9 w-full gap-2 border-sidebar-border bg-sidebar-accent/40 text-sidebar-foreground text-sm hover:bg-sidebar-accent"
         aria-label="Select location"
       >
-        <MapPin className="h-3.5 w-3.5 text-text-secondary" />
+        <MapPin className="h-3.5 w-3.5 text-sidebar-foreground/70" />
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

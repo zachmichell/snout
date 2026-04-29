@@ -21,6 +21,7 @@ const SOURCES = [
   { value: "reservations", label: "Reservations" },
   { value: "invoices", label: "Invoices" },
   { value: "grooming", label: "Grooming Appointments" },
+  { value: "memberships", label: "Memberships (started or cancelled)" },
 ];
 
 const DIMENSIONS_BY_SOURCE: Record<string, { value: string; label: string }[]> = {
@@ -40,6 +41,13 @@ const DIMENSIONS_BY_SOURCE: Record<string, { value: string; label: string }[]> =
     { value: "groomer", label: "Groomer" },
     { value: "status", label: "Status" },
   ],
+  memberships: [
+    { value: "date", label: "Date" },
+    { value: "event", label: "Event (started or cancelled)" },
+    { value: "package", label: "Package" },
+    { value: "owner", label: "Owner" },
+    { value: "status", label: "Current status" },
+  ],
 };
 
 const METRICS_BY_SOURCE: Record<string, { value: string; label: string }[]> = {
@@ -57,6 +65,9 @@ const METRICS_BY_SOURCE: Record<string, { value: string; label: string }[]> = {
     { value: "revenue", label: "Revenue" },
     { value: "tips", label: "Tips" },
     { value: "duration", label: "Duration (min)" },
+  ],
+  memberships: [
+    { value: "count", label: "Count" },
   ],
 };
 
@@ -290,6 +301,7 @@ async function runReport(orgId: string, config: ReportConfig, range: DateRange):
   if (config.source === "reservations") return runReservations(orgId, config, range);
   if (config.source === "invoices") return runInvoices(orgId, config, range);
   if (config.source === "grooming") return runGrooming(orgId, config, range);
+  if (config.source === "memberships") return runMemberships(orgId, config, range);
   return [];
 }
 
@@ -367,6 +379,66 @@ async function runGrooming(orgId: string, c: ReportConfig, range: DateRange) {
     })),
     c,
   );
+}
+
+async function runMemberships(orgId: string, c: ReportConfig, range: DateRange) {
+  // The owner_subscriptions table records purchase time but does not have a
+  // dedicated cancelled_at column. We approximate "cancelled in range" by
+  // (status = 'cancelled' AND updated_at in range AND not equal to purchase
+  // time). Each subscription can emit up to two synthetic rows: one for the
+  // start event, one for the cancel event.
+  const [subs, packages, owners] = await Promise.all([
+    supabase
+      .from("owner_subscriptions")
+      .select("id, owner_id, package_id, status, purchased_at, updated_at")
+      .eq("organization_id", orgId)
+      .limit(10000),
+    supabase.from("subscription_packages").select("id, name").eq("organization_id", orgId),
+    supabase.from("owners").select("id, first_name, last_name").eq("organization_id", orgId),
+  ]);
+  const pkgMap = new Map((packages.data ?? []).map((p: any) => [p.id, p.name]));
+  const ownerMap = new Map(
+    (owners.data ?? []).map((o: any) => [o.id, `${o.first_name} ${o.last_name}`]),
+  );
+
+  const fromMs = range.from.getTime();
+  const toMs = range.to.getTime();
+  const inRange = (iso: string | null) => {
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    return t >= fromMs && t <= toMs;
+  };
+
+  const events: Array<Record<string, any>> = [];
+  for (const s of (subs.data ?? []) as any[]) {
+    const pkg = s.package_id ? pkgMap.get(s.package_id) ?? "—" : "—";
+    const owner = s.owner_id ? ownerMap.get(s.owner_id) ?? "—" : "—";
+
+    if (inRange(s.purchased_at)) {
+      events.push({
+        date: dayKey(new Date(s.purchased_at)),
+        event: "started",
+        package: pkg,
+        owner,
+        status: s.status,
+      });
+    }
+    if (
+      s.status === "cancelled" &&
+      inRange(s.updated_at) &&
+      // Don't double-count when a subscription was cancelled at purchase time.
+      (!s.purchased_at || new Date(s.updated_at).getTime() !== new Date(s.purchased_at).getTime())
+    ) {
+      events.push({
+        date: dayKey(new Date(s.updated_at)),
+        event: "cancelled",
+        package: pkg,
+        owner,
+        status: s.status,
+      });
+    }
+  }
+  return aggregate(events, c);
 }
 
 function aggregate(rows: any[], c: ReportConfig): Record<string, any>[] {

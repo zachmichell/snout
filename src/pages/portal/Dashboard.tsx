@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import PortalLayout from "@/components/portal/PortalLayout";
 import { useAuth } from "@/hooks/useAuth";
+import { useActiveStaff } from "@/contexts/StaffCodeContext";
 import { greeting } from "@/lib/timezones";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocationFilter } from "@/contexts/LocationContext";
@@ -33,6 +34,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { createInvoiceForReservation } from "@/lib/invoice";
+import { tryConsumeCredits, formatCreditsUsed } from "@/lib/credits";
+import { useLogActivity } from "@/hooks/useLogActivity";
+import { reservationLabel, serviceLabel } from "@/components/portal/ReservationCells";
+import { AddOnDialog } from "@/components/portal/AddOnDialog";
+import { RecentCustomerUploads } from "@/components/portal/RecentCustomerUploads";
+import { Plus } from "lucide-react";
 import { formatTime } from "@/lib/money";
 
 const TZ = "America/Edmonton";
@@ -57,22 +64,71 @@ function isSameDay(a: Date, b: Date) {
 
 type Row = {
   id: string;
+  organization_id: string;
+  location_id: string | null;
+  primary_owner_id: string | null;
   start_at: string;
   end_at: string;
   status: string;
   checked_in_at: string | null;
   checked_out_at: string | null;
+  suite_id: string | null;
+  parent_reservation_id: string | null;
   services: { name: string | null; module: string | null } | null;
-  owners: { id: string; first_name: string | null; last_name: string | null } | null;
-  reservation_pets: { pets: { id: string; name: string | null } | null }[];
+  owners: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    daycare_full_day_credits: number | null;
+    daycare_half_day_credits: number | null;
+    boarding_night_credits: number | null;
+  } | null;
+  suites: { name: string | null } | null;
+  reservation_pets: { pets: { id: string; name: string | null; breed: string | null; photo_url: string | null } | null }[];
+  add_ons: Array<{ id: string; services: { name: string | null; module: string | null } | null }> | null;
 };
 
 type DrillKey = "arriving" | "departing" | "overnight" | "onsite" | null;
 
+/**
+ * Fetch reservations whose schedule overlaps a given day-range.
+ * Used twice in Dashboard: once for the date being viewed (drives KPIs +
+ * drill-downs) and once for today (drives the operational tables, which stay
+ * pinned to current state regardless of the date picker).
+ */
+async function fetchDashboardRange(
+  rangeStart: Date,
+  rangeEnd: Date,
+  locationId: string | null | undefined,
+): Promise<Row[]> {
+  let q = supabase
+    .from("reservations")
+    .select(
+      `id, organization_id, location_id, primary_owner_id, start_at, end_at, status, checked_in_at, checked_out_at, suite_id, parent_reservation_id,
+       services:service_id(name, module),
+       owners:primary_owner_id(id, first_name, last_name, daycare_full_day_credits, daycare_half_day_credits, boarding_night_credits),
+       suites:suite_id(name),
+       reservation_pets(pets(id, name, breed, photo_url)),
+       add_ons:reservations!parent_reservation_id(id, services:service_id(name, module))`,
+    )
+    .is("deleted_at", null)
+    .is("parent_reservation_id", null)
+    .or(
+      `and(start_at.gte.${rangeStart.toISOString()},start_at.lte.${rangeEnd.toISOString()}),and(checked_in_at.lte.${rangeEnd.toISOString()},or(checked_out_at.is.null,checked_out_at.gte.${rangeStart.toISOString()})),and(end_at.gte.${rangeStart.toISOString()},end_at.lte.${rangeEnd.toISOString()})`,
+    )
+    .order("start_at", { ascending: true });
+  if (locationId) q = q.eq("location_id", locationId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as unknown as Row[];
+}
+
 export default function Dashboard() {
-  const { profile, user } = useAuth();
+  const { profile, user, membership } = useAuth();
+  const { activeStaff } = useActiveStaff();
   const qc = useQueryClient();
   const locationId = useLocationFilter();
+  const log = useLogActivity();
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [drill, setDrill] = useState<DrillKey>(null);
@@ -83,34 +139,36 @@ export default function Dashboard() {
   const dayStart = startOfDay(selectedDate);
   const dayEnd = endOfDay(selectedDate);
 
+  // "today" is captured once on mount. The tables below the KPIs always reflect
+  // today's operational state regardless of which date the picker is on; only
+  // the KPI cards and drill panels follow the picker.
+  const todayBase = useMemo(() => new Date(), []);
+  const todayStart = useMemo(() => startOfDay(todayBase), [todayBase]);
+  const todayEnd = useMemo(() => endOfDay(todayBase), [todayBase]);
+
+  // KPI / drill-down dataset (selected date)
   const { data: rows = [] } = useQuery({
     queryKey: ["dashboard-day", locationId, dayStart.toISOString()],
-    queryFn: async () => {
-      let q = supabase
-        .from("reservations")
-        .select(
-          `id, start_at, end_at, status, checked_in_at, checked_out_at,
-           services:service_id(name, module),
-           owners:primary_owner_id(id, first_name, last_name),
-           reservation_pets(pets(id, name))`,
-        )
-        .is("deleted_at", null)
-        .or(
-          `and(start_at.gte.${dayStart.toISOString()},start_at.lte.${dayEnd.toISOString()}),and(checked_in_at.lte.${dayEnd.toISOString()},or(checked_out_at.is.null,checked_out_at.gte.${dayStart.toISOString()})),and(end_at.gte.${dayStart.toISOString()},end_at.lte.${dayEnd.toISOString()})`,
-        )
-        .order("start_at", { ascending: true });
-      if (locationId) q = q.eq("location_id", locationId);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as unknown as Row[];
-    },
+    queryFn: () => fetchDashboardRange(dayStart, dayEnd, locationId),
   });
 
-  // Apply module filter to all rows first
+  // Operational dataset for the tables (always today). When the picker is on
+  // today, both queries share a key and React Query dedupes — no extra fetch.
+  const { data: todayRows = [] } = useQuery({
+    queryKey: ["dashboard-day", locationId, todayStart.toISOString()],
+    queryFn: () => fetchDashboardRange(todayStart, todayEnd, locationId),
+  });
+
+  // Apply module filter pill to both datasets (filter affects KPIs *and* tables)
   const filteredRows = useMemo(() => {
     if (moduleFilter === "all") return rows;
     return rows.filter((r) => r.services?.module === moduleFilter);
   }, [rows, moduleFilter]);
+
+  const todayFilteredRows = useMemo(() => {
+    if (moduleFilter === "all") return todayRows;
+    return todayRows.filter((r) => r.services?.module === moduleFilter);
+  }, [todayRows, moduleFilter]);
 
   // Apply search term across pet + owner names
   const searchFilter = (list: Row[]) => {
@@ -123,6 +181,7 @@ export default function Dashboard() {
     });
   };
 
+  // Selected-date aggregates → power KPI cards + drill-down panels
   const expectedAll = useMemo(
     () =>
       filteredRows.filter(
@@ -167,11 +226,56 @@ export default function Dashboard() {
     [filteredRows, dayStart, dayEnd],
   );
 
-  // Search-filtered versions for the tabs (counts in tab labels reflect search)
-  const expected = useMemo(() => searchFilter(expectedAll), [expectedAll, searchTerm]);
-  const checkedIn = useMemo(() => searchFilter(checkedInAll), [checkedInAll, searchTerm]);
-  const goingHome = useMemo(() => searchFilter(goingHomeAll), [goingHomeAll, searchTerm]);
-  const requested = useMemo(() => searchFilter(requestedAll), [requestedAll, searchTerm]);
+  // Today-pinned aggregates → power the operational tables below the KPIs
+  const todayExpectedAll = useMemo(
+    () =>
+      todayFilteredRows.filter(
+        (r) =>
+          r.status === "confirmed" &&
+          new Date(r.start_at) >= todayStart &&
+          new Date(r.start_at) <= todayEnd,
+      ),
+    [todayFilteredRows, todayStart, todayEnd],
+  );
+
+  const todayCheckedInAll = useMemo(
+    () =>
+      todayFilteredRows.filter(
+        (r) =>
+          r.status === "checked_in" &&
+          (!r.checked_in_at || new Date(r.checked_in_at) <= todayEnd) &&
+          (!r.checked_out_at || new Date(r.checked_out_at) >= todayStart),
+      ),
+    [todayFilteredRows, todayStart, todayEnd],
+  );
+
+  const todayGoingHomeAll = useMemo(
+    () =>
+      todayFilteredRows.filter(
+        (r) =>
+          r.status === "checked_in" &&
+          new Date(r.end_at) >= todayStart &&
+          new Date(r.end_at) <= todayEnd,
+      ),
+    [todayFilteredRows, todayStart, todayEnd],
+  );
+
+  const todayRequestedAll = useMemo(
+    () =>
+      todayFilteredRows.filter(
+        (r) =>
+          r.status === "requested" &&
+          new Date(r.start_at) >= todayStart &&
+          new Date(r.start_at) <= todayEnd,
+      ),
+    [todayFilteredRows, todayStart, todayEnd],
+  );
+
+  // Search-filtered versions for the tabs (always today-based)
+  const expected = useMemo(() => searchFilter(todayExpectedAll), [todayExpectedAll, searchTerm]);
+  const checkedIn = useMemo(() => searchFilter(todayCheckedInAll), [todayCheckedInAll, searchTerm]);
+  const goingHome = useMemo(() => searchFilter(todayGoingHomeAll), [todayGoingHomeAll, searchTerm]);
+  const requested = useMemo(() => searchFilter(todayRequestedAll), [todayRequestedAll, searchTerm]);
 
   // Counters use the (unsearched) filtered totals so KPIs reflect day+module
   const arrivingCount = expectedAll.length;
@@ -203,12 +307,20 @@ export default function Dashboard() {
         })
         .eq("id", id);
       if (error) throw error;
+      if (membership?.organization_id) {
+        await log({
+          organization_id: membership.organization_id,
+          action: "checked_in",
+          entity_type: "reservation",
+          entity_id: id,
+        });
+      }
     },
     onSuccess: () => {
-      toast.success("Checked in");
+      toast.success("Checked in. Pet is on site.");
       invalidate();
     },
-    onError: (e: any) => toast.error(e.message ?? "Check-in failed"),
+    onError: () => toast.error("Couldn't check in. Try again."),
   });
 
   const checkOutMut = useMutation({
@@ -222,56 +334,102 @@ export default function Dashboard() {
         })
         .eq("id", id);
       if (error) throw error;
+      if (membership?.organization_id) {
+        await log({
+          organization_id: membership.organization_id,
+          action: "checked_out",
+          entity_type: "reservation",
+          entity_id: id,
+        });
+      }
       return id;
     },
     onSuccess: async (id) => {
-      toast.success("Checked out");
       invalidate();
       try {
+        // Try to consume credits first. If the owner has enough, no invoice
+        // is created — this is the common path for daycare/boarding regulars.
+        const actor = activeStaff
+          ? { kind: "staff" as const, label: activeStaff.display_name || "Staff", staffCodeId: activeStaff.id }
+          : profile
+            ? {
+                kind: "staff" as const,
+                label:
+                  [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
+                  profile.email ||
+                  "Staff",
+              }
+            : { kind: "system" as const, label: "System" };
+        const result = await tryConsumeCredits(id, actor);
+        if (result.used) {
+          toast.success(`Checked out. Used ${formatCreditsUsed(result.creditsUsed)}.`);
+          return;
+        }
+        // Fall back to invoicing for: services (grooming/training), owners
+        // without sufficient credits, or no owner on the reservation.
         const inv = await createInvoiceForReservation(id);
         if (!inv.alreadyExisted) {
-          toast.success(`Invoice ${inv.invoice_number ?? ""} created`, {
+          toast.success(`Checked out. Invoice ${inv.invoice_number ?? ""} ready.`, {
             action: {
               label: "View",
               onClick: () => window.location.assign(`/invoices/${inv.id}`),
             },
           });
+        } else {
+          toast.success("Checked out.");
         }
         qc.invalidateQueries({ queryKey: ["invoices-list"] });
-      } catch (e: any) {
-        toast.error(`Invoice creation failed: ${e.message ?? "unknown"}`);
+      } catch {
+        toast.error("Checked out, but couldn't process credits or invoice. Try again or invoice manually.");
       }
     },
-    onError: (e: any) => toast.error(e.message ?? "Check-out failed"),
+    onError: () => toast.error("Couldn't check out. Try again."),
   });
 
   const approveMut = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("reservations").update({ status: "confirmed" }).eq("id", id);
       if (error) throw error;
+      if (membership?.organization_id) {
+        await log({
+          organization_id: membership.organization_id,
+          action: "confirmed",
+          entity_type: "reservation",
+          entity_id: id,
+        });
+      }
     },
     onSuccess: () => {
-      toast.success("Reservation approved");
+      toast.success("Approved.");
       invalidate();
     },
-    onError: (e: any) => toast.error(e.message ?? "Approval failed"),
+    onError: () => toast.error("Couldn't approve. Try again."),
   });
 
   const declineMut = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", id);
       if (error) throw error;
+      if (membership?.organization_id) {
+        await log({
+          organization_id: membership.organization_id,
+          action: "cancelled",
+          entity_type: "reservation",
+          entity_id: id,
+          metadata: { reason: "Request declined" },
+        });
+      }
     },
     onSuccess: () => {
-      toast.success("Reservation declined");
+      toast.success("Declined.");
       invalidate();
     },
-    onError: (e: any) => toast.error(e.message ?? "Decline failed"),
+    onError: () => toast.error("Couldn't decline. Try again."),
   });
 
   const [quickOpen, setQuickOpen] = useState(false);
 
-  const firstName = profile?.first_name || "there";
+  const firstName = profile?.first_name || "";
   const dateLabel = selectedDate.toLocaleDateString("en-CA", {
     weekday: "long",
     month: "long",
@@ -279,15 +437,21 @@ export default function Dashboard() {
     year: "numeric",
     timeZone: "America/Regina",
   });
-  const shortDateLabel = selectedDate.toLocaleDateString("en-CA", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    timeZone: "America/Regina",
-  });
-
   const today = new Date();
   const isToday = isSameDay(selectedDate, today);
+
+  // Subtitle always reflects today — it describes the current state of the
+  // building, not the date being viewed in the KPI cards above.
+  const subtitle = (() => {
+    const todayOnSite = todayCheckedInAll.length;
+    const todayRequests = todayRequestedAll.length;
+    const inPackText = `${todayOnSite} in the pack`;
+    if (todayRequests > 0) {
+      const reqText = `${todayRequests} request${todayRequests === 1 ? "" : "s"} waiting`;
+      return todayOnSite > 0 ? `${reqText} · ${inPackText}` : reqText;
+    }
+    return todayOnSite > 0 ? `All caught up. ${inPackText}.` : "All caught up.";
+  })();
 
   const shiftDay = (delta: number) => {
     const d = new Date(selectedDate);
@@ -297,10 +461,10 @@ export default function Dashboard() {
   };
 
   const kpis: { key: Exclude<DrillKey, null>; label: string; value: number; bar: string; bg: string }[] = [
-    { key: "arriving", label: "Arriving", value: arrivingCount, bar: "bg-success", bg: "bg-brand-mist-bg" },
-    { key: "departing", label: "Departing", value: departingCount, bar: "bg-teal", bg: "bg-brand-frost-bg" },
-    { key: "overnight", label: "Overnight", value: overnightCount, bar: "bg-plum", bg: "bg-brand-cotton-bg" },
-    { key: "onsite", label: "Total On Site", value: onSiteCount, bar: "bg-primary", bg: "bg-brand-vanilla-bg" },
+    { key: "arriving", label: "Coming In", value: arrivingCount, bar: "bg-success", bg: "bg-brand-mist-bg" },
+    { key: "departing", label: "Going Home", value: departingCount, bar: "bg-teal", bg: "bg-brand-frost-bg" },
+    { key: "overnight", label: "Sleeping Over", value: overnightCount, bar: "bg-plum", bg: "bg-brand-cotton-bg" },
+    { key: "onsite", label: "In The Pack", value: onSiteCount, bar: "bg-primary", bg: "bg-brand-vanilla-bg" },
   ];
 
   const toggleDrill = (k: Exclude<DrillKey, null>) => setDrill((cur) => (cur === k ? null : k));
@@ -310,10 +474,10 @@ export default function Dashboard() {
       <div className="px-8 py-6">
         <header className="mb-5">
           <h1 className="font-display text-2xl text-foreground">
-            {greeting()}, {firstName}
+            {greeting()}{firstName ? `, ${firstName}` : ""}
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            {shortDateLabel} · {arrivingCount} arriving · {onSiteCount} on site
+            {subtitle}
           </p>
         </header>
 
@@ -360,6 +524,8 @@ export default function Dashboard() {
           </Popover>
         </div>
 
+        <RecentCustomerUploads />
+
         {/* Daily Summary */}
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((k) => {
@@ -398,10 +564,10 @@ export default function Dashboard() {
           <section className="mb-6 animate-fade-in overflow-hidden rounded-lg border border-border bg-surface shadow-card">
             <div className="flex items-center justify-between border-b border-border-subtle px-5 py-3">
               <h2 className="font-display text-base font-semibold text-foreground">
-                {drill === "arriving" && "Arriving"}
-                {drill === "departing" && "Departing"}
-                {drill === "overnight" && "Overnight Boarders"}
-                {drill === "onsite" && "Total On Site"}
+                {drill === "arriving" && "Coming In Today"}
+                {drill === "departing" && "Going Home Today"}
+                {drill === "overnight" && "Sleeping Over Tonight"}
+                {drill === "onsite" && "In The Pack Now"}
               </h2>
               <Button variant="ghost" size="sm" onClick={() => setDrill(null)} className="gap-1">
                 <X className="h-3.5 w-3.5" />
@@ -411,36 +577,40 @@ export default function Dashboard() {
             {drill === "arriving" && (
               <GroupedTable
                 rows={expectedAll}
-                emptyText="No arrivals for this day"
-                columns={["Pet", "Owner", "Service", "Scheduled Time", "Status"]}
+                emptyText="No arrivals scheduled. Add a reservation to fill the day."
+                columns={["Pet", "Owner", "Reservation", "Service", "Start", "End", "Status"]}
                 renderRow={(r) => [
                   <PetCell r={r} />,
-                  ownerName(r),
-                  r.services?.name ?? "—",
-                  formatTime(r.start_at, TZ),
-                  <StatusPill label={r.status === "confirmed" ? "Confirmed" : "Pending"} tone={r.status === "confirmed" ? "success" : "warning"} />,
+                  <OwnerCell r={r} />,
+                  reservationLabel(r.services),
+                  serviceLabel(r.services),
+                  formatDayTime(effectiveStart(r)),
+                  formatDayTime(effectiveEnd(r)),
+                  <StatusPill label={r.status === "confirmed" ? "Confirmed" : "Pending"} tone={r.status === "confirmed" ? "success" : "neutral"} />,
                 ]}
               />
             )}
             {drill === "departing" && (
               <GroupedTable
                 rows={goingHomeAll}
-                emptyText="No departures for this day"
-                columns={["Pet", "Owner", "Service", "Scheduled Pickup", "Status"]}
+                emptyText="No departures scheduled."
+                columns={["Pet", "Owner", "Reservation", "Service", "Start", "End", "Status"]}
                 renderRow={(r) => [
                   <PetCell r={r} />,
-                  ownerName(r),
-                  r.services?.name ?? "—",
-                  formatTime(r.end_at, TZ),
-                  <StatusPill label={r.checked_out_at ? "Checked Out" : "Ready"} tone="teal" />,
+                  <OwnerCell r={r} />,
+                  reservationLabel(r.services),
+                  serviceLabel(r.services),
+                  formatDayTime(effectiveStart(r)),
+                  formatDayTime(effectiveEnd(r)),
+                  <StatusPill label={r.checked_out_at ? "Checked Out" : "Ready for pickup"} tone="teal" />,
                 ]}
               />
             )}
             {drill === "overnight" && (
               <FlatTable
                 rows={overnight}
-                emptyText="No overnight boarders"
-                columns={["Pet", "Owner", "Check-in", "Scheduled Checkout", "Nights Remaining"]}
+                emptyText="No overnight stays tonight."
+                columns={["Pet", "Owner", "Start", "End", "Nights Remaining"]}
                 renderRow={(r) => {
                   const end = new Date(r.end_at);
                   const nights = Math.max(
@@ -449,9 +619,9 @@ export default function Dashboard() {
                   );
                   return [
                     <PetCell r={r} />,
-                    ownerName(r),
-                    r.checked_in_at ? format(new Date(r.checked_in_at), "MMM d, h:mm a") : "—",
-                    format(end, "MMM d, h:mm a"),
+                    <OwnerCell r={r} />,
+                    formatDayTime(effectiveStart(r)),
+                    formatDayTime(effectiveEnd(r)),
                     `${nights} night${nights === 1 ? "" : "s"}`,
                   ];
                 }}
@@ -460,13 +630,15 @@ export default function Dashboard() {
             {drill === "onsite" && (
               <GroupedTable
                 rows={checkedInAll}
-                emptyText="No pets currently on site"
-                columns={["Pet", "Owner", "Service", "Checked In"]}
+                emptyText="Nothing on site right now. Quiet day."
+                columns={["Pet", "Owner", "Reservation", "Service", "Start", "End"]}
                 renderRow={(r) => [
                   <PetCell r={r} />,
-                  ownerName(r),
-                  r.services?.name ?? "—",
-                  r.checked_in_at ? formatTime(r.checked_in_at, TZ) : "—",
+                  <OwnerCell r={r} />,
+                  reservationLabel(r.services),
+                  serviceLabel(r.services),
+                  formatDayTime(effectiveStart(r)),
+                  formatDayTime(effectiveEnd(r)),
                 ]}
               />
             )}
@@ -508,7 +680,12 @@ export default function Dashboard() {
 
         {/* Quick Actions */}
         <div className="mb-6 flex flex-wrap items-center gap-3">
-          <Button size="lg" onClick={() => setQuickOpen(true)} className="gap-2">
+          <Button
+            size="lg"
+            onClick={() => setQuickOpen(true)}
+            className="gap-2"
+            title="Find and check in any expected pet"
+          >
             <Search className="h-4 w-4" />
             Quick Check-In
           </Button>
@@ -523,7 +700,7 @@ export default function Dashboard() {
               <Input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by pet name or owner name..."
+                placeholder="Search pets or owners"
                 className="pl-9 pr-9"
               />
               {searchTerm && (
@@ -537,29 +714,27 @@ export default function Dashboard() {
                 </button>
               )}
             </div>
-            {searchTerm && (
+            {searchTerm && expected.length + checkedIn.length + goingHome.length + requested.length > 0 && (
               <span className="text-xs text-text-secondary">
-                Showing {expected.length + checkedIn.length + goingHome.length + requested.length} of{" "}
-                {expectedAll.length + checkedInAll.length + goingHomeAll.length + requestedAll.length} results
+                {expected.length + checkedIn.length + goingHome.length + requested.length} of{" "}
+                {todayExpectedAll.length + todayCheckedInAll.length + todayGoingHomeAll.length + todayRequestedAll.length} match
               </span>
             )}
           </div>
           <Tabs defaultValue="expected" className="w-full">
-            <div className="border-b border-border-subtle px-5 pt-4">
+            <div className="border-b border-border-subtle px-5 pt-4 pb-3">
               <TabsList>
-                <TabsTrigger value="expected">Expected ({expected.length})</TabsTrigger>
-                <TabsTrigger value="checkedin">Checked In ({checkedIn.length})</TabsTrigger>
-                <TabsTrigger value="going">Going Home ({goingHome.length})</TabsTrigger>
-                <TabsTrigger value="requested">Requested ({requested.length})</TabsTrigger>
+                <TabsTrigger value="expected" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Coming In ({expected.length})</TabsTrigger>
+                <TabsTrigger value="checkedin" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">In The Pack ({checkedIn.length})</TabsTrigger>
+                <TabsTrigger value="going" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Going Home ({goingHome.length})</TabsTrigger>
+                <TabsTrigger value="requested" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Requests ({requested.length})</TabsTrigger>
               </TabsList>
             </div>
 
             <TabsContent value="expected" className="m-0">
               <ResTable
                 rows={expected}
-                emptyText="No expected arrivals"
-                timeLabel="Scheduled"
-                getTime={(r) => formatTime(r.start_at, TZ)}
+                emptyText="No arrivals today. You're all caught up."
                 action={(r) => (
                   <Button
                     size="sm"
@@ -577,9 +752,7 @@ export default function Dashboard() {
             <TabsContent value="checkedin" className="m-0">
               <ResTable
                 rows={checkedIn}
-                emptyText="No pets currently on site"
-                timeLabel="Checked In"
-                getTime={(r) => (r.checked_in_at ? formatTime(r.checked_in_at, TZ) : "—")}
+                emptyText="Nobody checked in yet. The first arrival will appear here."
                 action={(r) => (
                   <Button
                     size="sm"
@@ -598,9 +771,7 @@ export default function Dashboard() {
             <TabsContent value="going" className="m-0">
               <ResTable
                 rows={goingHome}
-                emptyText="No departures today"
-                timeLabel="Scheduled Pickup"
-                getTime={(r) => formatTime(r.end_at, TZ)}
+                emptyText="No departures today."
                 action={(r) => (
                   <Button
                     size="sm"
@@ -617,40 +788,12 @@ export default function Dashboard() {
             </TabsContent>
 
             <TabsContent value="requested" className="m-0">
-              <ResTable
+              <RequestedTable
                 rows={requested}
-                emptyText="No pending requests"
-                timeLabel="Requested Date"
-                getTime={(r) =>
-                  new Date(r.start_at).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    timeZone: TZ,
-                  })
-                }
-                action={(r) => (
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => approveMut.mutate(r.id)}
-                      disabled={approveMut.isPending}
-                      className="gap-1"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => declineMut.mutate(r.id)}
-                      disabled={declineMut.isPending}
-                      className="gap-1"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      Decline
-                    </Button>
-                  </div>
-                )}
+                onApprove={(id) => approveMut.mutate(id)}
+                onDecline={(id) => declineMut.mutate(id)}
+                isApproving={approveMut.isPending}
+                isDeclining={declineMut.isPending}
               />
             </TabsContent>
           </Tabs>
@@ -683,20 +826,85 @@ function ownerName(r: Row) {
 }
 
 function PetCell({ r }: { r: Row }) {
+  const pets = (r.reservation_pets ?? [])
+    .map((rp) => rp.pets)
+    .filter(Boolean) as NonNullable<Row["reservation_pets"][number]["pets"]>[];
+  const first = pets[0];
+  const extra = Math.max(0, pets.length - 1);
   return (
-    <Link to={`/reservations/${r.id}`} className="font-medium text-foreground hover:text-primary">
-      {petNames(r) || "—"}
+    <Link to={`/reservations/${r.id}`} className="group flex items-center gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+        {first?.photo_url ? (
+          <img src={first.photo_url} alt={first.name ?? ""} className="h-full w-full object-cover" />
+        ) : (
+          (first?.name?.[0] ?? "?").toUpperCase()
+        )}
+      </div>
+      <div className="min-w-0">
+        <div className="truncate font-medium text-foreground group-hover:text-primary">
+          {first?.name ?? "—"}
+          {extra > 0 && <span className="ml-1 text-text-tertiary">+{extra}</span>}
+        </div>
+        {first?.breed && (
+          <div className="truncate text-xs text-text-secondary">{first.breed}</div>
+        )}
+      </div>
     </Link>
   );
 }
 
-function StatusPill({ label, tone }: { label: string; tone: "success" | "warning" | "teal" }) {
+function OwnerCell({ r }: { r: Row }) {
+  const credits = ownerCreditSummary(r.owners);
+  return (
+    <div className="min-w-0">
+      <div className="truncate text-text-secondary">{ownerName(r)}</div>
+      {credits && (
+        <div className="truncate text-[11px] text-text-tertiary">{credits}</div>
+      )}
+    </div>
+  );
+}
+
+function ownerCreditSummary(o: Row["owners"]): string | null {
+  if (!o) return null;
+  const full = o.daycare_full_day_credits ?? 0;
+  const half = o.daycare_half_day_credits ?? 0;
+  const nights = o.boarding_night_credits ?? 0;
+  const parts: string[] = [];
+  if (full > 0) parts.push(`${full} full`);
+  if (half > 0) parts.push(`${half} half`);
+  if (nights > 0) parts.push(`${nights} ${nights === 1 ? "night" : "nights"}`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+function formatDayTime(iso: string): string {
+  const date = new Date(iso).toLocaleDateString("en-CA", {
+    month: "short",
+    day: "numeric",
+    timeZone: TZ,
+  });
+  return `${date} · ${formatTime(iso, TZ)}`;
+}
+
+/** Effective start: actual check-in time once checked in, else scheduled start. */
+function effectiveStart(r: Row): string {
+  return r.checked_in_at ?? r.start_at;
+}
+
+/** Effective end: actual check-out time once checked out, else scheduled end. */
+function effectiveEnd(r: Row): string {
+  return r.checked_out_at ?? r.end_at;
+}
+
+function StatusPill({ label, tone }: { label: string; tone: "success" | "warning" | "teal" | "neutral" }) {
   const cls =
     tone === "success"
       ? "bg-success-bg text-success"
       : tone === "warning"
         ? "bg-warning-bg text-warning"
-        : "bg-brand-frost-bg text-teal";
+        : tone === "neutral"
+          ? "bg-muted text-muted-foreground"
+          : "bg-brand-frost-bg text-teal";
   return (
     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", cls)}>
       {label}
@@ -838,52 +1046,154 @@ function GroupedTable({
 function ResTable({
   rows,
   emptyText,
-  timeLabel,
-  getTime,
   action,
 }: {
   rows: Row[];
   emptyText: string;
-  timeLabel: string;
-  getTime: (r: Row) => string;
   action: (r: Row) => React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden">
+    <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-background">
           <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
             <th className="px-5 py-3">Pet</th>
             <th className="px-5 py-3">Owner</th>
+            <th className="px-5 py-3">Reservation</th>
             <th className="px-5 py-3">Service</th>
-            <th className="px-5 py-3">{timeLabel}</th>
+            <th className="px-5 py-3">Start</th>
+            <th className="px-5 py-3">End</th>
             <th className="px-5 py-3 text-right">Action</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={5} className="px-5 py-12 text-center">
+              <td colSpan={7} className="px-5 py-12 text-center">
                 <div className="font-display text-base text-foreground">{emptyText}</div>
               </td>
             </tr>
           ) : (
             rows.map((r) => (
               <tr key={r.id} className="border-t border-border-subtle hover:bg-background/60">
-                <td className="px-5 py-3">
-                  <Link to={`/reservations/${r.id}`} className="font-medium text-foreground hover:text-primary">
-                    {petNames(r) || "—"}
-                  </Link>
-                </td>
-                <td className="px-5 py-3 text-text-secondary">{ownerName(r)}</td>
-                <td className="px-5 py-3 text-text-secondary">{r.services?.name ?? "—"}</td>
-                <td className="px-5 py-3 text-text-secondary">{getTime(r)}</td>
+                <td className="px-5 py-3"><PetCell r={r} /></td>
+                <td className="px-5 py-3"><OwnerCell r={r} /></td>
+                <td className="px-5 py-3 text-text-secondary">{reservationLabel(r.services)}</td>
+                <td className="px-5 py-3 text-text-secondary">{serviceLabel(r.services)}</td>
+                <td className="px-5 py-3 text-text-secondary whitespace-nowrap">{formatDayTime(effectiveStart(r))}</td>
+                <td className="px-5 py-3 text-text-secondary whitespace-nowrap">{formatDayTime(effectiveEnd(r))}</td>
                 <td className="px-5 py-3 text-right">{action(r)}</td>
               </tr>
             ))
           )}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function RequestedTable({
+  rows,
+  onApprove,
+  onDecline,
+  isApproving,
+  isDeclining,
+}: {
+  rows: Row[];
+  onApprove: (id: string) => void;
+  onDecline: (id: string) => void;
+  isApproving: boolean;
+  isDeclining: boolean;
+}) {
+  const [addOnFor, setAddOnFor] = useState<Row | null>(null);
+
+  if (rows.length === 0) {
+    return (
+      <div className="px-5 py-12 text-center font-display text-base text-foreground">
+        No requests waiting. New booking requests appear here.
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-background">
+          <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+            <th className="px-5 py-3">Pet</th>
+            <th className="px-5 py-3">Owner</th>
+            <th className="px-5 py-3">Reservation</th>
+            <th className="px-5 py-3">Service</th>
+            <th className="px-5 py-3">Start</th>
+            <th className="px-5 py-3">End</th>
+            <th className="px-5 py-3">Suite</th>
+            <th className="px-5 py-3">Add-on</th>
+            <th className="px-5 py-3 text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const isParentReservation =
+              r.services?.module === "daycare" || r.services?.module === "boarding";
+            const hasAddOns = !!(r.add_ons && r.add_ons.length > 0);
+            return (
+              <tr key={r.id} className="border-t border-border-subtle hover:bg-background/60">
+                <td className="px-5 py-3"><PetCell r={r} /></td>
+                <td className="px-5 py-3"><OwnerCell r={r} /></td>
+                <td className="px-5 py-3 text-text-secondary">{reservationLabel(r.services)}</td>
+                <td className="px-5 py-3 text-text-secondary">{serviceLabel(r.services)}</td>
+                <td className="px-5 py-3 text-text-secondary whitespace-nowrap">{formatDayTime(effectiveStart(r))}</td>
+                <td className="px-5 py-3 text-text-secondary whitespace-nowrap">{formatDayTime(effectiveEnd(r))}</td>
+                <td className="px-5 py-3 text-text-secondary">{r.suites?.name ?? "—"}</td>
+                <td className="px-5 py-3 text-text-secondary">
+                  {hasAddOns ? (
+                    r.add_ons!.map((a) => a.services?.name ?? "Service").join(", ")
+                  ) : isParentReservation ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs"
+                      onClick={() => setAddOnFor(r)}
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add
+                    </Button>
+                  ) : (
+                    <span className="text-text-tertiary">—</span>
+                  )}
+                </td>
+                <td className="px-5 py-3 text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" onClick={() => onApprove(r.id)} disabled={isApproving} className="gap-1">
+                      <Check className="h-3.5 w-3.5" />
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => onDecline(r.id)} disabled={isDeclining} className="gap-1">
+                      <X className="h-3.5 w-3.5" />
+                      Decline
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {addOnFor && (
+        <AddOnDialog
+          open={!!addOnFor}
+          onOpenChange={(o) => !o && setAddOnFor(null)}
+          parent={{
+            id: addOnFor.id,
+            organization_id: addOnFor.organization_id,
+            location_id: addOnFor.location_id,
+            primary_owner_id: addOnFor.primary_owner_id,
+            start_at: addOnFor.start_at,
+            end_at: addOnFor.end_at,
+          }}
+          petId={addOnFor.reservation_pets?.[0]?.pets?.id ?? ""}
+        />
+      )}
     </div>
   );
 }
@@ -924,14 +1234,14 @@ function QuickCheckInDialog({
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search pet or owner name…"
+            placeholder="Search pets or owners"
             className="pl-9"
           />
         </div>
         <div className="max-h-80 overflow-y-auto rounded-md border border-border-subtle">
           {filtered.length === 0 ? (
             <div className="p-6 text-center text-sm text-text-secondary">
-              {candidates.length === 0 ? "No expected arrivals today" : "No matches"}
+              {candidates.length === 0 ? "Nothing to check in today." : "No matches. Try a different name."}
             </div>
           ) : (
             <ul className="divide-y divide-border-subtle">

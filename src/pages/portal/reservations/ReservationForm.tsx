@@ -165,6 +165,45 @@ export default function ReservationForm() {
     [services, serviceId],
   );
 
+  // Enclosure memory: surface the suite this pet stayed in last time so staff
+  // can rebook into the same room without hunting through the dropdown. Only
+  // queried when a pet is selected and the chosen service is boarding.
+  const memoryPetId = petIds[0] ?? null;
+  const memoryEnabled =
+    !!memoryPetId && (selectedService?.duration_type === "overnight" || selectedService?.duration_type === "multi_night");
+  const { data: lastSuiteRes } = useQuery({
+    queryKey: ["last-suite-for-pet", memoryPetId],
+    enabled: memoryEnabled,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("reservations")
+        .select(
+          "id, suite_id, start_at, suites:suite_id(name), reservation_pets!inner(pet_id)",
+        )
+        .eq("reservation_pets.pet_id", memoryPetId!)
+        .not("suite_id", "is", null)
+        .is("deleted_at", null)
+        .in("status", ["requested", "confirmed", "checked_in", "checked_out"])
+        .order("start_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Pre-fill the suite dropdown with the pet's last suite the first time we
+  // learn about it, but only if the user has not already chosen one and the
+  // form was not opened with an explicit ?suite_id= preset.
+  useEffect(() => {
+    if (!memoryEnabled) return;
+    if (presetSuiteId) return;
+    if (suiteId !== "none") return;
+    const last = lastSuiteRes?.suite_id;
+    if (last) setSuiteId(last);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastSuiteRes?.suite_id, memoryEnabled]);
+
   // Auto end time when service or start changes
   useEffect(() => {
     if (selectedService && startAt) {
@@ -444,7 +483,15 @@ export default function ReservationForm() {
                   className="bg-background"
                 />
               </Field>
-              <Field label="Suite" span={2} hint="Optional — assign an overnight suite for lodging">
+              <Field
+                label="Suite"
+                span={2}
+                hint={
+                  lastSuiteRes?.suites?.name
+                    ? `Last stay: ${lastSuiteRes.suites.name}. Pre-filled.`
+                    : "Optional. Assign an overnight suite for lodging."
+                }
+              >
                 <Select value={suiteId} onValueChange={setSuiteId}>
                   <SelectTrigger className="bg-background">
                     <SelectValue placeholder="No suite" />
@@ -453,7 +500,7 @@ export default function ReservationForm() {
                     <SelectItem value="none">No suite</SelectItem>
                     {suites.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.name} — {s.type.charAt(0).toUpperCase() + s.type.slice(1)}
+                        {s.name} {s.type ? `, ${s.type.charAt(0).toUpperCase() + s.type.slice(1)}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>

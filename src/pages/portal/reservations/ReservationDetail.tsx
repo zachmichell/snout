@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, CheckCircle2, LogIn, LogOut, XCircle, AlertTriangle, Plus, Trash2, FileHeart } from "lucide-react";
+import { Pencil, CheckCircle2, LogIn, LogOut, XCircle, AlertTriangle, Plus, Trash2, FileHeart, Repeat } from "lucide-react";
 import PortalLayout from "@/components/portal/PortalLayout";
 import PageHeader from "@/components/portal/PageHeader";
 import ReservationStatusBadge from "@/components/portal/ReservationStatusBadge";
@@ -40,15 +40,21 @@ import { createInvoiceForReservation } from "@/lib/invoice";
 import { sendReservationConfirmation } from "@/lib/email";
 import { usePermissions } from "@/hooks/usePermissions";
 import { logActivity } from "@/lib/activity";
+import { useLogActivity } from "@/hooks/useLogActivity";
+import { ActivityLog } from "@/components/portal/ActivityLog";
+import { ownerCreditSummary } from "@/components/portal/ReservationCells";
 
 export default function ReservationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { user, membership } = useAuth();
+  const log = useLogActivity();
   const { can } = usePermissions();
   const canEdit = can("reservations.edit");
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [switchOpen, setSwitchOpen] = useState(false);
+  const [switchServiceId, setSwitchServiceId] = useState<string>("");
   const [cancelReason, setCancelReason] = useState("");
   const [noShowOpen, setNoShowOpen] = useState(false);
   const [addPetId, setAddPetId] = useState<string>("");
@@ -62,10 +68,12 @@ export default function ReservationDetail() {
         .from("reservations")
         .select(
           `*,
-           owners:primary_owner_id(id, first_name, last_name, email, phone),
-           services(id, name, duration_type, base_price_cents),
+           owners:primary_owner_id(id, first_name, last_name, email, phone, daycare_full_day_credits, daycare_half_day_credits, boarding_night_credits),
+           services(id, name, module, duration_type, base_price_cents),
+           suites:suite_id(name),
            locations(name, timezone),
-           reservation_pets(id, pet_id, pets(id, name, species, breed, intake_status))`,
+           reservation_pets(id, pet_id, pets(id, name, species, breed, photo_url, intake_status)),
+           add_ons:reservations!parent_reservation_id(id, start_at, end_at, status, services:service_id(name, module))`,
         )
         .eq("id", id!)
         .maybeSingle();
@@ -145,6 +153,7 @@ export default function ReservationDetail() {
           location_name: location?.name ?? "",
           reservation_id: r.id,
           owner_first_name: owner.first_name,
+          owner_id: owner.id,
         }).catch((e) => console.warn("reservation email failed:", e));
       }
     }
@@ -263,6 +272,12 @@ export default function ReservationDetail() {
   const linkedPetIds = new Set(((r as any).reservation_pets ?? []).map((rp: any) => rp.pet_id));
   const addable = (ownerPetsForAdd ?? []).filter((p) => !linkedPetIds.has(p.id));
 
+  // "Switch service" is allowed only before the pet has arrived. After
+  // check-in or check-out the relevant accounting (credits, invoicing) has
+  // already been keyed off the original service module and changing it
+  // retroactively is its own can of worms.
+  const canSwitchService = r.status === "requested" || r.status === "confirmed";
+
   const renderActions = () => {
     switch (r.status) {
       case "requested":
@@ -303,8 +318,67 @@ export default function ReservationDetail() {
     }
   };
 
+  // Org services for the switch dialog. Loaded once when the dialog opens.
+  const { data: switchServices = [] } = useQuery({
+    queryKey: ["switch-services", membership?.organization_id],
+    enabled: switchOpen && !!membership?.organization_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("services")
+        .select("id, name, module, duration_type, location_id")
+        .eq("organization_id", membership!.organization_id)
+        .eq("active", true)
+        .is("deleted_at", null)
+        .order("module")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const handleSwitchService = async () => {
+    if (!switchServiceId || !membership) return;
+    const newService = switchServices.find((s) => s.id === switchServiceId);
+    if (!newService) return toast.error("Service not found");
+
+    const oldServiceName = (r as any).services?.name ?? "service";
+    const { error } = await supabase
+      .from("reservations")
+      .update({ service_id: switchServiceId })
+      .eq("id", r.id);
+    if (error) return toast.error(error.message);
+
+    try {
+      await log({
+        organization_id: membership.organization_id,
+        action: "updated",
+        entity_type: "reservation",
+        entity_id: r.id,
+        metadata: {
+          summary: `Service changed from ${oldServiceName} to ${newService.name}`,
+          previous_service_id: r.service_id ?? null,
+          new_service_id: switchServiceId,
+        },
+      });
+    } catch (logErr) {
+      console.warn("activity_log write failed", logErr);
+    }
+
+    toast.success(`Switched to ${newService.name}`);
+    setSwitchOpen(false);
+    setSwitchServiceId("");
+    refresh();
+  };
+
   const titleService = (r as any).services?.name ?? "Reservation";
-  const headerTitle = `${titleService} · ${formatDateTime(r.start_at, tz)}`;
+  const reservationPets = (r as any).reservation_pets ?? [];
+  const firstPet = reservationPets[0]?.pets;
+  const extraPetCount = Math.max(0, reservationPets.length - 1);
+  const headerTitle = firstPet?.name
+    ? `${firstPet.name}${extraPetCount > 0 ? ` +${extraPetCount}` : ""}`
+    : "Reservation";
+  const owner = (r as any).owners;
+  const ownerCredits = ownerCreditSummary(owner ?? null);
 
   return (
     <PortalLayout>
@@ -312,21 +386,50 @@ export default function ReservationDetail() {
         <PageHeader
           title={headerTitle}
           description={
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
               <ReservationStatusBadge status={r.status} />
-              {(r as any).owners && (
-                <Link
-                  to={`/owners/${(r as any).owners.id}`}
-                  className="text-sm text-foreground hover:text-primary"
-                >
-                  {(r as any).owners.first_name} {(r as any).owners.last_name}
-                </Link>
+              <span className="text-text-secondary">
+                {firstPet?.breed ? `${firstPet.breed} · ` : ""}
+                {titleService}
+                {" · "}
+                {formatDateTime(r.start_at, tz)}
+              </span>
+              {owner && (
+                <span className="ml-auto inline-flex items-center gap-2">
+                  <Link
+                    to={`/owners/${owner.id}`}
+                    className="text-foreground hover:text-primary"
+                  >
+                    {owner.first_name} {owner.last_name}
+                  </Link>
+                  {ownerCredits && (
+                    <span className="text-xs text-text-tertiary">{ownerCredits}</span>
+                  )}
+                </span>
               )}
             </div>
           }
           actions={
             <>
               {renderActions()}
+              {(r.status === "checked_in" || r.status === "checked_out") && firstPet?.id && (
+                <Button
+                  variant="outline"
+                  onClick={() => setReportPet({ id: firstPet.id, name: firstPet.name ?? "Pet" })}
+                >
+                  <FileHeart className="h-4 w-4" />
+                  {(reportCards ?? []).find((c: any) => c.pet_id === firstPet.id)?.published
+                    ? "Report Card"
+                    : (reportCards ?? []).find((c: any) => c.pet_id === firstPet.id)
+                      ? "Report Card · Draft"
+                      : "Report Card"}
+                </Button>
+              )}
+              {canEdit && canSwitchService && (
+                <Button variant="outline" onClick={() => { setSwitchServiceId(r.service_id ?? ""); setSwitchOpen(true); }}>
+                  <Repeat className="h-4 w-4" /> Switch service
+                </Button>
+              )}
               {canEdit && r.status !== "checked_out" && r.status !== "cancelled" && r.status !== "no_show" && (
                 <Button variant="outline" onClick={() => navigate(`/reservations/${r.id}/edit`)}>
                   <Pencil className="h-4 w-4" /> Edit
@@ -336,13 +439,7 @@ export default function ReservationDetail() {
           }
         />
 
-        <Tabs defaultValue="details">
-          <TabsList>
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="pets">Pets ({(r as any).reservation_pets?.length ?? 0})</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="details" className="mt-4">
+        <div className="mt-4">
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="space-y-6 lg:col-span-2">
                 <div className="rounded-lg border border-border bg-surface p-6 shadow-card">
@@ -377,6 +474,10 @@ export default function ReservationDetail() {
                       <dd className="text-foreground">{formatDateTime(r.end_at, tz)}</dd>
                     </div>
                     <div>
+                      <dt className="text-xs text-text-tertiary">Suite</dt>
+                      <dd className="text-foreground">{(r as any).suites?.name ?? "—"}</dd>
+                    </div>
+                    <div>
                       <dt className="text-xs text-text-tertiary">Source</dt>
                       <dd>
                         <span className="inline-flex items-center rounded-pill border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
@@ -385,6 +486,26 @@ export default function ReservationDetail() {
                       </dd>
                     </div>
                   </dl>
+                  {(r as any).add_ons?.length > 0 && (
+                    <div className="mt-5 border-t border-border-subtle pt-4">
+                      <div className="text-xs text-text-tertiary mb-2">Linked services</div>
+                      <ul className="space-y-1.5 text-sm">
+                        {((r as any).add_ons as Array<any>).map((a) => (
+                          <li key={a.id} className="flex items-center justify-between">
+                            <Link
+                              to={`/reservations/${a.id}`}
+                              className="font-medium text-foreground hover:text-primary"
+                            >
+                              {a.services?.name ?? "Service"}
+                            </Link>
+                            <span className="text-xs text-text-tertiary">
+                              {formatDateTime(a.start_at, tz)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {r.notes && (
                     <div className="mt-5 border-t border-border-subtle pt-4">
                       <div className="text-xs text-text-tertiary mb-1">Notes</div>
@@ -437,6 +558,11 @@ export default function ReservationDetail() {
                     </>
                   )}
                 </div>
+
+                <div className="rounded-lg border border-border bg-surface p-6 shadow-card">
+                  <div className="label-eyebrow mb-3">Activity</div>
+                  <ActivityLog entityType="reservation" entityId={r.id} />
+                </div>
               </div>
             </div>
 
@@ -446,93 +572,46 @@ export default function ReservationDetail() {
                 petIds={((r as any).reservation_pets ?? []).map((rp: any) => rp.pet_id)}
               />
             </div>
-          </TabsContent>
-
-          <TabsContent value="pets" className="mt-4">
-            <div className="rounded-lg border border-border bg-surface shadow-card">
-              <div className="flex items-center justify-between border-b border-border-subtle px-6 py-4">
-                <div className="font-display text-base text-foreground">Pets on this reservation</div>
-                {addable.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Select value={addPetId} onValueChange={setAddPetId}>
-                      <SelectTrigger className="w-56 bg-background">
-                        <SelectValue placeholder="Add a pet…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {addable.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button onClick={addPet} disabled={!addPetId}>
-                      <Plus className="h-4 w-4" /> Add
-                    </Button>
-                  </div>
-                )}
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-background text-left">
-                    <th className="px-[18px] py-[12px] label-eyebrow">Name</th>
-                    <th className="px-[18px] py-[12px] label-eyebrow">Species</th>
-                    <th className="px-[18px] py-[12px] label-eyebrow">Breed</th>
-                    <th className="px-[18px] py-[12px] label-eyebrow">Intake</th>
-                    <th className="px-[18px] py-[12px]" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {((r as any).reservation_pets ?? []).map((rp: any) => (
-                    <tr key={rp.id} className="border-t border-border-subtle">
-                      <td className="px-[18px] py-[12px]">
-                        <Link to={`/pets/${rp.pet_id}`} className="text-foreground hover:text-primary font-medium">
-                          {rp.pets?.name ?? "—"}
-                        </Link>
-                      </td>
-                      <td className="px-[18px] py-[12px] text-text-secondary">{rp.pets?.species ?? "—"}</td>
-                      <td className="px-[18px] py-[12px] text-text-secondary">{rp.pets?.breed ?? "—"}</td>
-                      <td className="px-[18px] py-[12px]">
-                        {rp.pets?.intake_status && (
-                          <StatusBadge tone={intakeTone(rp.pets.intake_status)}>
-                            {rp.pets.intake_status.replace("_", " ")}
-                          </StatusBadge>
-                        )}
-                      </td>
-                      <td className="px-[18px] py-[12px] text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {(r.status === "checked_in" || r.status === "checked_out") && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setReportPet({ id: rp.pet_id, name: rp.pets?.name ?? "Pet" })}
-                            >
-                              <FileHeart className="h-4 w-4" />
-                              {(reportCards ?? []).find((c: any) => c.pet_id === rp.pet_id)?.published
-                                ? "Published"
-                                : (reportCards ?? []).find((c: any) => c.pet_id === rp.pet_id)
-                                ? "Draft"
-                                : "Report"}
-                            </Button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => removePet(rp.id)}
-                            className="text-text-tertiary hover:text-destructive"
-                            aria-label="Remove pet"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </TabsContent>
-        </Tabs>
+        </div>
       </div>
+
+      {/* Switch service modal */}
+      <Dialog open={switchOpen} onOpenChange={setSwitchOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Switch service</DialogTitle>
+            <DialogDescription>
+              Pick a different service for this reservation. Times stay the same; adjust them
+              from the Edit screen if the new service requires it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Select value={switchServiceId} onValueChange={setSwitchServiceId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pick a service..." />
+              </SelectTrigger>
+              <SelectContent>
+                {switchServices.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name} ({s.module})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSwitchOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSwitchService}
+              disabled={!switchServiceId || switchServiceId === r.service_id}
+            >
+              Switch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel modal */}
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>

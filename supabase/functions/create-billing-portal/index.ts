@@ -27,13 +27,14 @@ Deno.serve(async (req) => {
 
     const { data: mem } = await admin
       .from("memberships")
-      .select("organization_id")
+      .select("organization_id, role")
       .eq("profile_id", userId)
       .eq("active", true)
-      .order("created_at", { ascending: true })
-      .limit(1)
       .maybeSingle();
-    if (!mem?.organization_id) return json({ error: "No organization" }, 404);
+    if (!mem?.organization_id) return json({ error: "No active organization" }, 403);
+    if (!["owner", "admin"].includes(mem.role)) {
+      return json({ error: "Insufficient permissions" }, 403);
+    }
 
     const { data: sub } = await admin
       .from("subscriptions")
@@ -55,8 +56,9 @@ Deno.serve(async (req) => {
 
     return json({ url: portal.url });
   } catch (e: any) {
-    console.error("create-billing-portal error", e);
-    return json({ error: e.message ?? "Internal error" }, 500);
+    const errorId = crypto.randomUUID().slice(0, 8);
+    console.error(`create-billing-portal error [${errorId}]:`, e);
+    return json({ error: "Internal error", error_id: errorId }, 500);
   }
 });
 

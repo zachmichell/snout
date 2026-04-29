@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useStaffCodes } from "@/hooks/useStaffCodes";
 
 export type ActiveStaffCode = {
   id: string;
@@ -19,9 +20,11 @@ const STORAGE_KEY = "snout_active_staff_code";
 
 export function StaffCodeProvider({ children }: { children: ReactNode }) {
   const { membership } = useAuth();
+  const { data: codes } = useStaffCodes();
   const [activeStaff, setActiveStaffState] = useState<ActiveStaffCode | null>(null);
 
-  // Load from sessionStorage on mount / when org changes
+  // Load from sessionStorage on mount / when org changes. Treat the stored
+  // row as provisional — a later effect re-validates against server truth.
   useEffect(() => {
     if (!membership?.organization_id) {
       setActiveStaffState(null);
@@ -50,6 +53,31 @@ export function StaffCodeProvider({ children }: { children: ReactNode }) {
   );
 
   const clearActiveStaff = useCallback(() => setActiveStaff(null), [setActiveStaff]);
+
+  // Re-validate the stored staff code against server-truth whenever the
+  // RLS-gated staff_codes list arrives. Any field (role, display_name) from
+  // sessionStorage is forgeable by a local attacker; the authoritative
+  // values come from the DB row, and a missing/inactive/cross-org row
+  // means the stored identity is stale or fabricated and must be cleared.
+  useEffect(() => {
+    if (!activeStaff?.id || !codes) return;
+    const orgId = membership?.organization_id;
+    const server = codes.find((c) => c.id === activeStaff.id);
+    if (!server || !server.is_active || server.organization_id !== orgId) {
+      setActiveStaff(null);
+      return;
+    }
+    if (
+      server.display_name !== activeStaff.display_name ||
+      server.role !== activeStaff.role
+    ) {
+      setActiveStaff({
+        id: server.id,
+        display_name: server.display_name,
+        role: server.role,
+      });
+    }
+  }, [codes, activeStaff?.id, activeStaff?.display_name, activeStaff?.role, membership?.organization_id, setActiveStaff]);
 
   return (
     <StaffCodeCtx.Provider value={{ activeStaff, setActiveStaff, clearActiveStaff }}>

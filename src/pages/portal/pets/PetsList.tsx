@@ -26,6 +26,7 @@ export default function PetsList() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [species, setSpecies] = useState<string>("all");
+  const [photoFilter, setPhotoFilter] = useState<"all" | "with" | "without">("all");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSizeState] = useState(() => usePageSize(PAGE_SIZE_KEY, 25));
   const [dupeOpen, setDupeOpen] = useState(false);
@@ -38,12 +39,12 @@ export default function PetsList() {
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ["pets", search, species, page, pageSize, sort],
+    queryKey: ["pets", search, species, photoFilter, page, pageSize, sort],
     queryFn: async () => {
       let q = supabase
         .from("pets")
         .select(
-          "id, name, species, breed, weight_kg, intake_status, created_at, microchip_id, pet_owners(role, relationship, owner:owners(id, first_name, last_name))",
+          "id, name, species, breed, weight_kg, intake_status, created_at, microchip_id, photo_url, pet_owners(role, relationship, owner:owners(id, first_name, last_name))",
           { count: "exact" },
         )
         .is("deleted_at", null);
@@ -57,6 +58,8 @@ export default function PetsList() {
       q = q.range(page * pageSize, page * pageSize + pageSize - 1);
 
       if (species !== "all") q = q.eq("species", species as any);
+      if (photoFilter === "without") q = q.is("photo_url", null);
+      else if (photoFilter === "with") q = q.not("photo_url", "is", null);
       const term = search.trim();
       if (term) q = q.or(`name.ilike.%${term}%,breed.ilike.%${term}%,microchip_id.ilike.%${term}%`);
       const { data, count, error } = await q;
@@ -121,6 +124,16 @@ export default function PetsList() {
                 <SelectItem value="dog">Dogs</SelectItem>
                 <SelectItem value="cat">Cats</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={photoFilter} onValueChange={(v) => { setPage(0); setPhotoFilter(v as typeof photoFilter); }}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Photo: any</SelectItem>
+                <SelectItem value="with">Photo: with photo</SelectItem>
+                <SelectItem value="without">Photo: missing</SelectItem>
               </SelectContent>
             </Select>
           </div>

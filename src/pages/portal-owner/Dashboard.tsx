@@ -16,6 +16,7 @@ import VaccinationStatusBadge from "@/components/portal-owner/VaccinationStatusB
 import InvoiceStatusBadge from "@/components/portal/InvoiceStatusBadge";
 import ReservationStatusBadge from "@/components/portal/ReservationStatusBadge";
 import BookingWizard from "@/components/portal-owner/booking-wizard/BookingWizard";
+import EnableNotificationsCard from "@/components/portal-owner/EnableNotificationsCard";
 import { Button } from "@/components/ui/button";
 
 export default function OwnerDashboard() {
@@ -136,10 +137,12 @@ export default function OwnerDashboard() {
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-3xl font-bold text-foreground sm:text-4xl">
-          {greeting}, {profile?.first_name ?? "there"}
+          {greeting}{profile?.first_name ? `, ${profile.first_name}` : ""}
         </h1>
         {org?.name && <p className="mt-2 text-base text-muted-foreground">{org.name}</p>}
       </div>
+
+      <EnableNotificationsCard />
 
       {setupBanner && (
         <div className="rounded-xl border border-warning/30 bg-warning-light p-5">

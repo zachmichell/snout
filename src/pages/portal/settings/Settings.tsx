@@ -10,6 +10,8 @@ import SubscriptionTab from "./SubscriptionTab";
 import PaymentsTab from "./PaymentsTab";
 import BillingTab from "./BillingTab";
 import EmailTab from "./EmailTab";
+import MessageTemplatesTab from "./MessageTemplatesTab";
+import SurchargeTab from "./SurchargeTab";
 import DepositsTab from "./DepositsTab";
 import { PlaygroupsSection } from "../playgroups/Playgroups";
 import { KennelRunsSection } from "../kennel-runs/KennelRuns";
@@ -18,6 +20,9 @@ import { GroomerManagementSection } from "../facility/GroomerManagement";
 import SettingsTraitsTab from "./TraitsTab";
 import StaffCodesTab from "./StaffCodesTab";
 import ImportWizard from "./import/ImportWizard";
+import ChangelogTab from "./ChangelogTab";
+import WebcamsTab from "./WebcamsTab";
+import QuickBooksTab from "./QuickBooksTab";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { Permission } from "@/lib/permissions";
 
@@ -28,8 +33,10 @@ const TAB_CONFIG: Array<{ key: string; label: string; permission: Permission }> 
   { key: "staff-codes", label: "Staff Codes", permission: "settings.team" },
   { key: "payments", label: "Payments", permission: "settings.payments" },
   { key: "deposits", label: "Deposits", permission: "settings.payments" },
+  { key: "surcharge", label: "Surcharge", permission: "settings.payments" },
   { key: "billing", label: "Billing", permission: "settings.billing" },
   { key: "email", label: "Email", permission: "settings.email" },
+  { key: "templates", label: "Templates", permission: "settings.email" },
   { key: "subscription", label: "Subscription", permission: "settings.subscription" },
   { key: "playgroups", label: "Playgroups", permission: "playgroups.manage" },
   { key: "kennel-runs", label: "Kennel Runs", permission: "kennels.manage" },
@@ -37,6 +44,9 @@ const TAB_CONFIG: Array<{ key: string; label: string; permission: Permission }> 
   { key: "groomers", label: "Groomers", permission: "settings.organization" },
   { key: "traits", label: "Traits", permission: "settings.organization" },
   { key: "import", label: "Import", permission: "settings.organization" },
+  { key: "changelog", label: "Changelog", permission: "settings.organization" },
+  { key: "webcams", label: "Webcams", permission: "settings.organization" },
+  { key: "quickbooks", label: "QuickBooks", permission: "settings.billing" },
 ];
 
 export default function Settings() {
@@ -113,6 +123,11 @@ export default function Settings() {
             <DepositsTab />
           </TabsContent>
         )}
+        {can("settings.payments") && (
+          <TabsContent value="surcharge" className="mt-6">
+            <SurchargeTab />
+          </TabsContent>
+        )}
         {can("settings.billing") && (
           <TabsContent value="billing" className="mt-6">
             <BillingTab />
@@ -121,6 +136,11 @@ export default function Settings() {
         {can("settings.email") && (
           <TabsContent value="email" className="mt-6">
             <EmailTab />
+          </TabsContent>
+        )}
+        {can("settings.email") && (
+          <TabsContent value="templates" className="mt-6">
+            <MessageTemplatesTab />
           </TabsContent>
         )}
         {can("settings.subscription") && (
@@ -156,6 +176,21 @@ export default function Settings() {
         {can("settings.organization") && (
           <TabsContent value="import" className="mt-6">
             <ImportWizard />
+          </TabsContent>
+        )}
+        {can("settings.organization") && (
+          <TabsContent value="changelog" className="mt-6">
+            <ChangelogTab />
+          </TabsContent>
+        )}
+        {can("settings.organization") && (
+          <TabsContent value="webcams" className="mt-6">
+            <WebcamsTab />
+          </TabsContent>
+        )}
+        {can("settings.billing") && (
+          <TabsContent value="quickbooks" className="mt-6">
+            <QuickBooksTab />
           </TabsContent>
         )}
       </Tabs>

@@ -420,6 +420,96 @@ export type Database = {
           },
         ]
       }
+      changelog_entries: {
+        Row: {
+          affects_modules: Database["public"]["Enums"]["module_enum"][] | null
+          author_id: string | null
+          body_md: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          organization_id: string | null
+          published_at: string | null
+          severity: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          affects_modules?: Database["public"]["Enums"]["module_enum"][] | null
+          author_id?: string | null
+          body_md: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          organization_id?: string | null
+          published_at?: string | null
+          severity?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          affects_modules?: Database["public"]["Enums"]["module_enum"][] | null
+          author_id?: string | null
+          body_md?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          organization_id?: string | null
+          published_at?: string | null
+          severity?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "changelog_entries_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "changelog_entries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      changelog_reads: {
+        Row: {
+          entry_id: string
+          profile_id: string
+          read_at: string
+        }
+        Insert: {
+          entry_id: string
+          profile_id: string
+          read_at?: string
+        }
+        Update: {
+          entry_id?: string
+          profile_id?: string
+          read_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "changelog_reads_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "changelog_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "changelog_reads_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_completions: {
         Row: {
           completed_items: Json
@@ -764,6 +854,92 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      credit_ledger: {
+        Row: {
+          actor_kind: string
+          actor_label: string | null
+          created_at: string
+          delta_full: number
+          delta_half: number
+          delta_nights: number
+          expires_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["credit_ledger_kind"]
+          note: string | null
+          organization_id: string
+          owner_id: string
+          reference_id: string | null
+          reference_type: string | null
+          source_purchase_id: string | null
+          staff_code_id: string | null
+        }
+        Insert: {
+          actor_kind?: string
+          actor_label?: string | null
+          created_at?: string
+          delta_full?: number
+          delta_half?: number
+          delta_nights?: number
+          expires_at?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["credit_ledger_kind"]
+          note?: string | null
+          organization_id: string
+          owner_id: string
+          reference_id?: string | null
+          reference_type?: string | null
+          source_purchase_id?: string | null
+          staff_code_id?: string | null
+        }
+        Update: {
+          actor_kind?: string
+          actor_label?: string | null
+          created_at?: string
+          delta_full?: number
+          delta_half?: number
+          delta_nights?: number
+          expires_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["credit_ledger_kind"]
+          note?: string | null
+          organization_id?: string
+          owner_id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          source_purchase_id?: string | null
+          staff_code_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_source_purchase_id_fkey"
+            columns: ["source_purchase_id"]
+            isOneToOne: false
+            referencedRelation: "credit_ledger"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_ledger_staff_code_id_fkey"
+            columns: ["staff_code_id"]
+            isOneToOne: false
+            referencedRelation: "staff_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       deposit_settings: {
         Row: {
@@ -1317,6 +1493,97 @@ export type Database = {
           },
         ]
       }
+      helcim_accounts: {
+        Row: {
+          account_id: string | null
+          api_token_secret_id: string
+          business_name: string | null
+          charges_enabled: boolean
+          created_at: string
+          currency: string
+          deleted_at: string | null
+          id: string
+          last_verification_error: string | null
+          last_verified_at: string | null
+          organization_id: string
+          status: string
+          updated_at: string
+          webhook_verifier_secret_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          api_token_secret_id: string
+          business_name?: string | null
+          charges_enabled?: boolean
+          created_at?: string
+          currency?: string
+          deleted_at?: string | null
+          id?: string
+          last_verification_error?: string | null
+          last_verified_at?: string | null
+          organization_id: string
+          status?: string
+          updated_at?: string
+          webhook_verifier_secret_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          api_token_secret_id?: string
+          business_name?: string | null
+          charges_enabled?: boolean
+          created_at?: string
+          currency?: string
+          deleted_at?: string | null
+          id?: string
+          last_verification_error?: string | null
+          last_verified_at?: string | null
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          webhook_verifier_secret_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "helcim_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      helcim_processed_events: {
+        Row: {
+          event_type: string
+          helcim_event_id: string
+          id: string
+          organization_id: string | null
+          received_at: string
+        }
+        Insert: {
+          event_type: string
+          helcim_event_id: string
+          id?: string
+          organization_id?: string | null
+          received_at?: string
+        }
+        Update: {
+          event_type?: string
+          helcim_event_id?: string
+          id?: string
+          organization_id?: string | null
+          received_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "helcim_processed_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_jobs: {
         Row: {
           column_mapping: Json
@@ -1494,6 +1761,7 @@ export type Database = {
           id: string
           invoice_id: string
           line_total_cents: number
+          line_type: string
           organization_id: string
           quantity: number
           service_id: string | null
@@ -1505,6 +1773,7 @@ export type Database = {
           id?: string
           invoice_id: string
           line_total_cents: number
+          line_type?: string
           organization_id: string
           quantity?: number
           service_id?: string | null
@@ -1516,6 +1785,7 @@ export type Database = {
           id?: string
           invoice_id?: string
           line_total_cents?: number
+          line_type?: string
           organization_id?: string
           quantity?: number
           service_id?: string | null
@@ -1609,6 +1879,9 @@ export type Database = {
           currency: Database["public"]["Enums"]["currency_enum"]
           deleted_at: string | null
           due_at: string | null
+          helcim_checkout_expires_at: string | null
+          helcim_checkout_secret_token: string | null
+          helcim_checkout_token: string | null
           id: string
           invoice_number: string | null
           issued_at: string | null
@@ -1624,6 +1897,7 @@ export type Database = {
           store_credit_applied_cents: number
           stripe_checkout_session_id: string | null
           subtotal_cents: number
+          surcharge_cents: number
           tax_cents: number
           total_cents: number
           updated_at: string
@@ -1636,6 +1910,9 @@ export type Database = {
           currency: Database["public"]["Enums"]["currency_enum"]
           deleted_at?: string | null
           due_at?: string | null
+          helcim_checkout_expires_at?: string | null
+          helcim_checkout_secret_token?: string | null
+          helcim_checkout_token?: string | null
           id?: string
           invoice_number?: string | null
           issued_at?: string | null
@@ -1651,6 +1928,7 @@ export type Database = {
           store_credit_applied_cents?: number
           stripe_checkout_session_id?: string | null
           subtotal_cents?: number
+          surcharge_cents?: number
           tax_cents?: number
           total_cents?: number
           updated_at?: string
@@ -1663,6 +1941,9 @@ export type Database = {
           currency?: Database["public"]["Enums"]["currency_enum"]
           deleted_at?: string | null
           due_at?: string | null
+          helcim_checkout_expires_at?: string | null
+          helcim_checkout_secret_token?: string | null
+          helcim_checkout_token?: string | null
           id?: string
           invoice_number?: string | null
           issued_at?: string | null
@@ -1678,6 +1959,7 @@ export type Database = {
           store_credit_applied_cents?: number
           stripe_checkout_session_id?: string | null
           subtotal_cents?: number
+          surcharge_cents?: number
           tax_cents?: number
           total_cents?: number
           updated_at?: string
@@ -2219,9 +2501,12 @@ export type Database = {
           category: string
           channel: string
           created_at: string
+          deleted_at: string | null
+          event_type: string | null
           id: string
           name: string
           organization_id: string
+          service_module: Database["public"]["Enums"]["module_enum"] | null
           subject: string | null
           updated_at: string
         }
@@ -2231,9 +2516,12 @@ export type Database = {
           category?: string
           channel?: string
           created_at?: string
+          deleted_at?: string | null
+          event_type?: string | null
           id?: string
           name: string
           organization_id: string
+          service_module?: Database["public"]["Enums"]["module_enum"] | null
           subject?: string | null
           updated_at?: string
         }
@@ -2243,9 +2531,12 @@ export type Database = {
           category?: string
           channel?: string
           created_at?: string
+          deleted_at?: string | null
+          event_type?: string | null
           id?: string
           name?: string
           organization_id?: string
+          service_module?: Database["public"]["Enums"]["module_enum"] | null
           subject?: string | null
           updated_at?: string
         }
@@ -2334,10 +2625,13 @@ export type Database = {
         Row: {
           country: Database["public"]["Enums"]["country_enum"]
           created_at: string
+          credit_expiration_days: number | null
           currency: Database["public"]["Enums"]["currency_enum"]
           deleted_at: string | null
           id: string
+          invoice_counter: number
           name: string
+          payment_processor: Database["public"]["Enums"]["payment_processor_kind"]
           slug: string
           status: Database["public"]["Enums"]["org_status_enum"]
           timezone: string
@@ -2347,10 +2641,13 @@ export type Database = {
         Insert: {
           country: Database["public"]["Enums"]["country_enum"]
           created_at?: string
+          credit_expiration_days?: number | null
           currency: Database["public"]["Enums"]["currency_enum"]
           deleted_at?: string | null
           id?: string
+          invoice_counter?: number
           name: string
+          payment_processor?: Database["public"]["Enums"]["payment_processor_kind"]
           slug: string
           status?: Database["public"]["Enums"]["org_status_enum"]
           timezone?: string
@@ -2360,10 +2657,13 @@ export type Database = {
         Update: {
           country?: Database["public"]["Enums"]["country_enum"]
           created_at?: string
+          credit_expiration_days?: number | null
           currency?: Database["public"]["Enums"]["currency_enum"]
           deleted_at?: string | null
           id?: string
+          invoice_counter?: number
           name?: string
+          payment_processor?: Database["public"]["Enums"]["payment_processor_kind"]
           slug?: string
           status?: Database["public"]["Enums"]["org_status_enum"]
           timezone?: string
@@ -2465,9 +2765,12 @@ export type Database = {
       }
       owners: {
         Row: {
+          boarding_night_credits: number
           city: string | null
           communication_preference: Database["public"]["Enums"]["communication_pref"]
           created_at: string
+          daycare_full_day_credits: number
+          daycare_half_day_credits: number
           deleted_at: string | null
           email: string | null
           external_id: string | null
@@ -2490,9 +2793,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          boarding_night_credits?: number
           city?: string | null
           communication_preference?: Database["public"]["Enums"]["communication_pref"]
           created_at?: string
+          daycare_full_day_credits?: number
+          daycare_half_day_credits?: number
           deleted_at?: string | null
           email?: string | null
           external_id?: string | null
@@ -2515,9 +2821,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          boarding_night_credits?: number
           city?: string | null
           communication_preference?: Database["public"]["Enums"]["communication_pref"]
           created_at?: string
+          daycare_full_day_credits?: number
+          daycare_half_day_credits?: number
           deleted_at?: string | null
           email?: string | null
           external_id?: string | null
@@ -2623,9 +2932,13 @@ export type Database = {
       payments: {
         Row: {
           amount_cents: number
+          card_funding: string | null
           created_at: string
           currency: Database["public"]["Enums"]["currency_enum"]
           deleted_at: string | null
+          expected_payout_at: string | null
+          helcim_invoice_number: string | null
+          helcim_transaction_id: string | null
           id: string
           invoice_id: string
           method: Database["public"]["Enums"]["payment_method_enum"]
@@ -2639,9 +2952,13 @@ export type Database = {
         }
         Insert: {
           amount_cents: number
+          card_funding?: string | null
           created_at?: string
           currency: Database["public"]["Enums"]["currency_enum"]
           deleted_at?: string | null
+          expected_payout_at?: string | null
+          helcim_invoice_number?: string | null
+          helcim_transaction_id?: string | null
           id?: string
           invoice_id: string
           method: Database["public"]["Enums"]["payment_method_enum"]
@@ -2655,9 +2972,13 @@ export type Database = {
         }
         Update: {
           amount_cents?: number
+          card_funding?: string | null
           created_at?: string
           currency?: Database["public"]["Enums"]["currency_enum"]
           deleted_at?: string | null
+          expected_payout_at?: string | null
+          helcim_invoice_number?: string | null
+          helcim_transaction_id?: string | null
           id?: string
           invoice_id?: string
           method?: Database["public"]["Enums"]["payment_method_enum"]
@@ -3643,6 +3964,154 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          deleted_at: string | null
+          endpoint: string
+          id: string
+          last_seen_at: string
+          p256dh: string
+          profile_id: string
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          deleted_at?: string | null
+          endpoint: string
+          id?: string
+          last_seen_at?: string
+          p256dh: string
+          profile_id: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          deleted_at?: string | null
+          endpoint?: string
+          id?: string
+          last_seen_at?: string
+          p256dh?: string
+          profile_id?: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quickbooks_accounts: {
+        Row: {
+          access_token_expires_at: string | null
+          access_token_secret_id: string
+          company_name: string | null
+          created_at: string
+          deleted_at: string | null
+          environment: string
+          id: string
+          last_verification_error: string | null
+          last_verified_at: string | null
+          organization_id: string
+          realm_id: string
+          refresh_token_secret_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          access_token_expires_at?: string | null
+          access_token_secret_id: string
+          company_name?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          environment?: string
+          id?: string
+          last_verification_error?: string | null
+          last_verified_at?: string | null
+          organization_id: string
+          realm_id: string
+          refresh_token_secret_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          access_token_expires_at?: string | null
+          access_token_secret_id?: string
+          company_name?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          environment?: string
+          id?: string
+          last_verification_error?: string | null
+          last_verified_at?: string | null
+          organization_id?: string
+          realm_id?: string
+          refresh_token_secret_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quickbooks_oauth_pending: {
+        Row: {
+          created_at: string
+          expires_at: string
+          initiated_by: string | null
+          organization_id: string
+          return_to: string | null
+          state: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          initiated_by?: string | null
+          organization_id: string
+          return_to?: string | null
+          state: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          initiated_by?: string | null
+          organization_id?: string
+          return_to?: string | null
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_oauth_pending_initiated_by_fkey"
+            columns: ["initiated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quickbooks_oauth_pending_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurring_reservation_groups: {
         Row: {
           created_at: string
@@ -4001,7 +4470,7 @@ export type Database = {
           {
             foreignKeyName: "reservation_pets_reservation_id_fkey"
             columns: ["reservation_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "reservations"
             referencedColumns: ["id"]
           },
@@ -4028,6 +4497,7 @@ export type Database = {
           location_id: string | null
           notes: string | null
           organization_id: string
+          parent_reservation_id: string | null
           primary_owner_id: string | null
           recurring_group_id: string | null
           requested_at: string | null
@@ -4059,6 +4529,7 @@ export type Database = {
           location_id?: string | null
           notes?: string | null
           organization_id: string
+          parent_reservation_id?: string | null
           primary_owner_id?: string | null
           recurring_group_id?: string | null
           requested_at?: string | null
@@ -4090,6 +4561,7 @@ export type Database = {
           location_id?: string | null
           notes?: string | null
           organization_id?: string
+          parent_reservation_id?: string | null
           primary_owner_id?: string | null
           recurring_group_id?: string | null
           requested_at?: string | null
@@ -4128,6 +4600,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_parent_reservation_id_fkey"
+            columns: ["parent_reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
             referencedColumns: ["id"]
           },
           {
@@ -4439,7 +4918,8 @@ export type Database = {
           is_active: boolean
           last_used_at: string | null
           organization_id: string
-          pin_code: string
+          pin_code: string | null
+          pin_hash: string | null
           profile_id: string | null
           role: string
           updated_at: string
@@ -4451,7 +4931,8 @@ export type Database = {
           is_active?: boolean
           last_used_at?: string | null
           organization_id: string
-          pin_code: string
+          pin_code?: string | null
+          pin_hash?: string | null
           profile_id?: string | null
           role?: string
           updated_at?: string
@@ -4463,7 +4944,8 @@ export type Database = {
           is_active?: boolean
           last_used_at?: string | null
           organization_id?: string
-          pin_code?: string
+          pin_code?: string | null
+          pin_hash?: string | null
           profile_id?: string | null
           role?: string
           updated_at?: string
@@ -4872,6 +5354,53 @@ export type Database = {
           },
         ]
       }
+      surcharge_settings: {
+        Row: {
+          applies_to_credit_only: boolean
+          created_at: string
+          customer_notice_text: string | null
+          deleted_at: string | null
+          enabled: boolean
+          id: string
+          organization_id: string
+          rate_basis_points: number
+          registered_with_card_networks: boolean
+          updated_at: string
+        }
+        Insert: {
+          applies_to_credit_only?: boolean
+          created_at?: string
+          customer_notice_text?: string | null
+          deleted_at?: string | null
+          enabled?: boolean
+          id?: string
+          organization_id: string
+          rate_basis_points?: number
+          registered_with_card_networks?: boolean
+          updated_at?: string
+        }
+        Update: {
+          applies_to_credit_only?: boolean
+          created_at?: string
+          customer_notice_text?: string | null
+          deleted_at?: string | null
+          enabled?: boolean
+          id?: string
+          organization_id?: string
+          rate_basis_points?: number
+          registered_with_card_networks?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "surcharge_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       survey_responses: {
         Row: {
           created_at: string
@@ -5259,16 +5788,176 @@ export type Database = {
           },
         ]
       }
+      webcams: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          description: string | null
+          enabled: boolean
+          id: string
+          location_id: string | null
+          name: string
+          organization_id: string
+          provider: string | null
+          source_kind: Database["public"]["Enums"]["webcam_source_kind"]
+          source_url: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          location_id?: string | null
+          name: string
+          organization_id: string
+          provider?: string | null
+          source_kind?: Database["public"]["Enums"]["webcam_source_kind"]
+          source_url: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          location_id?: string | null
+          name?: string
+          organization_id?: string
+          provider?: string | null
+          source_kind?: Database["public"]["Enums"]["webcam_source_kind"]
+          source_url?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webcams_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webcams_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      apply_credit_adjustment: {
+        Args: {
+          p_actor_kind: string
+          p_actor_label: string
+          p_delta_full: number
+          p_delta_half: number
+          p_delta_nights: number
+          p_note: string
+          p_owner_id: string
+          p_staff_code_id: string
+        }
+        Returns: Json
+      }
+      apply_helcim_payment: {
+        Args: {
+          _amount_cents: number
+          _card_funding?: string
+          _currency: string
+          _helcim_invoice_number?: string
+          _helcim_transaction_id: string
+          _invoice_id: string
+          _method?: string
+        }
+        Returns: undefined
+      }
+      apply_stripe_payment:
+        | {
+            Args: {
+              _amount_cents: number
+              _currency: string
+              _invoice_id: string
+              _method?: string
+              _payment_intent_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              _amount_cents: number
+              _card_funding?: string
+              _currency: string
+              _expected_payout_at?: string
+              _invoice_id: string
+              _method?: string
+              _payment_intent_id: string
+            }
+            Returns: undefined
+          }
+      client_retention_stats: {
+        Args: { _org_id: string; _range_from: string }
+        Returns: {
+          retention30: number
+          retention60: number
+          retention90: number
+          total_prior_owners: number
+        }[]
+      }
+      consume_credits: {
+        Args: {
+          p_actor_kind: string
+          p_actor_label: string
+          p_need_full: number
+          p_need_half: number
+          p_need_nights: number
+          p_owner_id: string
+          p_reservation_id: string
+          p_staff_code_id: string
+        }
+        Returns: Json
+      }
+      consume_quickbooks_oauth_pending: {
+        Args: { _state: string }
+        Returns: {
+          organization_id: string
+          return_to: string
+        }[]
+      }
       create_membership: {
         Args: {
           _org_id: string
           _role: Database["public"]["Enums"]["membership_role"]
         }
+        Returns: string
+      }
+      create_organization_with_owner: {
+        Args: {
+          _country: string
+          _currency: string
+          _name: string
+          _slug: string
+          _timezone: string
+        }
+        Returns: string
+      }
+      create_quickbooks_oauth_pending: {
+        Args: {
+          _initiated_by: string
+          _org_id: string
+          _return_to?: string
+          _state: string
+        }
+        Returns: undefined
+      }
+      create_staff_code: {
+        Args: { _display_name: string; _pin: string; _role: string }
         Returns: string
       }
       current_org_id: { Args: never; Returns: string }
@@ -5280,10 +5969,71 @@ export type Database = {
         }
         Returns: undefined
       }
+      detach_helcim_account: { Args: { _org_id: string }; Returns: undefined }
+      detach_quickbooks_account: {
+        Args: { _org_id: string }
+        Returns: undefined
+      }
+      expire_credits: { Args: { p_organization_id: string }; Returns: Json }
+      get_helcim_api_token: { Args: { _org_id: string }; Returns: string }
+      get_helcim_webhook_verifier: {
+        Args: { _org_id: string }
+        Returns: string
+      }
+      get_quickbooks_tokens: {
+        Args: { _org_id: string }
+        Returns: {
+          access_token: string
+          access_token_expires_at: string
+          environment: string
+          realm_id: string
+          refresh_token: string
+        }[]
+      }
       is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       is_org_member: { Args: { _org_id: string }; Returns: boolean }
+      mark_invoice_paid_offline: {
+        Args: { invoice_id: string; method?: string }
+        Returns: undefined
+      }
+      next_invoice_number: { Args: { _org_id: string }; Returns: string }
+      refresh_owner_credit_cache: {
+        Args: { p_owner_id: string }
+        Returns: undefined
+      }
+      set_helcim_api_token: {
+        Args: { _api_token: string; _org_id: string }
+        Returns: string
+      }
+      set_helcim_webhook_verifier: {
+        Args: { _org_id: string; _verifier: string }
+        Returns: undefined
+      }
       set_member_active: {
         Args: { _active: boolean; _membership_id: string }
+        Returns: undefined
+      }
+      set_quickbooks_tokens: {
+        Args: {
+          _access_expires_at: string
+          _access_token: string
+          _company_name: string
+          _environment: string
+          _org_id: string
+          _realm_id: string
+          _refresh_token: string
+        }
+        Returns: string
+      }
+      update_helcim_verification: {
+        Args: {
+          _account_id: string
+          _business_name: string
+          _charges_enabled: boolean
+          _currency: string
+          _org_id: string
+          _verification_error?: string
+        }
         Returns: undefined
       }
       update_member_role: {
@@ -5293,11 +6043,35 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_quickbooks_tokens: {
+        Args: {
+          _access_expires_at: string
+          _access_token: string
+          _org_id: string
+          _refresh_token: string
+        }
+        Returns: undefined
+      }
+      update_staff_code_pin: {
+        Args: { _id: string; _new_pin: string }
+        Returns: undefined
+      }
+      verify_staff_pin: {
+        Args: { _org_id: string; _pin: string }
+        Returns: string
+      }
     }
     Enums: {
       communication_pref: "email" | "sms" | "both"
       connect_account_type: "standard" | "express" | "custom"
       country_enum: "CA" | "US"
+      credit_ledger_kind:
+        | "opening_balance"
+        | "purchase"
+        | "consumption"
+        | "refund"
+        | "expiration"
+        | "manual_adjustment"
       currency_enum: "CAD" | "USD"
       duration_type_enum:
         | "hourly"
@@ -5317,6 +6091,7 @@ export type Database = {
       module_enum: "daycare" | "boarding" | "grooming" | "training" | "retail"
       org_status_enum: "trial" | "active" | "paused" | "past_due" | "cancelled"
       payment_method_enum: "card" | "ach" | "in_person"
+      payment_processor_kind: "stripe" | "helcim"
       payment_status: "pending" | "succeeded" | "failed" | "refunded"
       pet_owner_relationship: "primary" | "secondary" | "emergency_only"
       reservation_source: "staff_created" | "owner_self_serve"
@@ -5347,6 +6122,7 @@ export type Database = {
         | "influenza"
         | "fvrcp"
         | "other"
+      webcam_source_kind: "hls" | "mp4" | "iframe"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5477,6 +6253,14 @@ export const Constants = {
       communication_pref: ["email", "sms", "both"],
       connect_account_type: ["standard", "express", "custom"],
       country_enum: ["CA", "US"],
+      credit_ledger_kind: [
+        "opening_balance",
+        "purchase",
+        "consumption",
+        "refund",
+        "expiration",
+        "manual_adjustment",
+      ],
       currency_enum: ["CAD", "USD"],
       duration_type_enum: [
         "hourly",
@@ -5498,6 +6282,7 @@ export const Constants = {
       module_enum: ["daycare", "boarding", "grooming", "training", "retail"],
       org_status_enum: ["trial", "active", "paused", "past_due", "cancelled"],
       payment_method_enum: ["card", "ach", "in_person"],
+      payment_processor_kind: ["stripe", "helcim"],
       payment_status: ["pending", "succeeded", "failed", "refunded"],
       pet_owner_relationship: ["primary", "secondary", "emergency_only"],
       reservation_source: ["staff_created", "owner_self_serve"],
@@ -5531,6 +6316,7 @@ export const Constants = {
         "fvrcp",
         "other",
       ],
+      webcam_source_kind: ["hls", "mp4", "iframe"],
     },
   },
 } as const

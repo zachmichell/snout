@@ -10,7 +10,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:watch": "vitest --config vitest.integration.config.ts",
+    "test:all": "npm run test && npm run test:integration"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -52,6 +55,7 @@
     "date-fns-tz": "^3.2.0",
     "dompurify": "^3.4.0",
     "embla-carousel-react": "^8.6.0",
+    "hls.js": "^1.6.16",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",

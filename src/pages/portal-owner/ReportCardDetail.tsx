@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOwnerRecord } from "@/hooks/useOwnerRecord";
 import { useOwnerReportCard } from "@/hooks/useReportCards";
@@ -9,6 +10,11 @@ import {
   SOCIABILITY_OPTIONS, formatTime, moodMeta, ratingMeta,
 } from "@/lib/care";
 import { formatDate, speciesIcon } from "@/lib/format";
+import {
+  extensionFromPath,
+  slugifyForFilename,
+  withDownloadFilename,
+} from "@/lib/storage-download";
 
 function findLabel(opts: { value: string; label: string }[], v?: string | null) {
   if (!v) return null;
@@ -35,6 +41,30 @@ export default function OwnerReportCardDetail() {
       return data ?? [];
     },
   });
+
+  const cardPhotoPaths: string[] = ((card as any)?.photo_urls ?? []) as string[];
+  const [photoSignedUrls, setPhotoSignedUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    if (cardPhotoPaths.length === 0) {
+      setPhotoSignedUrls({});
+      return;
+    }
+    (async () => {
+      const { data, error } = await supabase.storage
+        .from("report-card-photos")
+        .createSignedUrls(cardPhotoPaths, 3600);
+      if (cancelled || error || !data) return;
+      const map: Record<string, string> = {};
+      data.forEach((d, i) => {
+        if (d.signedUrl) map[cardPhotoPaths[i]] = d.signedUrl;
+      });
+      setPhotoSignedUrls(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cardPhotoPaths.join("|")]);
 
   if (!ownerLoading && !owner) return <Navigate to="/portal/report-cards" replace />;
   if (!isLoading && card === null) return <Navigate to="/portal/report-cards" replace />;
@@ -93,12 +123,42 @@ export default function OwnerReportCardDetail() {
         <section className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
           <h2 className="font-display text-xl font-semibold text-foreground">Photos</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {c.photo_urls.map((url: string) => (
-              <a key={url} href={url} target="_blank" rel="noreferrer" className="block">
-                <img src={url} alt="" className="aspect-square w-full rounded-xl object-cover" />
-              </a>
-            ))}
+            {c.photo_urls.map((path: string, idx: number) => {
+              const signed = photoSignedUrls[path];
+              if (!signed) return null;
+              // Filename pattern: <pet>-<YYYY-MM-DD>-photo-<idx>.<ext>
+              // so a saved file is recognisable in Photos / Files apps
+              // without leaking the storage hash.
+              const ext = extensionFromPath(path, "jpg");
+              const datePart = c.reservations?.start_at
+                ? new Date(c.reservations.start_at).toISOString().slice(0, 10)
+                : "report";
+              const filename = `${slugifyForFilename(c.pets?.name)}-${datePart}-photo-${idx + 1}.${ext}`;
+              const downloadUrl = withDownloadFilename(signed, filename);
+              return (
+                <div key={path} className="group relative">
+                  <a href={signed} target="_blank" rel="noreferrer" className="block">
+                    <img
+                      src={signed}
+                      alt=""
+                      className="aspect-square w-full rounded-xl object-cover"
+                    />
+                  </a>
+                  <a
+                    href={downloadUrl}
+                    download={filename}
+                    aria-label={`Download ${filename}`}
+                    className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-foreground/80 text-background opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
+                </div>
+              );
+            })}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Tap a photo to view full size. Use the download icon to save it to your device.
+          </p>
         </section>
       )}
 

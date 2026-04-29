@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, AlertTriangle, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -89,6 +89,56 @@ export default function CheckInFlow({
   // Assignment options
   const showPlaygroup = serviceModule === "daycare" && (modules?.has("daycare") ?? true);
   const showKennel = serviceModule === "boarding" && (modules?.has("boarding") ?? true);
+
+  // Enclosure memory: surface where this pet was last assigned so staff
+  // can put them in the same space without scrolling. Pre-fills the
+  // dropdown the first time the data arrives, only if staff has not
+  // already chosen one.
+  const { data: lastPlaygroup } = useQuery({
+    queryKey: ["last-playgroup-for-pet", firstPetId],
+    enabled: !!firstPetId && showPlaygroup,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("playgroup_assignments")
+        .select("playgroup_id, assigned_at, playgroup:playgroups(name)")
+        .eq("pet_id", firstPetId!)
+        .order("assigned_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: lastKennelRun } = useQuery({
+    queryKey: ["last-kennel-run-for-pet", firstPetId],
+    enabled: !!firstPetId && showKennel,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("kennel_run_assignments")
+        .select("kennel_run_id, assigned_at, kennel_run:kennel_runs(name)")
+        .eq("pet_id", firstPetId!)
+        .order("assigned_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  useEffect(() => {
+    if (!showPlaygroup) return;
+    if (playgroupId) return;
+    if (lastPlaygroup?.playgroup_id) setPlaygroupId(lastPlaygroup.playgroup_id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastPlaygroup?.playgroup_id, showPlaygroup]);
+
+  useEffect(() => {
+    if (!showKennel) return;
+    if (kennelRunId) return;
+    if (lastKennelRun?.kennel_run_id) setKennelRunId(lastKennelRun.kennel_run_id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastKennelRun?.kennel_run_id, showKennel]);
 
   const { data: playgroups } = useQuery({
     queryKey: ["checkin-playgroups", orgId, locationId],

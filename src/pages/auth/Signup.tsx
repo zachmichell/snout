@@ -48,16 +48,43 @@ export default function Signup() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="first">First name</Label>
-                <Input id="first" required value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                <Input
+                  id="first"
+                  name="first-name"
+                  autoComplete="given-name"
+                  autoCapitalize="words"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="last">Last name</Label>
-                <Input id="last" required value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                <Input
+                  id="last"
+                  name="last-name"
+                  autoComplete="family-name"
+                  autoCapitalize="words"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                autoCapitalize="off"
+                spellCheck={false}
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>

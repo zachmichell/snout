@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       }
       case "payment_intent.succeeded": {
         const intent = event.data.object as Stripe.PaymentIntent;
-        await handlePaymentIntentSucceeded(intent);
+        await handlePaymentIntentSucceeded(intent, event.account ?? null);
         break;
       }
       default:
@@ -70,6 +70,46 @@ Deno.serve(async (req) => {
 
   return ok({ received: true, event_id: event.id, processed: true });
 });
+
+// Cross-check that an inbound payment event really corresponds to the invoice
+// whose id is sitting in its metadata. Blocks two classes of attack/bug:
+//   (a) an event spoofed onto the wrong org's connected account,
+//   (b) a currency mismatch silently credited as if it were invoice currency.
+// Returns { ok: true } on pass; otherwise { ok: false, reason } — caller
+// should log and skip the state mutation (event is still marked processed).
+async function validatePaymentOrigin(
+  invoice: { id: string; organization_id: string; currency: string },
+  connectedAccountId: string | null,
+  paymentCurrency: string | null,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!connectedAccountId) {
+    return { ok: false, reason: "event has no connected account id" };
+  }
+
+  const { data: connect } = await admin
+    .from("stripe_connect_accounts")
+    .select("stripe_account_id")
+    .eq("organization_id", invoice.organization_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!connect?.stripe_account_id) {
+    return { ok: false, reason: `org ${invoice.organization_id} has no connect account` };
+  }
+  if (connect.stripe_account_id !== connectedAccountId) {
+    return {
+      ok: false,
+      reason: `connect account mismatch: event=${connectedAccountId} invoice_org=${connect.stripe_account_id}`,
+    };
+  }
+  if (paymentCurrency && paymentCurrency.toUpperCase() !== invoice.currency.toUpperCase()) {
+    return {
+      ok: false,
+      reason: `currency mismatch: event=${paymentCurrency} invoice=${invoice.currency}`,
+    };
+  }
+  return { ok: true };
+}
 
 async function handleCheckoutCompleted(
   session: Stripe.Checkout.Session,
@@ -93,48 +133,46 @@ async function handleCheckoutCompleted(
     return;
   }
 
-  const newAmountPaid = (invoice.amount_paid_cents ?? 0) + amountPaid;
-  const fullyPaid = newAmountPaid >= (invoice.total_cents ?? 0);
-  const balance = Math.max(0, (invoice.total_cents ?? 0) - newAmountPaid);
+  const check = await validatePaymentOrigin(invoice, connectedAccountId, session.currency ?? null);
+  if (!check.ok) {
+    console.warn(`Rejecting checkout.session.completed for invoice ${invoice.id}: ${check.reason}`);
+    return;
+  }
 
-  await admin.from("invoices").update({
-    status: fullyPaid ? "paid" : "partial",
-    amount_paid_cents: newAmountPaid,
-    balance_due_cents: balance,
-    paid_at: fullyPaid ? new Date().toISOString() : null,
-  }).eq("id", invoice.id);
-
-  // Insert a payment row (idempotent guard on stripe_payment_intent_id)
   const paymentIntentId = typeof session.payment_intent === "string"
     ? session.payment_intent
     : session.payment_intent?.id ?? null;
 
-  if (paymentIntentId) {
-    const { data: existing } = await admin
-      .from("payments")
-      .select("id")
-      .eq("stripe_payment_intent_id", paymentIntentId)
-      .maybeSingle();
-    if (existing) return;
+  if (!paymentIntentId) {
+    console.warn(`checkout.session.completed for invoice ${invoice.id} has no payment_intent; skipping`);
+    return;
   }
 
-  await admin.from("payments").insert({
-    invoice_id: invoice.id,
-    organization_id: invoice.organization_id,
-    amount_cents: amountPaid,
-    currency: invoice.currency,
-    method: "card",
-    status: "succeeded",
-    stripe_payment_intent_id: paymentIntentId,
-    processed_at: new Date().toISOString(),
+  const enrich = await fetchPaymentEnrichment(paymentIntentId, connectedAccountId);
+
+  const { error: rpcErr } = await admin.rpc("apply_stripe_payment", {
+    _invoice_id: invoice.id,
+    _payment_intent_id: paymentIntentId,
+    _amount_cents: amountPaid,
+    _currency: invoice.currency,
+    _method: "card",
+    _card_funding: enrich.card_funding,
+    _expected_payout_at: enrich.expected_payout_at,
   });
+  if (rpcErr) {
+    console.error(`apply_stripe_payment failed for invoice ${invoice.id}:`, rpcErr);
+    return;
+  }
 
   console.log(
-    `Invoice ${invoice.id} updated; +${amountPaid} (acct ${connectedAccountId ?? "?"})`,
+    `Invoice ${invoice.id} payment applied; +${amountPaid} (acct ${connectedAccountId ?? "?"}, PI ${paymentIntentId}, funding ${enrich.card_funding ?? "n/a"})`,
   );
 }
 
-async function handlePaymentIntentSucceeded(intent: Stripe.PaymentIntent) {
+async function handlePaymentIntentSucceeded(
+  intent: Stripe.PaymentIntent,
+  connectedAccountId: string | null,
+) {
   const invoiceId = intent.metadata?.invoice_id;
   if (!invoiceId) return;
 
@@ -153,27 +191,73 @@ async function handlePaymentIntentSucceeded(intent: Stripe.PaymentIntent) {
     .maybeSingle();
   if (!invoice) return;
 
-  const newAmountPaid = (invoice.amount_paid_cents ?? 0) + intent.amount_received;
-  const fullyPaid = newAmountPaid >= (invoice.total_cents ?? 0);
-  const balance = Math.max(0, (invoice.total_cents ?? 0) - newAmountPaid);
+  const check = await validatePaymentOrigin(invoice, connectedAccountId, intent.currency ?? null);
+  if (!check.ok) {
+    console.warn(`Rejecting payment_intent.succeeded for invoice ${invoice.id}: ${check.reason}`);
+    return;
+  }
 
-  await admin.from("invoices").update({
-    status: fullyPaid ? "paid" : "partial",
-    amount_paid_cents: newAmountPaid,
-    balance_due_cents: balance,
-    paid_at: fullyPaid ? new Date().toISOString() : null,
-  }).eq("id", invoice.id);
+  // Re-use the already-loaded intent if it carries the expanded fields; otherwise refetch.
+  const enrich = extractEnrichment(intent) ?? await fetchPaymentEnrichment(intent.id, connectedAccountId);
 
-  await admin.from("payments").insert({
-    invoice_id: invoice.id,
-    organization_id: invoice.organization_id,
-    amount_cents: intent.amount_received,
-    currency: invoice.currency,
-    method: "card",
-    status: "succeeded",
-    stripe_payment_intent_id: intent.id,
-    processed_at: new Date().toISOString(),
+  const { error: rpcErr } = await admin.rpc("apply_stripe_payment", {
+    _invoice_id: invoice.id,
+    _payment_intent_id: intent.id,
+    _amount_cents: intent.amount_received,
+    _currency: invoice.currency,
+    _method: "card",
+    _card_funding: enrich.card_funding,
+    _expected_payout_at: enrich.expected_payout_at,
   });
+  if (rpcErr) {
+    console.error(`apply_stripe_payment failed for invoice ${invoice.id}:`, rpcErr);
+  }
+}
+
+// Pull the two fields we care about off a PaymentIntent: card funding type
+// (credit, debit, prepaid) and the date Stripe expects the payout to land
+// in the connected account. Funding tells us whether a surcharge was legal;
+// payout date powers the operator-facing "money lands on..." hint.
+//
+// We retrieve the PI on the connected account with both branches expanded.
+// `payment_method.card.funding` may be null for non-card flows. The payout
+// availability date lives on the latest charge's balance transaction. Any
+// fetch failure degrades gracefully: the payment still records, just
+// without enrichment.
+type Enrichment = { card_funding: string | null; expected_payout_at: string | null };
+
+function extractEnrichment(intent: Stripe.PaymentIntent): Enrichment | null {
+  const pm = typeof intent.payment_method === "string" ? null : intent.payment_method;
+  const charge = typeof intent.latest_charge === "string" ? null : intent.latest_charge;
+  if (!pm && !charge) return null;
+  const funding = pm?.card?.funding ?? null;
+  const balTxn = charge && typeof charge.balance_transaction !== "string"
+    ? charge.balance_transaction
+    : null;
+  const availDate = balTxn?.available_on ?? null;
+  return {
+    card_funding: funding,
+    expected_payout_at: availDate ? new Date(availDate * 1000).toISOString() : null,
+  };
+}
+
+async function fetchPaymentEnrichment(
+  paymentIntentId: string,
+  connectedAccountId: string | null,
+): Promise<Enrichment> {
+  const empty: Enrichment = { card_funding: null, expected_payout_at: null };
+  if (!connectedAccountId) return empty;
+  try {
+    const intent = await stripe.paymentIntents.retrieve(
+      paymentIntentId,
+      { expand: ["payment_method", "latest_charge.balance_transaction"] },
+      { stripeAccount: connectedAccountId },
+    );
+    return extractEnrichment(intent) ?? empty;
+  } catch (err) {
+    console.warn(`fetchPaymentEnrichment failed for PI ${paymentIntentId}:`, (err as Error).message);
+    return empty;
+  }
 }
 
 function ok(body: unknown) {

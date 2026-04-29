@@ -7,6 +7,7 @@ import PageHeader from "@/components/portal/PageHeader";
 import StatusBadge, { commPrefTone, relationshipTone } from "@/components/portal/StatusBadge";
 import PetOwnerLinkDialog from "@/components/portal/PetOwnerLinkDialog";
 import PaymentMethodsSection from "@/components/portal/PaymentMethodsSection";
+import { OwnerCreditsCard } from "@/components/portal/OwnerCreditsCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -175,6 +176,8 @@ export default function OwnerDetail() {
           </TabsList>
 
           <TabsContent value="details" className="mt-6 space-y-4">
+            <OwnerCreditsCard owner={owner as any} />
+
             <div className="rounded-lg border border-border bg-surface p-5 shadow-card">
               <div className="font-display text-base mb-3">Address</div>
               {owner.street_address || owner.city ? (
