@@ -1,0 +1,12 @@
+{
+  "name": "@snout/shared-types",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Generated TypeScript types from the Snout Supabase schema. Regenerate with `bun run types:gen` from the repo root.",
+  "main": "./src/database.ts",
+  "types": "./src/database.ts",
+  "exports": {
+    ".": "./src/database.ts",
+    "./database": "./src/database.ts"
+  }
+}
