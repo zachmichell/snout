@@ -1,8 +1,26 @@
 /**
  * Booking helpers: time slots, duration math, price estimates.
+ *
+ * Swift parity: apps/ios/Snout/Utilities/BookingHelpers.swift
+ * Both implementations must produce the same outputs for the same inputs.
+ * See docs/PARITY_LOG.md.
  */
 
-export type DurationType = "hourly" | "half_day" | "full_day" | "overnight" | "multi_night";
+export type DurationType =
+  | "hourly"
+  | "half_day"
+  | "full_day"
+  | "overnight"
+  | "multi_night"
+  | "flat";
+
+/**
+ * Default reservation duration in minutes for `flat` services. Used to derive
+ * end_at from start_at when the wizard only collects a start time.
+ * Could become per-service configurable via a future
+ * `services.default_duration_minutes` column.
+ */
+export const FLAT_SERVICE_DEFAULT_DURATION_MINUTES = 60;
 
 /** Generate 15-minute time options between two hours (inclusive of both). */
 export function generateTimeSlots(startHour = 6, endHour = 21): { value: string; label: string }[] {
@@ -64,6 +82,9 @@ export function estimatePriceCents(args: {
       return basePriceCents * pets;
     case "multi_night":
       return basePriceCents * Math.max(1, nights) * pets;
+    case "flat":
+      // Per-appointment pricing — fixed price × pet count, no time component.
+      return basePriceCents * pets;
     default:
       return basePriceCents * pets;
   }
@@ -81,6 +102,8 @@ export function priceUnitLabel(durationType: DurationType): string {
       return "/night";
     case "multi_night":
       return "/night";
+    case "flat":
+      return "";  // No suffix — flat price per appointment.
     default:
       return "";
   }

@@ -3,9 +3,10 @@ import PortalLayout from "@/components/portal/PortalLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, UserCog, Pencil } from "lucide-react";
+import { Plus, UserCog, Pencil, Clock } from "lucide-react";
 import { useGroomers, type Groomer } from "@/hooks/useGroomers";
 import GroomerFormDialog from "./GroomerFormDialog";
+import GroomerAvailabilityDialog from "./GroomerAvailabilityDialog";
 
 const DAY_DOTS = [
   { full: "Monday", short: "M" },
@@ -21,9 +22,12 @@ export function GroomerManagementSection() {
   const { data: groomers = [], isLoading } = useGroomers();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Groomer | null>(null);
+  const [hoursDialogOpen, setHoursDialogOpen] = useState(false);
+  const [editingHours, setEditingHours] = useState<Groomer | null>(null);
 
   const openAdd = () => { setEditing(null); setDialogOpen(true); };
   const openEdit = (g: Groomer) => { setEditing(g); setDialogOpen(true); };
+  const openHours = (g: Groomer) => { setEditingHours(g); setHoursDialogOpen(true); };
 
   return (
     <>
@@ -121,6 +125,17 @@ export function GroomerManagementSection() {
                     );
                   })}
                 </div>
+
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={(e) => { e.stopPropagation(); openHours(g); }}
+                  >
+                    <Clock className="h-3.5 w-3.5" /> Working Hours
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>
@@ -128,6 +143,11 @@ export function GroomerManagementSection() {
       </div>
 
       <GroomerFormDialog open={dialogOpen} onOpenChange={setDialogOpen} groomer={editing} />
+      <GroomerAvailabilityDialog
+        open={hoursDialogOpen}
+        onOpenChange={setHoursDialogOpen}
+        groomer={editingHours}
+      />
     </>
   );
 }

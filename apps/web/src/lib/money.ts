@@ -29,6 +29,7 @@ export function formatDurationType(t: string): string {
     full_day: "Full Day",
     overnight: "Overnight",
     multi_night: "Multi-Night",
+    flat: "Per Appointment",
   };
   return map[t] ?? t;
 }
@@ -100,6 +101,11 @@ export function computeEndFromStart(startISO: string, durationType: string): str
       break;
     case "multi_night":
       end.setDate(end.getDate() + 1);
+      break;
+    case "flat":
+      // Per-appointment: default to 60 minutes after start. Mirrors
+      // FLAT_SERVICE_DEFAULT_DURATION_MINUTES from lib/booking.ts.
+      end.setMinutes(end.getMinutes() + 60);
       break;
     default:
       end.setHours(end.getHours() + 1);

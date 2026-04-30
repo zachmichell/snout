@@ -5,17 +5,27 @@ import { cn } from "@/lib/utils";
 import StepService from "./StepService";
 import StepPets from "./StepPets";
 import StepDateTime from "./StepDateTime";
+import StepGroomer from "./StepGroomer";
+import StepSlot from "./StepSlot";
 import StepReview from "./StepReview";
 
 export type WizardService = {
   id: string;
   name: string;
   description: string | null;
-  duration_type: "hourly" | "half_day" | "full_day" | "overnight" | "multi_night";
+  duration_type: "hourly" | "half_day" | "full_day" | "overnight" | "multi_night" | "flat";
   base_price_cents: number;
   max_pets_per_booking: number | null;
   location_id: string | null;
   module: string;
+  default_duration_minutes: number | null;
+};
+
+export type WizardGroomer = {
+  id: string;
+  display_name: string;
+  bio: string | null;
+  working_days: string[];
 };
 
 export type WizardPet = {
@@ -41,9 +51,23 @@ export type WizardState = {
   pets: WizardPet[];
   datetime: WizardDateTime | null;
   notes: string;
+  // Grooming-flow only:
+  groomer: WizardGroomer | null;
+  /// "yyyy-MM-dd" — date for the slot picker. Distinct from datetime.date so
+  /// flows don't accidentally cross-pollinate state.
+  groomingDate: string;
+  /// "HH:mm" — slot picked from the get_groomer_available_slots RPC.
+  groomingSlot: string | null;
 };
 
-const STEPS = ["Service", "Pets", "Date & Time", "Review"];
+const STEPS_DEFAULT = ["Service", "Pets", "Date & Time", "Review"];
+const STEPS_GROOMING = ["Service", "Pets", "Groomer", "Pick a time", "Review"];
+
+/// Returns the visible step labels and a lookup for "what step component to
+/// render at this index given the current state".
+function effectiveSteps(state: WizardState): string[] {
+  return state.service?.module === "grooming" ? STEPS_GROOMING : STEPS_DEFAULT;
+}
 
 export default function BookingWizard({
   open,
@@ -59,12 +83,24 @@ export default function BookingWizard({
     pets: [],
     datetime: null,
     notes: "",
+    groomer: null,
+    groomingDate: "",
+    groomingSlot: null,
   });
   const qc = useQueryClient();
 
   const reset = () => {
     setStep(0);
-    setState({ locationId: null, service: null, pets: [], datetime: null, notes: "" });
+    setState({
+      locationId: null,
+      service: null,
+      pets: [],
+      datetime: null,
+      notes: "",
+      groomer: null,
+      groomingDate: "",
+      groomingSlot: null,
+    });
   };
 
   const handleClose = (v: boolean) => {
@@ -72,7 +108,8 @@ export default function BookingWizard({
     onOpenChange(v);
   };
 
-  const next = () => setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  const visibleSteps = effectiveSteps(state);
+  const next = () => setStep((s) => Math.min(visibleSteps.length - 1, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
 
   const onComplete = () => {
@@ -90,7 +127,7 @@ export default function BookingWizard({
 
         {/* Step indicator */}
         <div className="flex items-center gap-2 px-1 pb-2">
-          {STEPS.map((label, i) => {
+          {visibleSteps.map((label, i) => {
             const done = i < step;
             const active = i === step;
             return (
@@ -113,7 +150,7 @@ export default function BookingWizard({
                 >
                   {label}
                 </span>
-                {i < STEPS.length - 1 && (
+                {i < visibleSteps.length - 1 && (
                   <div
                     className={cn(
                       "h-px flex-1 transition-colors",
@@ -127,20 +164,22 @@ export default function BookingWizard({
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1">
-          {step === 0 && (
-            <StepService
-              state={state}
-              setState={setState}
-              onNext={next}
-            />
+          {visibleSteps[step] === "Service" && (
+            <StepService state={state} setState={setState} onNext={next} />
           )}
-          {step === 1 && (
+          {visibleSteps[step] === "Pets" && (
             <StepPets state={state} setState={setState} onBack={back} onNext={next} />
           )}
-          {step === 2 && (
+          {visibleSteps[step] === "Date & Time" && (
             <StepDateTime state={state} setState={setState} onBack={back} onNext={next} />
           )}
-          {step === 3 && (
+          {visibleSteps[step] === "Groomer" && (
+            <StepGroomer state={state} setState={setState} onBack={back} onNext={next} />
+          )}
+          {visibleSteps[step] === "Pick a time" && (
+            <StepSlot state={state} setState={setState} onBack={back} onNext={next} />
+          )}
+          {visibleSteps[step] === "Review" && (
             <StepReview state={state} setState={setState} onBack={back} onComplete={onComplete} />
           )}
         </div>

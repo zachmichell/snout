@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:wght@600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Grandiflora+One&family=Montserrat:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -130,11 +130,12 @@
     font-feature-settings: "ss01", "cv11";
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Fraunces', Georgia, serif;
-    font-weight: 600;
+    /* Grandiflora One is single-weight (400). We don't set font-weight here so
+       browsers don't synthesize faux-bold — keeps parity with iOS, where
+       SwiftUI's .weight() is a no-op on a single-weight custom font. */
+    font-family: 'Grandiflora One', Georgia, serif;
     letter-spacing: -0.01em;
   }
-  h1 { font-weight: 700; }
 }
 
 @layer components {

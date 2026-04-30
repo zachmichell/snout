@@ -14,18 +14,39 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [magicLoading, setMagicLoading] = useState(false);
 
+  /// Pick the right landing path based on the user's first active membership.
+  /// Customers go to the parent portal; staff/manager/admin/owner go to the
+  /// staff dashboard. Falls back to /dashboard so the existing not-authorized
+  /// guard catches anything weird.
+  const landingPathForUser = async (userId: string): Promise<string> => {
+    const { data, error } = await supabase
+      .from("memberships")
+      .select("role")
+      .eq("profile_id", userId)
+      .eq("active", true)
+      .limit(1);
+    if (error || !data || data.length === 0) return "/dashboard";
+    return data[0].role === "customer" ? "/portal-owner" : "/dashboard";
+  };
+
   const handlePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) return toast.error(error.message);
-    navigate("/dashboard");
+    const userId = data?.user?.id;
+    const path = userId ? await landingPathForUser(userId) : "/dashboard";
+    navigate(path);
   };
 
   const handleMagic = async () => {
     if (!email) return toast.error("Enter your email first");
     setMagicLoading(true);
+    // We don't know the user's role until they actually authenticate, so the
+    // magic-link redirect goes to a generic /post-login route that can do the
+    // role-aware redirect. For now, /dashboard with the same role gate keeps
+    // working — the not-authorized page sends customers home with one click.
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/dashboard` },

@@ -8,7 +8,12 @@ import { useOwnerRecord } from "@/hooks/useOwnerRecord";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCentsShort } from "@/lib/money";
-import { combineDateTime, diffNights, estimatePriceCents } from "@/lib/booking";
+import {
+  FLAT_SERVICE_DEFAULT_DURATION_MINUTES,
+  combineDateTime,
+  diffNights,
+  estimatePriceCents,
+} from "@/lib/booking";
 import type { WizardState } from "./BookingWizard";
 
 export default function StepReview({
@@ -26,12 +31,31 @@ export default function StepReview({
   const { data: owner } = useOwnerRecord();
   const [submitting, setSubmitting] = useState(false);
 
-  const dt = state.datetime!;
   const svc = state.service!;
+  const isGroomingFlow = svc.module === "grooming";
+  // datetime is null for the grooming flow (we use groomingDate + groomingSlot
+  // instead). Use a safe stub for downstream branches that don't apply.
+  const dt = state.datetime ?? {
+    date: state.groomingDate || "",
+    startTime: state.groomingSlot ?? "",
+    endDate: undefined,
+    endTime: undefined,
+    hours: 1,
+  };
   const nights = dt.endDate ? diffNights(dt.date, dt.endDate) : 0;
   const hours = dt.hours ?? 1;
 
   const { startISO, endISO } = useMemo(() => {
+    // Grooming flow uses state.groomingDate + state.groomingSlot rather than
+    // the standard datetime input. Duration comes from the service's default
+    // (v2 will swap in the per-groomer time matrix).
+    if (isGroomingFlow && state.groomingSlot && state.groomingDate) {
+      const duration = svc.default_duration_minutes ?? FLAT_SERVICE_DEFAULT_DURATION_MINUTES;
+      const start = combineDateTime(state.groomingDate, state.groomingSlot);
+      const end = new Date(start);
+      end.setMinutes(end.getMinutes() + duration);
+      return { startISO: start.toISOString(), endISO: end.toISOString() };
+    }
     if (svc.duration_type === "overnight" || svc.duration_type === "multi_night") {
       const start = combineDateTime(dt.date, dt.startTime);
       const end = combineDateTime(dt.endDate!, dt.endTime ?? "11:00");
@@ -43,10 +67,16 @@ export default function StepReview({
       end.setHours(end.getHours() + hours);
       return { startISO: start.toISOString(), endISO: end.toISOString() };
     }
+    if (svc.duration_type === "flat") {
+      const start = combineDateTime(dt.date, dt.startTime);
+      const end = new Date(start);
+      end.setMinutes(end.getMinutes() + FLAT_SERVICE_DEFAULT_DURATION_MINUTES);
+      return { startISO: start.toISOString(), endISO: end.toISOString() };
+    }
     const start = combineDateTime(dt.date, dt.startTime);
     const end = combineDateTime(dt.date, dt.endTime ?? dt.startTime);
     return { startISO: start.toISOString(), endISO: end.toISOString() };
-  }, [dt, svc.duration_type, hours]);
+  }, [dt, svc.duration_type, svc.default_duration_minutes, hours, isGroomingFlow, state.groomingDate, state.groomingSlot]);
 
   const estimate = estimatePriceCents({
     basePriceCents: svc.base_price_cents,
@@ -66,6 +96,10 @@ export default function StepReview({
       });
     if (svc.duration_type === "overnight" || svc.duration_type === "multi_night") {
       return `${fmt(startISO)} → ${fmt(endISO)} (${nights} night${nights === 1 ? "" : "s"})`;
+    }
+    if (svc.duration_type === "flat") {
+      // Per-appointment: only the start time is meaningful to the parent.
+      return fmt(startISO);
     }
     return `${fmt(startISO)} – ${new Date(endISO).toLocaleTimeString(undefined, {
       hour: "numeric",
@@ -103,6 +137,29 @@ export default function StepReview({
       }));
       const { error: rpErr } = await supabase.from("reservation_pets").insert(rows);
       if (rpErr) throw rpErr;
+
+      // Grooming flow: also create the per-groomer appointment row, linked
+      // back to the parent reservation. Status='requested' on both — staff
+      // confirms on the web side.
+      if (isGroomingFlow && state.groomer && state.pets[0] && state.groomingSlot && state.groomingDate) {
+        const duration = svc.default_duration_minutes ?? FLAT_SERVICE_DEFAULT_DURATION_MINUTES;
+        const { error: apptErr } = await supabase.from("grooming_appointments").insert({
+          organization_id: membership.organization_id,
+          groomer_id: state.groomer.id,
+          pet_id: state.pets[0].id,
+          owner_id: owner.id,
+          appointment_date: state.groomingDate,
+          start_time: `${state.groomingSlot}:00`,
+          estimated_duration_minutes: duration,
+          services_requested: [svc.id],
+          price_cents: svc.base_price_cents,
+          status: "requested",
+          reservation_id: res.id,
+          notes: state.notes || null,
+        });
+        if (apptErr) throw apptErr;
+      }
+
       return res.id;
     },
     onSuccess: () => {

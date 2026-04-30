@@ -34,7 +34,7 @@ export default function StepService({
     queryFn: async () => {
       let q = supabase
         .from("services")
-        .select("id, name, description, duration_type, base_price_cents, max_pets_per_booking, location_id, module")
+        .select("id, name, description, duration_type, base_price_cents, max_pets_per_booking, location_id, module, default_duration_minutes")
         .eq("organization_id", membership!.organization_id)
         .eq("active", true)
         .is("deleted_at", null)

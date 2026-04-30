@@ -85,8 +85,9 @@ export default function StepDateTime({
     if (dur === "overnight" || dur === "multi_night") {
       startDateObj.setDate(startDateObj.getDate() + 1);
     } else {
-      // For hourly and full-day, default date is "tomorrow" via minDate; align
-      // startDateObj to it so day-of-week lookups match the input value.
+      // For hourly, flat, and full-day, default date is "tomorrow" via
+      // minDate; align startDateObj to it so day-of-week lookups match the
+      // input value.
       const [y, m, d] = minDate.split("-").map(Number);
       startDateObj.setFullYear(y, m - 1, d);
     }
@@ -117,6 +118,16 @@ export default function StepDateTime({
           date: minDate,
           startTime: facilityOpen ?? FALLBACK_START_HOURLY,
           hours: 1,
+        },
+      }));
+    } else if (dur === "flat") {
+      // Per-appointment service: only date + start time matter. end_at is
+      // computed in StepReview from FLAT_SERVICE_DEFAULT_DURATION_MINUTES.
+      setState((s) => ({
+        ...s,
+        datetime: {
+          date: minDate,
+          startTime: facilityOpen ?? "10:00",
         },
       }));
     } else {
@@ -158,6 +169,9 @@ export default function StepDateTime({
       if (!dt.endDate) return false;
       if (nights < 1) return false;
     } else if (dur === "hourly") {
+      if (!dt.startTime) return false;
+    } else if (dur === "flat") {
+      // Only need a start time; end is derived from the default duration.
       if (!dt.startTime) return false;
     } else {
       if (!dt.startTime || !dt.endTime) return false;
@@ -243,6 +257,20 @@ export default function StepDateTime({
               </Select>
             </Field>
           </div>
+        </>
+      )}
+
+      {dur === "flat" && (
+        <>
+          <Field label={`Date (${dayOfWeek})`}>
+            <Input type="date" min={minDate} value={dt.date} onChange={(e) => update({ date: e.target.value })} />
+          </Field>
+          <Field label="Start time">
+            <TimeSelect value={dt.startTime} onChange={(v) => update({ startTime: v })} />
+          </Field>
+          <p className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+            Flat fee — your facility will set the actual end time when they confirm.
+          </p>
         </>
       )}
 

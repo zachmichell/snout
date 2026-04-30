@@ -226,6 +226,7 @@ export default function ServiceForm() {
                     <SelectItem value="full_day">Full Day</SelectItem>
                     <SelectItem value="overnight">Overnight</SelectItem>
                     <SelectItem value="multi_night">Multi-Night</SelectItem>
+                    <SelectItem value="flat">Flat / Per Appointment</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
