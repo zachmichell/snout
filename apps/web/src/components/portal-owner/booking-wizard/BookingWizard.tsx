@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import StepService from "./StepService";
 import StepPets from "./StepPets";
 import StepDateTime from "./StepDateTime";
+import StepGroomer from "./StepGroomer";
+import StepSlot from "./StepSlot";
 import StepReview from "./StepReview";
 
 export type WizardService = {
@@ -16,10 +18,14 @@ export type WizardService = {
   max_pets_per_booking: number | null;
   location_id: string | null;
   module: string;
-  // 7.2: estimated duration in minutes. Required for flat services
-  // (the wizard uses it to compute end_at on submission). Optional
-  // metadata for time-window services.
-  estimated_minutes: number | null;
+  default_duration_minutes: number | null;
+};
+
+export type WizardGroomer = {
+  id: string;
+  display_name: string;
+  bio: string | null;
+  working_days: string[];
 };
 
 export type WizardPet = {
@@ -45,12 +51,23 @@ export type WizardState = {
   pets: WizardPet[];
   datetime: WizardDateTime | null;
   notes: string;
-  // 7.1 follow-up: customer-selected groomer for grooming services.
-  // Null means "any available groomer"; staff assigns on confirmation.
-  groomerId: string | null;
+  // Grooming-flow only:
+  groomer: WizardGroomer | null;
+  /// "yyyy-MM-dd" — date for the slot picker. Distinct from datetime.date so
+  /// flows don't accidentally cross-pollinate state.
+  groomingDate: string;
+  /// "HH:mm" — slot picked from the get_groomer_available_slots RPC.
+  groomingSlot: string | null;
 };
 
-const STEPS = ["Service", "Pets", "Date & Time", "Review"];
+const STEPS_DEFAULT = ["Service", "Pets", "Date & Time", "Review"];
+const STEPS_GROOMING = ["Service", "Pets", "Groomer", "Pick a time", "Review"];
+
+/// Returns the visible step labels and a lookup for "what step component to
+/// render at this index given the current state".
+function effectiveSteps(state: WizardState): string[] {
+  return state.service?.module === "grooming" ? STEPS_GROOMING : STEPS_DEFAULT;
+}
 
 export default function BookingWizard({
   open,
@@ -66,7 +83,9 @@ export default function BookingWizard({
     pets: [],
     datetime: null,
     notes: "",
-    groomerId: null,
+    groomer: null,
+    groomingDate: "",
+    groomingSlot: null,
   });
   const qc = useQueryClient();
 
@@ -78,7 +97,9 @@ export default function BookingWizard({
       pets: [],
       datetime: null,
       notes: "",
-      groomerId: null,
+      groomer: null,
+      groomingDate: "",
+      groomingSlot: null,
     });
   };
 
@@ -87,18 +108,13 @@ export default function BookingWizard({
     onOpenChange(v);
   };
 
-  const next = () => setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  const visibleSteps = effectiveSteps(state);
+  const next = () => setStep((s) => Math.min(visibleSteps.length - 1, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
 
   const onComplete = () => {
     qc.invalidateQueries({ queryKey: ["owner-bookings"] });
     qc.invalidateQueries({ queryKey: ["owner-upcoming"] });
-    // Staff side: refresh grooming requests + week calendar so the
-    // new appointment shows up immediately for any open staff session
-    // viewing the same browser. Realtime subscriptions would be ideal
-    // here; this keyed invalidation is the lightweight fix.
-    qc.invalidateQueries({ queryKey: ["grooming-requests"] });
-    qc.invalidateQueries({ queryKey: ["grooming-week"] });
     handleClose(false);
   };
 
@@ -111,7 +127,7 @@ export default function BookingWizard({
 
         {/* Step indicator */}
         <div className="flex items-center gap-2 px-1 pb-2">
-          {STEPS.map((label, i) => {
+          {visibleSteps.map((label, i) => {
             const done = i < step;
             const active = i === step;
             return (
@@ -134,7 +150,7 @@ export default function BookingWizard({
                 >
                   {label}
                 </span>
-                {i < STEPS.length - 1 && (
+                {i < visibleSteps.length - 1 && (
                   <div
                     className={cn(
                       "h-px flex-1 transition-colors",
@@ -148,20 +164,22 @@ export default function BookingWizard({
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1">
-          {step === 0 && (
-            <StepService
-              state={state}
-              setState={setState}
-              onNext={next}
-            />
+          {visibleSteps[step] === "Service" && (
+            <StepService state={state} setState={setState} onNext={next} />
           )}
-          {step === 1 && (
+          {visibleSteps[step] === "Pets" && (
             <StepPets state={state} setState={setState} onBack={back} onNext={next} />
           )}
-          {step === 2 && (
+          {visibleSteps[step] === "Date & Time" && (
             <StepDateTime state={state} setState={setState} onBack={back} onNext={next} />
           )}
-          {step === 3 && (
+          {visibleSteps[step] === "Groomer" && (
+            <StepGroomer state={state} setState={setState} onBack={back} onNext={next} />
+          )}
+          {visibleSteps[step] === "Pick a time" && (
+            <StepSlot state={state} setState={setState} onBack={back} onNext={next} />
+          )}
+          {visibleSteps[step] === "Review" && (
             <StepReview state={state} setState={setState} onBack={back} onComplete={onComplete} />
           )}
         </div>
