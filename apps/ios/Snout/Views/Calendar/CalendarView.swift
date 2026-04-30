@@ -412,6 +412,9 @@ struct CalendarView: View {
     private func daySheet(for day: Date) -> some View {
         let visits = vm.reservations(on: day, calendar: calendar)
         return VStack(alignment: .leading, spacing: SnoutTheme.Spacing.md) {
+            // Header: date + close. Sits on the cream page background so the
+            // colored visit cards below stand out cleanly without competing
+            // with an outer container tint.
             HStack {
                 Text(dayHeading(day))
                     .font(SnoutTheme.titleMD)
@@ -429,46 +432,66 @@ struct CalendarView: View {
                 }
                 .buttonStyle(.plain)
             }
+
             if visits.isEmpty {
                 Text("No visits scheduled.")
                     .font(SnoutTheme.bodyMD)
                     .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                    .padding(SnoutTheme.Spacing.lg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(SnoutTheme.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
             } else {
-                ForEach(visits, id: \.id) { v in
-                    visitRow(v)
+                VStack(spacing: SnoutTheme.Spacing.sm) {
+                    ForEach(visits, id: \.id) { v in
+                        visitCard(v)
+                    }
                 }
             }
         }
-        .snoutTinted(SnoutTheme.mist)
     }
 
-    private func visitRow(_ r: Reservation) -> some View {
+    /// Each visit is its own card tinted by its module color (matching the
+    /// dot color on the calendar grid). Left-edge accent stripe drives the
+    /// color signal hardest; subtle tinted background supports it without
+    /// drowning text contrast.
+    private func visitCard(_ r: Reservation) -> some View {
         let module = vm.module(for: r)
-        return HStack(spacing: SnoutTheme.Spacing.md) {
-            // Module-tinted avatar so the dot color from the calendar grid
-            // carries through to the detail panel — same color = same kind
-            // of visit.
-            ZStack {
-                Circle().fill(module.color.opacity(0.6)).frame(width: 36, height: 36)
-                Image(systemName: "pawprint.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(SnoutTheme.onSurface)
+        return HStack(spacing: 0) {
+            // Bold left-edge stripe in the module color — most legible signal.
+            Rectangle()
+                .fill(module.color)
+                .frame(width: 5)
+
+            HStack(spacing: SnoutTheme.Spacing.md) {
+                ZStack {
+                    Circle().fill(module.color.opacity(0.7)).frame(width: 36, height: 36)
+                    Image(systemName: "pawprint.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(SnoutTheme.onSurface)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(timeRange(r))
+                        .font(SnoutTheme.body(15, weight: .semibold))
+                        .foregroundStyle(SnoutTheme.onSurface)
+                    Text(module.label)
+                        .font(SnoutTheme.bodySM)
+                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                }
+                Spacer()
+                SnoutBadge(
+                    text: statusLabel(r.status),
+                    background: SnoutTheme.statusBackground(for: r.status),
+                    foreground: SnoutTheme.statusForeground(for: r.status)
+                )
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(timeRange(r))
-                    .font(SnoutTheme.body(15, weight: .semibold))
-                    .foregroundStyle(SnoutTheme.onSurface)
-                Text(module.label)
-                    .font(SnoutTheme.bodySM)
-                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
-            }
-            Spacer()
-            SnoutBadge(
-                text: statusLabel(r.status),
-                background: SnoutTheme.statusBackground(for: r.status),
-                foreground: SnoutTheme.statusForeground(for: r.status)
-            )
+            .padding(SnoutTheme.Spacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // Subtle module-tinted background carries the color across the
+            // full card without overpowering the text.
+            .background(module.color.opacity(0.18))
         }
+        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
     }
 
     private func timeRange(_ r: Reservation) -> String {
