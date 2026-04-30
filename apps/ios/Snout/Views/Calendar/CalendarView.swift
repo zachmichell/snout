@@ -67,6 +67,9 @@ enum CalendarModule: String, CaseIterable, Hashable {
 final class CalendarViewModel: ObservableObject {
     @Published var reservations: [Reservation] = []
     @Published var services: [Service] = []
+    /// reservation_id → array of pets attached to that reservation (via
+    /// reservation_pets). Built once after reservations + pets load.
+    @Published var petsByReservation: [String: [Pet]] = [:]
     @Published var isLoading: Bool = false
     @Published var loadError: String?
 
@@ -75,33 +78,92 @@ final class CalendarViewModel: ObservableObject {
     func load(ownerId: String, organizationId: String) async {
         isLoading = true
         defer { isLoading = false }
-        do {
-            // Reservations and services in parallel — services are needed to
-            // map each reservation's service_id to a module, which drives the
-            // dot color on each day cell.
-            async let resTask: [Reservation] = client
-                .from("reservations")
-                .select()
-                .eq("primary_owner_id", value: ownerId)
-                .is("deleted_at", value: nil)
-                .order("start_at", ascending: true)
-                .limit(300)
-                .execute()
-                .value
-            async let svcTask: [Service] = client
-                .from("services")
-                .select()
-                .eq("organization_id", value: organizationId)
-                .is("deleted_at", value: nil)
-                .execute()
-                .value
 
-            reservations = (try? await resTask) ?? []
-            services     = (try? await svcTask) ?? []
-            loadError = nil
-        } catch {
-            loadError = error.localizedDescription
+        // Reservations + services + pets in parallel.
+        async let resTask: [Reservation] = loadReservations(ownerId: ownerId)
+        async let svcTask: [Service]     = loadServices(organizationId: organizationId)
+        async let petsTask: [Pet]        = loadPets(ownerId: ownerId)
+
+        let res = (try? await resTask) ?? []
+        let svcs = (try? await svcTask) ?? []
+        let pets = (try? await petsTask) ?? []
+
+        reservations = res
+        services = svcs
+
+        // Stage 2: load reservation_pets for the loaded reservation IDs and
+        // build the lookup map. Skipped when there are no reservations.
+        if !res.isEmpty {
+            petsByReservation = await loadReservationPets(
+                reservationIds: res.map(\.id),
+                pets: pets
+            )
+        } else {
+            petsByReservation = [:]
         }
+    }
+
+    private func loadReservations(ownerId: String) async throws -> [Reservation] {
+        try await client
+            .from("reservations")
+            .select()
+            .eq("primary_owner_id", value: ownerId)
+            .is("deleted_at", value: nil)
+            .order("start_at", ascending: true)
+            .limit(300)
+            .execute()
+            .value
+    }
+
+    private func loadServices(organizationId: String) async throws -> [Service] {
+        try await client
+            .from("services")
+            .select()
+            .eq("organization_id", value: organizationId)
+            .is("deleted_at", value: nil)
+            .execute()
+            .value
+    }
+
+    private func loadPets(ownerId: String) async throws -> [Pet] {
+        struct PetOwnerJoin: Decodable { let pet: Pet }
+        let rows: [PetOwnerJoin] = try await client
+            .from("pet_owners")
+            .select("pet:pets(*)")
+            .eq("owner_id", value: ownerId)
+            .execute()
+            .value
+        return rows.map(\.pet).filter { $0.deletedAt == nil }
+    }
+
+    /// Bulk-fetch reservation_pets rows for the given reservation IDs and
+    /// turn them into a `reservation_id → [Pet]` lookup. The pets passed in
+    /// is the owner's full pet roster; we filter to whichever ones are on
+    /// the reservation.
+    private func loadReservationPets(reservationIds: [String], pets: [Pet]) async -> [String: [Pet]] {
+        struct Row: Decodable {
+            let reservation_id: String
+            let pet_id: String
+        }
+        let rows: [Row]
+        do {
+            rows = try await client
+                .from("reservation_pets")
+                .select("reservation_id, pet_id")
+                .in("reservation_id", values: reservationIds)
+                .execute()
+                .value
+        } catch {
+            return [:]
+        }
+        let petById = Dictionary(uniqueKeysWithValues: pets.map { ($0.id, $0) })
+        var result: [String: [Pet]] = [:]
+        for row in rows {
+            if let pet = petById[row.pet_id] {
+                result[row.reservation_id, default: []].append(pet)
+            }
+        }
+        return result
     }
 
     /// Reservations that overlap the given calendar day in `America/Regina`.
@@ -141,6 +203,21 @@ final class CalendarViewModel: ObservableObject {
             return .other
         }
         return CalendarModule(module: svc.module)
+    }
+
+    /// Service name for the visit (e.g. "Grooming — Bath & Brush"). Falls back
+    /// to the module label when we can't resolve a service.
+    func serviceName(for reservation: Reservation) -> String {
+        if let svcId = reservation.serviceId,
+           let svc = services.first(where: { $0.id == svcId }) {
+            return svc.name
+        }
+        return module(for: reservation).label
+    }
+
+    /// Pets attached to a reservation via reservation_pets.
+    func pets(for reservation: Reservation) -> [Pet] {
+        petsByReservation[reservation.id] ?? []
     }
 
     /// Modules that appear in *any* of the loaded reservations. Used for the
@@ -455,8 +532,16 @@ struct CalendarView: View {
     /// dot color on the calendar grid). Left-edge accent stripe drives the
     /// color signal hardest; subtle tinted background supports it without
     /// drowning text contrast.
+    ///
+    /// Shows: pet avatar (initials placeholder until photo_url lands) + time
+    /// range + service name + pet name. Status badge on the right uses a
+    /// module-INDEPENDENT palette (white surface + status icon + neutral text
+    /// on a thin border) so it never collides with the card's tint.
     private func visitCard(_ r: Reservation) -> some View {
         let module = vm.module(for: r)
+        let visitPets = vm.pets(for: r)
+        let avatarPet = visitPets.first  // grooming = 1 pet; multi-pet shows first
+
         return HStack(spacing: 0) {
             // Bold left-edge stripe in the module color — most legible signal.
             Rectangle()
@@ -464,34 +549,89 @@ struct CalendarView: View {
                 .frame(width: 5)
 
             HStack(spacing: SnoutTheme.Spacing.md) {
-                ZStack {
-                    Circle().fill(module.color.opacity(0.7)).frame(width: 36, height: 36)
-                    Image(systemName: "pawprint.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(SnoutTheme.onSurface)
-                }
+                petAvatar(pet: avatarPet, fallbackTint: module.color)
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text(timeRange(r))
                         .font(SnoutTheme.body(15, weight: .semibold))
                         .foregroundStyle(SnoutTheme.onSurface)
-                    Text(module.label)
-                        .font(SnoutTheme.bodySM)
-                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                    Text(vm.serviceName(for: r))
+                        .font(SnoutTheme.body(13, weight: .medium))
+                        .foregroundStyle(SnoutTheme.onSurface)
+                        .lineLimit(1)
+                    if !visitPets.isEmpty {
+                        Text(visitPets.map(\.name).joined(separator: ", "))
+                            .font(SnoutTheme.bodySM)
+                            .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer()
-                SnoutBadge(
-                    text: statusLabel(r.status),
-                    background: SnoutTheme.statusBackground(for: r.status),
-                    foreground: SnoutTheme.statusForeground(for: r.status)
-                )
+                statusChip(r.status)
             }
             .padding(SnoutTheme.Spacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
-            // Subtle module-tinted background carries the color across the
-            // full card without overpowering the text.
             .background(module.color.opacity(0.18))
         }
         .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+    }
+
+    /// Pet avatar — initials on a tinted circle until we wire up `photo_url`.
+    /// The tint defaults to surface so the avatar stays neutral on a colored
+    /// card; passing `fallbackTint` lets callers tint it when there's no pet.
+    private func petAvatar(pet: Pet?, fallbackTint: Color) -> some View {
+        ZStack {
+            Circle()
+                .fill(SnoutTheme.surface)
+                .frame(width: 40, height: 40)
+            if let pet {
+                Text(initials(for: pet.name))
+                    .font(SnoutTheme.body(14, weight: .semibold))
+                    .foregroundStyle(SnoutTheme.onSurface)
+            } else {
+                // No pet on this reservation (rare) — pawprint placeholder
+                // with the module tint so the card still feels complete.
+                Image(systemName: "pawprint.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(fallbackTint)
+            }
+        }
+    }
+
+    private func initials(for name: String) -> String {
+        let parts = name.split(separator: " ").prefix(2)
+        let first = parts.compactMap { $0.first.map(String.init) }
+        return first.joined().uppercased()
+    }
+
+    /// Status pill on a white surface — visually independent from any module
+    /// color so a "Confirmed" badge on a Grooming (mist) card doesn't blend
+    /// with the card background. SF Symbol icon + status text.
+    private func statusChip(_ status: ReservationStatus) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: statusSymbol(status))
+                .font(.system(size: 11, weight: .semibold))
+            Text(statusLabel(status))
+                .font(SnoutTheme.labelSM)
+                .tracking(0.4)
+        }
+        .foregroundStyle(SnoutTheme.onSurface)
+        .padding(.horizontal, SnoutTheme.Spacing.sm)
+        .padding(.vertical, 5)
+        .background(SnoutTheme.surface)
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(SnoutTheme.divider, lineWidth: 1))
+    }
+
+    private func statusSymbol(_ s: ReservationStatus) -> String {
+        switch s {
+        case .requested:    return "clock"
+        case .confirmed:    return "checkmark"
+        case .checkedIn:    return "play.fill"
+        case .checkedOut:   return "checkmark.circle.fill"
+        case .cancelled:    return "xmark"
+        case .noShow:       return "minus.circle"
+        }
     }
 
     private func timeRange(_ r: Reservation) -> String {
