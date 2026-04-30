@@ -13,21 +13,68 @@
 
 import SwiftUI
 
+/// Maps a service `module` to a Boho Rainbow color so the calendar dots
+/// communicate "what kind of visit" at a glance. Modules that don't have
+/// a dedicated tone (or unknowns) fall back to Soft Camel (the brand accent).
+enum CalendarModule: String, CaseIterable, Hashable {
+    case daycare
+    case boarding
+    case grooming
+    case training
+    case retail
+    case other
+
+    init(module: String?) {
+        switch module?.lowercased() {
+        case "daycare":  self = .daycare
+        case "boarding": self = .boarding
+        case "grooming": self = .grooming
+        case "training": self = .training
+        case "retail":   self = .retail
+        default:         self = .other
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .daycare:   return SnoutTheme.cotton    // warm pink — playful daytime
+        case .boarding:  return SnoutTheme.frost     // cool blue-grey — overnight calm
+        case .grooming:  return SnoutTheme.vanilla   // warm cream — pampering
+        case .training:  return SnoutTheme.mist      // sage — focused
+        case .retail:    return SnoutTheme.blueberry // muted dusty rose
+        case .other:     return SnoutTheme.accent
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .daycare:  return "Daycare"
+        case .boarding: return "Boarding"
+        case .grooming: return "Grooming"
+        case .training: return "Training"
+        case .retail:   return "Retail"
+        case .other:    return "Other"
+        }
+    }
+}
+
 @MainActor
 final class CalendarViewModel: ObservableObject {
     @Published var reservations: [Reservation] = []
+    @Published var services: [Service] = []
     @Published var isLoading: Bool = false
     @Published var loadError: String?
 
     private let client = SupabaseClientProvider.shared
 
-    func load(ownerId: String) async {
+    func load(ownerId: String, organizationId: String) async {
         isLoading = true
         defer { isLoading = false }
         do {
-            // Pull a generous window so navigating ±a few months doesn't refetch on
-            // every swipe. Server-side filter could be tighter if this gets heavy.
-            let rows: [Reservation] = try await client
+            // Reservations and services in parallel — services are needed to
+            // map each reservation's service_id to a module, which drives the
+            // dot color on each day cell.
+            async let resTask: [Reservation] = client
                 .from("reservations")
                 .select()
                 .eq("primary_owner_id", value: ownerId)
@@ -36,7 +83,16 @@ final class CalendarViewModel: ObservableObject {
                 .limit(300)
                 .execute()
                 .value
-            reservations = rows
+            async let svcTask: [Service] = client
+                .from("services")
+                .select()
+                .eq("organization_id", value: organizationId)
+                .is("deleted_at", value: nil)
+                .execute()
+                .value
+
+            reservations = (try? await resTask) ?? []
+            services     = (try? await svcTask) ?? []
             loadError = nil
         } catch {
             loadError = error.localizedDescription
@@ -48,13 +104,54 @@ final class CalendarViewModel: ObservableObject {
         let startOfDay = calendar.startOfDay(for: day)
         guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { return [] }
         return reservations.filter { r in
-            // overlaps if start < endOfDay && end >= startOfDay
             r.startAt < endOfDay && r.endAt > startOfDay
         }
     }
 
     func hasReservation(on day: Date, calendar: Calendar) -> Bool {
         !reservations(on: day, calendar: calendar).isEmpty
+    }
+
+    /// Up-to-3 distinct module dots for a given day, ordered by visit start time.
+    /// Used by the calendar grid to render colored markers under the day number.
+    func modules(on day: Date, calendar: Calendar) -> [CalendarModule] {
+        let visits = reservations(on: day, calendar: calendar)
+        var seen = Set<CalendarModule>()
+        var result: [CalendarModule] = []
+        for r in visits {
+            let mod = module(for: r)
+            if !seen.contains(mod) {
+                seen.insert(mod)
+                result.append(mod)
+                if result.count >= 3 { break }
+            }
+        }
+        return result
+    }
+
+    /// Module for a single reservation — looks up the service by id.
+    func module(for reservation: Reservation) -> CalendarModule {
+        guard let svcId = reservation.serviceId,
+              let svc = services.first(where: { $0.id == svcId }) else {
+            return .other
+        }
+        return CalendarModule(module: svc.module)
+    }
+
+    /// Modules that appear in *any* of the loaded reservations. Used for the
+    /// legend so we only show pills for service types the user actually uses.
+    var legendModules: [CalendarModule] {
+        var seen = Set<CalendarModule>()
+        var ordered: [CalendarModule] = []
+        for r in reservations {
+            let mod = module(for: r)
+            if !seen.contains(mod) {
+                seen.insert(mod)
+                ordered.append(mod)
+            }
+        }
+        // Keep a stable display order matching the enum.
+        return CalendarModule.allCases.filter(seen.contains)
     }
 }
 
@@ -82,6 +179,7 @@ struct CalendarView: View {
                         monthHeader
                         weekdayLabels
                         monthGrid
+                        legend
                         if let selected = selectedDay {
                             daySheet(for: selected)
                         }
@@ -99,8 +197,9 @@ struct CalendarView: View {
     }
 
     private func loadIfReady() async {
-        if let owner = currentOwner.ownerId {
-            await vm.load(ownerId: owner)
+        if let owner = currentOwner.ownerId,
+           let org   = currentOwner.organizationId {
+            await vm.load(ownerId: owner, organizationId: org)
         }
     }
 
@@ -215,7 +314,10 @@ struct CalendarView: View {
         let isSelected = entry.date.map { d in
             selectedDay.map { calendar.isDate($0, inSameDayAs: d) } ?? false
         } ?? false
-        let hasVisit = entry.date.map { vm.hasReservation(on: $0, calendar: calendar) } ?? false
+        // Up to 3 distinct module colors for the day's visits.
+        let modules: [CalendarModule] = entry.date.map {
+            vm.modules(on: $0, calendar: calendar)
+        } ?? []
 
         return Button {
             if let d = entry.date {
@@ -231,9 +333,24 @@ struct CalendarView: View {
                         isSelected ? SnoutTheme.onAccent :
                         (entry.date == nil ? SnoutTheme.onSurfaceFaint : SnoutTheme.onSurface)
                     )
-                Circle()
-                    .fill(hasVisit ? (isSelected ? SnoutTheme.onAccent : SnoutTheme.accent) : Color.clear)
-                    .frame(width: 5, height: 5)
+                // Module dots: one Boho-tone circle per distinct service type
+                // on this day (max 3). When the day is selected, dots flip to
+                // a single white pip so they read against the accent fill.
+                if isSelected && !modules.isEmpty {
+                    Circle()
+                        .fill(SnoutTheme.onAccent)
+                        .frame(width: 5, height: 5)
+                } else if !modules.isEmpty {
+                    HStack(spacing: 3) {
+                        ForEach(modules.indices, id: \.self) { i in
+                            Circle()
+                                .fill(modules[i].color)
+                                .frame(width: 5, height: 5)
+                        }
+                    }
+                } else {
+                    Circle().fill(Color.clear).frame(width: 5, height: 5)
+                }
             }
             .frame(height: 44)
             .frame(maxWidth: .infinity)
@@ -244,6 +361,45 @@ struct CalendarView: View {
         }
         .buttonStyle(.plain)
         .disabled(entry.date == nil)
+    }
+
+    // MARK: - Legend
+
+    /// Pills showing which Boho tone maps to which service type. Only shows
+    /// modules the user actually has visits for, so brand-new accounts don't
+    /// see a meaningless full-spectrum row. Hidden entirely until visits load.
+    @ViewBuilder
+    private var legend: some View {
+        let modules = vm.legendModules
+        if !modules.isEmpty {
+            VStack(alignment: .leading, spacing: SnoutTheme.Spacing.sm) {
+                Text("WHAT THE DOTS MEAN")
+                    .font(SnoutTheme.labelSM)
+                    .tracking(0.8)
+                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: SnoutTheme.Spacing.sm) {
+                        ForEach(modules, id: \.self) { module in
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(module.color)
+                                    .frame(width: 8, height: 8)
+                                Text(module.label)
+                                    .font(SnoutTheme.labelMD)
+                                    .foregroundStyle(SnoutTheme.onSurface)
+                            }
+                            .padding(.horizontal, SnoutTheme.Spacing.md)
+                            .padding(.vertical, 6)
+                            .background(SnoutTheme.surface)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(SnoutTheme.divider, lineWidth: 1))
+                        }
+                    }
+                }
+                .scrollClipDisabled() // Let pill shadows breathe past the scroll edge.
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     // MARK: - Day detail
@@ -282,18 +438,22 @@ struct CalendarView: View {
     }
 
     private func visitRow(_ r: Reservation) -> some View {
-        HStack(spacing: SnoutTheme.Spacing.md) {
+        let module = vm.module(for: r)
+        return HStack(spacing: SnoutTheme.Spacing.md) {
+            // Module-tinted avatar so the dot color from the calendar grid
+            // carries through to the detail panel — same color = same kind
+            // of visit.
             ZStack {
-                Circle().fill(SnoutTheme.surface).frame(width: 36, height: 36)
+                Circle().fill(module.color.opacity(0.6)).frame(width: 36, height: 36)
                 Image(systemName: "pawprint.fill")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(SnoutTheme.accent)
+                    .foregroundStyle(SnoutTheme.onSurface)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(timeRange(r))
                     .font(SnoutTheme.body(15, weight: .semibold))
                     .foregroundStyle(SnoutTheme.onSurface)
-                Text(statusLabel(r.status))
+                Text(module.label)
                     .font(SnoutTheme.bodySM)
                     .foregroundStyle(SnoutTheme.onSurfaceMuted)
             }
