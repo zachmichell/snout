@@ -237,12 +237,18 @@ export default function GroomerAvailabilityDialog({ open, onOpenChange, groomer 
                     onClick={() => !isPast && setSelectedDate(dateStr)}
                     disabled={isPast}
                     className={cn(
-                      "h-10 rounded-lg text-sm font-medium transition-colors",
+                      "h-10 rounded-lg text-sm transition-colors",
+                      // Past dates: clearly disabled.
                       isPast && "cursor-not-allowed text-text-tertiary opacity-40",
-                      !isPast && !isAvailable && "bg-muted/40 text-text-secondary hover:bg-muted",
-                      !isPast && isAvailable && "bg-primary-light text-foreground hover:brightness-95",
-                      isSelected && "ring-2 ring-primary",
-                      isToday && !isSelected && "ring-1 ring-primary/30",
+                      // Off days: no fill, just faded text — visually empty so available stands out.
+                      !isPast && !isAvailable && "text-text-tertiary opacity-60 hover:bg-muted/30",
+                      // Available days: solid camel tint at 25% opacity + bold weight.
+                      // Strong enough to read as "filled in" against the warm card bg.
+                      !isPast && isAvailable && "bg-primary/25 text-foreground font-semibold hover:bg-primary/35",
+                      // Selected: full camel fill with dark text — wins regardless of availability.
+                      isSelected && "!bg-primary !text-primary-foreground !font-semibold",
+                      // Today (when not selected): ring accent.
+                      isToday && !isSelected && "ring-2 ring-primary/60",
                     )}
                     title={dateStr}
                   >
@@ -252,10 +258,17 @@ export default function GroomerAvailabilityDialog({ open, onOpenChange, groomer 
               })}
             </div>
 
-            <p className="mt-3 text-xs text-text-tertiary">
-              <span className="inline-block h-3 w-3 rounded-sm bg-primary-light align-middle" /> Available
-              <span className="ml-3 inline-block h-3 w-3 rounded-sm bg-muted/60 align-middle" /> Off
-            </p>
+            <div className="mt-3 flex items-center gap-4 text-xs text-text-tertiary">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded-sm bg-primary/25" /> Available
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded-sm border border-border" /> Off
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded-sm bg-primary" /> Selected
+              </span>
+            </div>
           </div>
 
           {/* Editor pane */}
