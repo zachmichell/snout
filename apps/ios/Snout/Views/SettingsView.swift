@@ -21,6 +21,7 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(spacing: SnoutTheme.Spacing.xl) {
                         profileCard
+                        librarySection
                         sectionCard(title: "App") {
                             row(label: "Version", value: appVersion)
                             Divider().background(SnoutTheme.divider)
@@ -96,6 +97,72 @@ struct SettingsView: View {
             }
             .snoutCard()
         }
+    }
+
+    // MARK: - Library section (report cards lives here since it left the tab bar)
+
+    private var librarySection: some View {
+        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.md) {
+            Text("LIBRARY")
+                .font(SnoutTheme.labelSM)
+                .tracking(0.8)
+                .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                .padding(.horizontal, SnoutTheme.Spacing.xs)
+            VStack(spacing: 0) {
+                libraryRow(
+                    title: "Report cards",
+                    body: "Photos and notes from each visit",
+                    symbol: "photo.on.rectangle",
+                    tint: SnoutTheme.vanilla
+                ) {
+                    ReportCardListView()
+                }
+                Divider().background(SnoutTheme.divider)
+                libraryRow(
+                    title: "Cameras",
+                    body: "Live view of your facility's cams",
+                    symbol: "video.fill",
+                    tint: SnoutTheme.frost
+                ) {
+                    WebcamListView()
+                }
+            }
+            .snoutCard(padding: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func libraryRow<Destination: View>(
+        title: String,
+        body: String,
+        symbol: String,
+        tint: Color,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) -> some View {
+        NavigationLink(destination: destination) {
+            HStack(spacing: SnoutTheme.Spacing.lg) {
+                ZStack {
+                    Circle().fill(tint).frame(width: 40, height: 40)
+                    Image(systemName: symbol)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(SnoutTheme.onSurface)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(SnoutTheme.body(16, weight: .semibold))
+                        .foregroundStyle(SnoutTheme.onSurface)
+                    Text(body)
+                        .font(SnoutTheme.bodySM)
+                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SnoutTheme.onSurfaceFaint)
+            }
+            .padding(SnoutTheme.Spacing.lg)
+        }
+        .buttonStyle(.plain)
     }
 
     private func row(label: String, value: String) -> some View {

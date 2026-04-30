@@ -33,6 +33,14 @@
 	<string>Snout saves report card photos to your library when you tap Save.</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>Snout sends you report cards, photos, and booking updates from your facility.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>GrandifloraOne-Regular.ttf</string>
+		<string>Montserrat-Regular.ttf</string>
+		<string>Montserrat-Medium.ttf</string>
+		<string>Montserrat-SemiBold.ttf</string>
+		<string>Montserrat-Bold.ttf</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

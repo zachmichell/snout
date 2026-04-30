@@ -48,7 +48,7 @@ final class ReservationListViewModel: ObservableObject {
             schema: "public",
             table: "reservations"
         )
-        await channel.subscribe()
+        try? await channel.subscribeWithError()
         realtimeChannel = channel
 
         Task { [weak self] in

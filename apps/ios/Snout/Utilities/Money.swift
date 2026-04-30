@@ -49,6 +49,7 @@ enum Money {
         case "full_day":    return "Full Day"
         case "overnight":   return "Overnight"
         case "multi_night": return "Multi-Night"
+        case "flat":        return "Per Appointment"
         default:            return t
         }
     }
