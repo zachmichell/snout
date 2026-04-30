@@ -39,19 +39,30 @@ export default function OrganizationTab() {
 
   const [name, setName] = useState("");
   const [timezone, setTimezone] = useState("");
+  const [cancellationHours, setCancellationHours] = useState("24");
+  const [groomingCancellationHours, setGroomingCancellationHours] = useState("48");
 
   useEffect(() => {
     if (org) {
       setName(org.name);
       setTimezone(org.timezone);
+      setCancellationHours(String(org.cancellation_policy_hours ?? 24));
+      setGroomingCancellationHours(String(org.grooming_cancellation_policy_hours ?? 48));
     }
   }, [org]);
 
   const saveMut = useMutation({
     mutationFn: async () => {
+      const cancelH = Math.max(0, parseInt(cancellationHours, 10) || 0);
+      const groomCancelH = Math.max(0, parseInt(groomingCancellationHours, 10) || 0);
       const { error } = await supabase
         .from("organizations")
-        .update({ name, timezone })
+        .update({
+          name,
+          timezone,
+          cancellation_policy_hours: cancelH,
+          grooming_cancellation_policy_hours: groomCancelH,
+        })
         .eq("id", orgId!);
       if (error) throw error;
       const { logActivity } = await import("@/lib/activity");
@@ -60,7 +71,7 @@ export default function OrganizationTab() {
         action: "updated",
         entity_type: "organization",
         entity_id: orgId!,
-        metadata: { name, timezone },
+        metadata: { name, timezone, cancellation_policy_hours: cancelH, grooming_cancellation_policy_hours: groomCancelH },
       });
     },
     onSuccess: () => {
@@ -69,6 +80,12 @@ export default function OrganizationTab() {
     },
     onError: (e: any) => toast.error(e.message ?? "Failed to update"),
   });
+
+  const isDirty =
+    name !== (org?.name ?? "") ||
+    timezone !== (org?.timezone ?? "") ||
+    parseInt(cancellationHours, 10) !== (org?.cancellation_policy_hours ?? 24) ||
+    parseInt(groomingCancellationHours, 10) !== (org?.grooming_cancellation_policy_hours ?? 48);
 
   if (isLoading || !org) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
@@ -142,10 +159,60 @@ export default function OrganizationTab() {
           </Select>
         </div>
 
+        <div className="rounded-lg border border-border-subtle bg-muted/20 p-4 space-y-4">
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-semibold text-foreground">Cancellation policy</h3>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                Cancellations made within this many hours of the appointment may incur a fee per your facility's policy. Pet parents see a warning when they try to cancel inside the window.
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="cancel-hours">General reservations</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="cancel-hours"
+                  type="number"
+                  min={0}
+                  max={720}
+                  value={cancellationHours}
+                  onChange={(e) => setCancellationHours(e.target.value)}
+                />
+                <span className="whitespace-nowrap text-sm text-muted-foreground">hours</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Daycare, boarding, training, etc. Default: 24 hours.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="groom-cancel-hours">Grooming appointments</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="groom-cancel-hours"
+                  type="number"
+                  min={0}
+                  max={720}
+                  value={groomingCancellationHours}
+                  onChange={(e) => setGroomingCancellationHours(e.target.value)}
+                />
+                <span className="whitespace-nowrap text-sm text-muted-foreground">hours</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Typically longer — groomer slots are harder to refill. Default: 48 hours.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="pt-2">
           <Button
             onClick={() => saveMut.mutate()}
-            disabled={saveMut.isPending || (name === org.name && timezone === org.timezone)}
+            disabled={saveMut.isPending || !isDirty}
           >
             {saveMut.isPending ? "Saving…" : "Save changes"}
           </Button>
