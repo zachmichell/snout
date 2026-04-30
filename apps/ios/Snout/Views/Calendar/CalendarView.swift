@@ -36,13 +36,18 @@ enum CalendarModule: String, CaseIterable, Hashable {
     }
 
     var color: Color {
+        // High-frequency services (daycare, boarding, grooming) get the three
+        // most-contrasting hues from Boho Rainbow — warm pink, cool blue-grey,
+        // and sage green — so they're easy to tell apart at a glance.
+        // Lower-frequency tiers reuse warm-family tones (close to cotton) since
+        // they're rare enough that a casual glance won't confuse them.
         switch self {
-        case .daycare:   return SnoutTheme.cotton    // warm pink — playful daytime
-        case .boarding:  return SnoutTheme.frost     // cool blue-grey — overnight calm
-        case .grooming:  return SnoutTheme.vanilla   // warm cream — pampering
-        case .training:  return SnoutTheme.mist      // sage — focused
-        case .retail:    return SnoutTheme.blueberry // muted dusty rose
-        case .other:     return SnoutTheme.accent
+        case .daycare:   return SnoutTheme.cotton    // warm pink (hue ~14°)
+        case .boarding:  return SnoutTheme.frost     // cool blue-grey (hue ~187°)
+        case .grooming:  return SnoutTheme.mist      // sage green (hue ~102°)
+        case .training:  return SnoutTheme.vanilla   // warm cream — secondary tier
+        case .retail:    return SnoutTheme.blueberry // dusty rose — secondary tier
+        case .other:     return SnoutTheme.accent    // soft camel fallback
         }
     }
 
