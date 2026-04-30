@@ -45,11 +45,14 @@ struct SignInView: View {
     // MARK: - Background
 
     private var backgroundGradient: some View {
+        // Two-stop, all-cool Boho: Morning Mist (sage) into Frosted Glass (blue-grey).
+        // Keeps the page entirely in the cool family so the warm Soft Camel wordmark
+        // and CTA button stand out as the focal points. The form card's white surface
+        // supplies all the warmth the screen needs.
         LinearGradient(
             colors: [
-                SnoutTheme.cotton,
-                SnoutTheme.vanilla,
-                SnoutTheme.background
+                SnoutTheme.mist,
+                SnoutTheme.frost
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -59,22 +62,13 @@ struct SignInView: View {
     // MARK: - Branding
 
     private var branding: some View {
-        VStack(spacing: SnoutTheme.Spacing.md) {
-            ZStack {
-                Circle()
-                    .fill(SnoutTheme.surface)
-                    .frame(width: 84, height: 84)
-                    .shadow(color: SnoutTheme.cardShadowColor,
-                            radius: SnoutTheme.cardShadowRadius, x: 0, y: SnoutTheme.cardShadowY)
-                Image(systemName: "pawprint.fill")
-                    .font(.system(size: 36))
-                    .foregroundStyle(SnoutTheme.accent)
-            }
-            .padding(.top, SnoutTheme.Spacing.xxl)
-
-            Text("Snout")
-                .font(SnoutTheme.display(44, weight: .bold))
-                .foregroundStyle(SnoutTheme.onSurface)
+        VStack(spacing: SnoutTheme.Spacing.lg) {
+            Image("SnoutLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 220)
+                .foregroundStyle(SnoutTheme.accent)
+                .padding(.top, SnoutTheme.Spacing.xxl)
 
             Text("Welcome back. Let's see what your pet is up to.")
                 .font(SnoutTheme.bodyMD)
@@ -110,7 +104,7 @@ struct SignInView: View {
             } label: {
                 Text("Email me a sign-in link instead")
                     .font(SnoutTheme.body(14, weight: .medium))
-                    .foregroundStyle(SnoutTheme.accent)
+                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
             }
             .disabled(isWorking || email.isEmpty)
         }

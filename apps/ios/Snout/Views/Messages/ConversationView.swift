@@ -47,9 +47,9 @@ final class ConversationViewModel: ObservableObject {
             InsertAction.self,
             schema: "public",
             table: "messages",
-            filter: "conversation_id=eq.\(conversationId)"
+            filter: .eq("conversation_id", value: conversationId)
         )
-        await channel.subscribe()
+        try? await channel.subscribeWithError()
         realtimeChannel = channel
 
         Task { [weak self] in
@@ -64,6 +64,27 @@ final class ConversationViewModel: ObservableObject {
         if let channel = realtimeChannel {
             await channel.unsubscribe()
             realtimeChannel = nil
+        }
+    }
+
+    /// Marks every unread staff message in this conversation as read AND zeros
+    /// out conversations.unread_owner — atomically — by calling the
+    /// `mark_conversation_read_by_owner` RPC. The RPC is SECURITY DEFINER and
+    /// authorizes the caller against `auth.uid()`, so it's safe to invoke any
+    /// time the conversation view appears.
+    func markAsRead(conversationId: String) async {
+        struct Params: Encodable { let p_conversation_id: String }
+        do {
+            try await client
+                .rpc("mark_conversation_read_by_owner",
+                     params: Params(p_conversation_id: conversationId))
+                .execute()
+        } catch {
+            // Non-fatal: leave the unread state alone if the call fails so we
+            // don't visually claim "read" when the server didn't agree.
+            #if DEBUG
+            print("[ConversationViewModel] markAsRead failed: \(error)")
+            #endif
         }
     }
 
@@ -98,6 +119,13 @@ struct ConversationView: View {
     let conversation: Conversation
     let orgName: String?
     @StateObject private var vm = ConversationViewModel()
+    // Pulled from the environment so we can refresh the tab-bar unread badge
+    // immediately after the RPC zeroes out unread_owner on the server.
+    @EnvironmentObject private var unread: UnreadMessagesService
+    @EnvironmentObject private var currentOwner: CurrentOwnerService
+    // Hide the floating tab bar while the user is in a conversation so the
+    // composer has room and isn't covered by chrome. Restored on dismiss.
+    @EnvironmentObject private var tabBar: TabBarVisibility
 
     var body: some View {
         ZStack {
@@ -109,11 +137,19 @@ struct ConversationView: View {
         }
         .navigationTitle(orgName ?? "Your facility")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear  { tabBar.isVisible = false }
+        .onDisappear {
+            tabBar.isVisible = true
+            Task { await vm.unsubscribe() }
+        }
         .task {
             await vm.load(conversationId: conversation.id)
+            // Mark as read BEFORE refreshing the badge so the badge reads the
+            // post-update unread_owner value.
+            await vm.markAsRead(conversationId: conversation.id)
+            await unread.refresh(ownerId: currentOwner.ownerId)
             await vm.subscribe(conversationId: conversation.id)
         }
-        .onDisappear { Task { await vm.unsubscribe() } }
     }
 
     private var messageList: some View {

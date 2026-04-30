@@ -2,9 +2,13 @@
 //  HomeView.swift
 //  Snout
 //
-//  Pet-parent landing surface. The "everything that matters right now" dashboard.
-//  Pulls a small snapshot of the most-recent state for each domain and presents it
-//  as warm, glanceable cards. Designed to make the app feel alive on first launch.
+//  Pet-parent landing surface. Three glanceable sections, in priority order:
+//    1. Greeting (time-of-day + first name)
+//    2. Compact "next visit" hero card (or current-visit if checked in)
+//    3. Credits summary — full days, half days, nights at a glance
+//
+//  Cameras live in their own tab. Report cards live in Settings → Library.
+//  Unread message count drives a badge on the Messages tab (see MainTabView).
 //
 
 import SwiftUI
@@ -14,10 +18,8 @@ final class HomeViewModel: ObservableObject {
     @Published var pets: [Pet] = []
     @Published var activeReservation: Reservation?     // checked_in right now
     @Published var nextReservation: Reservation?       // upcoming
-    @Published var latestReportCard: ReportCard?
-    @Published var availableWebcam: Webcam?            // first cam visible to this owner
-    @Published var unreadMessageCount: Int = 0
     @Published var orgName: String?
+    @Published var locations: [Location] = []
     @Published var isLoading: Bool = false
 
     private let client = SupabaseClientProvider.shared
@@ -28,27 +30,33 @@ final class HomeViewModel: ObservableObject {
 
         async let petsTask: [Pet] = loadPets(ownerId: ownerId)
         async let reservationsTask: [Reservation] = loadReservations(ownerId: ownerId)
-        async let cardTask: ReportCard? = loadLatestReportCard(organizationId: organizationId)
-        async let webcamTask: Webcam? = loadFirstWebcam(organizationId: organizationId, ownerId: ownerId)
-        async let unreadTask: Int = loadUnreadMessageCount(ownerId: ownerId)
         async let orgTask: String? = loadOrgName(organizationId: organizationId)
+        async let locationsTask: [Location] = loadLocations(organizationId: organizationId)
 
         let pets = (try? await petsTask) ?? []
         let reservations = (try? await reservationsTask) ?? []
         self.pets = pets
 
         let now = Date()
-        self.activeReservation = reservations.first {
-            $0.status == .checkedIn
-        }
+        self.activeReservation = reservations.first { $0.status == .checkedIn }
         self.nextReservation = reservations
             .filter { $0.startAt > now && ($0.status == .confirmed || $0.status == .requested) }
             .min(by: { $0.startAt < $1.startAt })
 
-        self.latestReportCard = (try? await cardTask) ?? nil
-        self.availableWebcam = (try? await webcamTask) ?? nil
-        self.unreadMessageCount = (try? await unreadTask) ?? 0
         self.orgName = (try? await orgTask) ?? nil
+        self.locations = (try? await locationsTask) ?? []
+    }
+
+    /// The location to surface in the header. Priority:
+    /// 1. The active reservation's location (we're checked in there right now).
+    /// 2. The next upcoming reservation's location.
+    /// 3. The first active location of the org as a fallback.
+    var displayLocation: Location? {
+        let resLocId = activeReservation?.locationId ?? nextReservation?.locationId
+        if let id = resLocId, let match = locations.first(where: { $0.id == id }) {
+            return match
+        }
+        return locations.first(where: { $0.active })
     }
 
     private func loadPets(ownerId: String) async throws -> [Pet] {
@@ -74,57 +82,6 @@ final class HomeViewModel: ObservableObject {
             .value
     }
 
-    private func loadLatestReportCard(organizationId: String) async throws -> ReportCard? {
-        let rows: [ReportCard] = try await client
-            .from("report_cards")
-            .select()
-            .eq("organization_id", value: organizationId)
-            .eq("published", value: true)
-            .order("published_at", ascending: false)
-            .limit(1)
-            .execute()
-            .value
-        return rows.first
-    }
-
-    private func loadFirstWebcam(organizationId: String, ownerId: String) async throws -> Webcam? {
-        // Apply same visibility rule as WebcamListView: org-wide cams always; location-scoped
-        // only if user has an active reservation at that location.
-        let cams: [Webcam] = try await client
-            .from("webcams")
-            .select()
-            .eq("organization_id", value: organizationId)
-            .eq("enabled", value: true)
-            .is("deleted_at", value: nil)
-            .execute()
-            .value
-
-        let activeReservations: [Reservation] = try await client
-            .from("reservations")
-            .select("id, location_id, status, primary_owner_id, organization_id, start_at, end_at, created_at, updated_at, source, is_recurring")
-            .eq("primary_owner_id", value: ownerId)
-            .in("status", values: ["confirmed", "checked_in"])
-            .is("deleted_at", value: nil)
-            .execute()
-            .value
-        let allowed = Set(activeReservations.compactMap(\.locationId))
-
-        return cams.first { cam in
-            cam.locationId == nil || (cam.locationId.map { allowed.contains($0) } ?? false)
-        }
-    }
-
-    private func loadUnreadMessageCount(ownerId: String) async throws -> Int {
-        struct Conv: Decodable { let unread_owner: Int }
-        let rows: [Conv] = try await client
-            .from("conversations")
-            .select("unread_owner")
-            .eq("owner_id", value: ownerId)
-            .execute()
-            .value
-        return rows.reduce(0) { $0 + $1.unread_owner }
-    }
-
     private func loadOrgName(organizationId: String) async throws -> String? {
         struct Org: Decodable { let name: String }
         let rows: [Org] = try await client
@@ -136,10 +93,22 @@ final class HomeViewModel: ObservableObject {
             .value
         return rows.first?.name
     }
+
+    private func loadLocations(organizationId: String) async throws -> [Location] {
+        try await client
+            .from("locations")
+            .select()
+            .eq("organization_id", value: organizationId)
+            .is("deleted_at", value: nil)
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+    }
 }
 
 struct HomeView: View {
     @EnvironmentObject private var currentOwner: CurrentOwnerService
+    @EnvironmentObject private var unread: UnreadMessagesService
     @StateObject private var vm = HomeViewModel()
 
     var body: some View {
@@ -148,15 +117,10 @@ struct HomeView: View {
                 SnoutTheme.background.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: SnoutTheme.Spacing.xl) {
+                        facilityHeader
                         greeting
                         heroCard
-                        if let cam = vm.availableWebcam {
-                            cameraCard(cam)
-                        }
-                        if let card = vm.latestReportCard {
-                            reportCardTile(card)
-                        }
-                        messagesTile
+                        creditsCard
                         Spacer(minLength: SnoutTheme.Spacing.xxl)
                     }
                     .padding(.horizontal, SnoutTheme.Spacing.xl)
@@ -166,7 +130,11 @@ struct HomeView: View {
             }
             .navigationBarHidden(true)
             .task { await loadIfReady() }
-            .refreshable { await loadIfReady() }
+            .refreshable {
+                await currentOwner.refreshOwner()
+                await unread.refresh(ownerId: currentOwner.ownerId)
+                await loadIfReady()
+            }
         }
     }
 
@@ -174,6 +142,61 @@ struct HomeView: View {
         if let org = currentOwner.organizationId, let owner = currentOwner.ownerId {
             await vm.load(organizationId: org, ownerId: owner)
         }
+    }
+
+    // MARK: - Facility header
+
+    /// Business-identity strip above the greeting: monogram tile + org name +
+    /// address subtitle. Designed so we can later swap the monogram for a real
+    /// logo image (organizations table doesn't have a logo column today).
+    @ViewBuilder
+    private var facilityHeader: some View {
+        if let org = vm.orgName {
+            HStack(spacing: SnoutTheme.Spacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(SnoutTheme.cotton.opacity(0.7))
+                        .frame(width: 38, height: 38)
+                    Text(monogram(for: org))
+                        .font(SnoutTheme.body(13, weight: .semibold))
+                        .foregroundStyle(SnoutTheme.onSurface)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(org)
+                        .font(SnoutTheme.body(15, weight: .semibold))
+                        .foregroundStyle(SnoutTheme.onSurface)
+                        .lineLimit(1)
+                    if let addr = facilityAddressLine {
+                        Text(addr)
+                            .font(SnoutTheme.bodySM)
+                            .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// Address subtitle — street only (no city/state) so it reads like
+    /// "123 Dogwood Drive". For multi-location orgs we prefix the location name
+    /// so the parent knows which physical site they're looking at.
+    private var facilityAddressLine: String? {
+        guard let loc = vm.displayLocation else { return nil }
+        let street = loc.streetLine
+        if vm.locations.count > 1 {
+            if let street { return "\(loc.name) · \(street)" }
+            return loc.name
+        }
+        return street
+    }
+
+    private func monogram(for name: String) -> String {
+        let words = name.split(separator: " ").prefix(2)
+        let initials = words.compactMap { $0.first.map(String.init) }
+        let mono = initials.joined()
+        return mono.isEmpty ? "•" : mono.uppercased()
     }
 
     // MARK: - Greeting
@@ -207,7 +230,7 @@ struct HomeView: View {
         return "Pet parent"
     }
 
-    // MARK: - Hero card
+    // MARK: - Hero card (compact)
 
     @ViewBuilder
     private var heroCard: some View {
@@ -269,7 +292,6 @@ struct HomeView: View {
     }
 
     private func serviceLabel(for r: Reservation) -> String {
-        // Without joining services, infer a friendly label from the duration.
         let hours = r.endAt.timeIntervalSince(r.startAt) / 3600
         switch hours {
         case ..<2:    return "appointment"
@@ -279,129 +301,56 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Camera tile
+    // MARK: - Credits card
 
-    private func cameraCard(_ cam: Webcam) -> some View {
-        NavigationLink {
-            WebcamPlayerView(cam: cam)
-        } label: {
-            HStack(spacing: SnoutTheme.Spacing.lg) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous)
-                        .fill(SnoutTheme.frost)
-                        .frame(width: 64, height: 64)
-                    Image(systemName: "video.fill")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(SnoutTheme.onSurface)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: SnoutTheme.Spacing.xs) {
-                        Circle().fill(SnoutTheme.accent).frame(width: 8, height: 8)
-                        Text("LIVE")
-                            .font(SnoutTheme.labelSM)
-                            .tracking(0.6)
-                            .foregroundStyle(SnoutTheme.accent)
-                    }
-                    Text(cam.name)
-                        .font(SnoutTheme.titleSM)
-                        .foregroundStyle(SnoutTheme.onSurface)
-                    if let d = cam.description {
-                        Text(d)
-                            .font(SnoutTheme.bodySM)
-                            .foregroundStyle(SnoutTheme.onSurfaceMuted)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(SnoutTheme.onSurfaceFaint)
-            }
-            .snoutCard()
-        }
-        .buttonStyle(.plain)
-    }
+    private var creditsCard: some View {
+        let owner = currentOwner.owner
+        let full = owner?.daycareFullDayCredits ?? 0
+        let half = owner?.daycareHalfDayCredits ?? 0
+        let nights = owner?.boardingNightCredits ?? 0
+        let hasAny = full + half + nights > 0
 
-    // MARK: - Latest report card tile
-
-    private func reportCardTile(_ card: ReportCard) -> some View {
-        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.md) {
+        return VStack(alignment: .leading, spacing: SnoutTheme.Spacing.lg) {
             HStack {
-                Text("Latest report card")
+                Text("Your credits")
                     .font(SnoutTheme.titleMD)
                     .foregroundStyle(SnoutTheme.onSurface)
                 Spacer()
-                if let pub = card.publishedAt {
-                    Text(Format.relativeDateLabel(pub))
-                        .font(SnoutTheme.labelMD)
-                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
-                }
             }
-            if let summary = card.summary, !summary.isEmpty {
-                Text("\u{201C}\(summary)\u{201D}")
+
+            if hasAny {
+                HStack(alignment: .top, spacing: SnoutTheme.Spacing.md) {
+                    creditColumn(value: full, label: full == 1 ? "Full day" : "Full days")
+                    Divider().background(SnoutTheme.divider).frame(height: 44)
+                    creditColumn(value: half, label: half == 1 ? "Half day" : "Half days")
+                    Divider().background(SnoutTheme.divider).frame(height: 44)
+                    creditColumn(value: nights, label: nights == 1 ? "Night" : "Nights")
+                }
+            } else {
+                Text("No credits on your account yet. Your facility can add a package when you book.")
                     .font(SnoutTheme.bodyMD)
-                    .foregroundStyle(SnoutTheme.onSurface)
-                    .lineLimit(4)
-            }
-            HStack(spacing: SnoutTheme.Spacing.sm) {
-                if let mood = card.mood {
-                    miniPill(emoji: Format.moodEmoji(mood), label: Format.humanize(mood))
-                }
-                if let energy = card.energyLevel {
-                    miniPill(emoji: Format.energyEmoji(energy), label: Format.humanize(energy))
-                }
-                if let rating = card.overallRating {
-                    miniPill(emoji: Format.ratingEmoji(rating), label: Format.humanize(rating))
-                }
+                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .snoutTinted(SnoutTheme.cotton)
     }
 
-    private func miniPill(emoji: String, label: String) -> some View {
-        HStack(spacing: 4) {
-            Text(emoji)
+    private func creditColumn(value: Int, label: String) -> some View {
+        VStack(spacing: 4) {
+            Text("\(value)")
+                .font(SnoutTheme.display(32, weight: .regular))
+                .foregroundStyle(SnoutTheme.onSurface)
             Text(label)
                 .font(SnoutTheme.labelMD)
-                .foregroundStyle(SnoutTheme.onSurface)
+                .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                .multilineTextAlignment(.center)
         }
-        .padding(.horizontal, SnoutTheme.Spacing.md)
-        .padding(.vertical, 6)
-        .background(SnoutTheme.surface)
-        .clipShape(Capsule())
-    }
-
-    // MARK: - Messages tile
-
-    @ViewBuilder
-    private var messagesTile: some View {
-        if vm.unreadMessageCount > 0 {
-            HStack(spacing: SnoutTheme.Spacing.lg) {
-                ZStack {
-                    Circle().fill(SnoutTheme.blueberry).frame(width: 48, height: 48)
-                    Image(systemName: "bubble.left.and.bubble.right.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(SnoutTheme.onSurface)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(vm.unreadMessageCount == 1 ? "1 new message" : "\(vm.unreadMessageCount) new messages")
-                        .font(SnoutTheme.titleSM)
-                        .foregroundStyle(SnoutTheme.onSurface)
-                    Text("From your facility")
-                        .font(SnoutTheme.bodySM)
-                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(SnoutTheme.onSurfaceFaint)
-            }
-            .snoutCard()
-        }
+        .frame(maxWidth: .infinity)
     }
 }
 
-// MARK: - Hero card
+// MARK: - Hero card (compact dimensions)
 
 private struct HeroCard: View {
     let tint: Color
@@ -412,7 +361,7 @@ private struct HeroCard: View {
     let badge: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.md) {
+        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.sm) {
             HStack {
                 Text(eyebrow.uppercased())
                     .font(SnoutTheme.labelSM)
@@ -434,35 +383,36 @@ private struct HeroCard: View {
                 }
             }
 
-            HStack(alignment: .top, spacing: SnoutTheme.Spacing.lg) {
+            HStack(alignment: .center, spacing: SnoutTheme.Spacing.md) {
                 ZStack {
                     Circle()
                         .fill(SnoutTheme.surface)
-                        .frame(width: 64, height: 64)
+                        .frame(width: 48, height: 48)
                     Image(systemName: symbol)
-                        .font(.system(size: 30))
+                        .font(.system(size: 22))
                         .foregroundStyle(SnoutTheme.accent)
                 }
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(headline)
-                        .font(SnoutTheme.titleLG)
+                        .font(SnoutTheme.titleMD)
                         .foregroundStyle(SnoutTheme.onSurface)
                     Text(subhead)
-                        .font(SnoutTheme.bodyMD)
+                        .font(SnoutTheme.bodySM)
                         .foregroundStyle(SnoutTheme.onSurfaceMuted)
                 }
                 Spacer()
             }
         }
-        .padding(SnoutTheme.Spacing.xl)
+        .padding(SnoutTheme.Spacing.lg)
         .background(tint.opacity(0.55))
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusHero, style: .continuous))
-        .shadow(color: SnoutTheme.heroShadowColor,
-                radius: SnoutTheme.heroShadowRadius, x: 0, y: SnoutTheme.heroShadowY)
+        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusTile, style: .continuous))
+        .shadow(color: SnoutTheme.cardShadowColor,
+                radius: SnoutTheme.cardShadowRadius, x: 0, y: SnoutTheme.cardShadowY)
     }
 }
 
 #Preview {
     HomeView()
         .environmentObject(CurrentOwnerService())
+        .environmentObject(UnreadMessagesService())
 }
