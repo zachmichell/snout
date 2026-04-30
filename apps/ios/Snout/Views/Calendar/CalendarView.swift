@@ -70,6 +70,12 @@ final class CalendarViewModel: ObservableObject {
     /// reservation_id → array of pets attached to that reservation (via
     /// reservation_pets). Built once after reservations + pets load.
     @Published var petsByReservation: [String: [Pet]] = [:]
+    @Published var locations: [Location] = []
+    /// Cancellation windows from the org row. Used by ReservationDetailView
+    /// to decide whether to show the late-cancellation warning. Defaults
+    /// match the schema-level defaults (24 / 48 hours).
+    @Published var cancellationPolicyHours: Int = 24
+    @Published var groomingCancellationPolicyHours: Int = 48
     @Published var isLoading: Bool = false
     @Published var loadError: String?
 
@@ -79,20 +85,25 @@ final class CalendarViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        // Reservations + services + pets in parallel.
+        // All foundational reads in parallel.
         async let resTask: [Reservation] = loadReservations(ownerId: ownerId)
         async let svcTask: [Service]     = loadServices(organizationId: organizationId)
         async let petsTask: [Pet]        = loadPets(ownerId: ownerId)
+        async let locTask: [Location]    = loadLocations(organizationId: organizationId)
+        async let policyTask: (Int, Int) = loadCancellationPolicy(organizationId: organizationId)
 
-        let res = (try? await resTask) ?? []
-        let svcs = (try? await svcTask) ?? []
-        let pets = (try? await petsTask) ?? []
+        let res   = (try? await resTask)  ?? []
+        let svcs  = (try? await svcTask)  ?? []
+        let pets  = (try? await petsTask) ?? []
+        let locs  = (try? await locTask)  ?? []
+        let (genHrs, groomHrs) = (try? await policyTask) ?? (24, 48)
 
         reservations = res
         services = svcs
+        locations = locs
+        cancellationPolicyHours = genHrs
+        groomingCancellationPolicyHours = groomHrs
 
-        // Stage 2: load reservation_pets for the loaded reservation IDs and
-        // build the lookup map. Skipped when there are no reservations.
         if !res.isEmpty {
             petsByReservation = await loadReservationPets(
                 reservationIds: res.map(\.id),
@@ -101,6 +112,36 @@ final class CalendarViewModel: ObservableObject {
         } else {
             petsByReservation = [:]
         }
+    }
+
+    /// Pull just the two cancellation-policy fields off the org row. RLS lets
+    /// org members read organizations.* (members include customers post-
+    /// memberships-trigger).
+    private func loadCancellationPolicy(organizationId: String) async throws -> (Int, Int) {
+        struct OrgPolicy: Decodable {
+            let cancellation_policy_hours: Int?
+            let grooming_cancellation_policy_hours: Int?
+        }
+        let rows: [OrgPolicy] = try await client
+            .from("organizations")
+            .select("cancellation_policy_hours, grooming_cancellation_policy_hours")
+            .eq("id", value: organizationId)
+            .limit(1)
+            .execute()
+            .value
+        let row = rows.first
+        return (row?.cancellation_policy_hours ?? 24,
+                row?.grooming_cancellation_policy_hours ?? 48)
+    }
+
+    private func loadLocations(organizationId: String) async throws -> [Location] {
+        try await client
+            .from("locations")
+            .select()
+            .eq("organization_id", value: organizationId)
+            .is("deleted_at", value: nil)
+            .execute()
+            .value
     }
 
     private func loadReservations(ownerId: String) async throws -> [Reservation] {
@@ -283,6 +324,22 @@ struct CalendarView: View {
            let org   = currentOwner.organizationId {
             await vm.load(ownerId: owner, organizationId: org)
         }
+    }
+
+    /// Resolve a friendly location name for a reservation by id, or nil
+    /// when the reservation has no location.
+    private func locationName(for r: Reservation) -> String? {
+        guard let id = r.locationId,
+              let loc = vm.locations.first(where: { $0.id == id }) else { return nil }
+        return loc.name
+    }
+
+    /// Pick the right cancellation window based on whether this reservation
+    /// is grooming. Grooming has its own (typically longer) policy.
+    private func cancellationHours(for r: Reservation) -> Int {
+        vm.module(for: r) == .grooming
+            ? vm.groomingCancellationPolicyHours
+            : vm.cancellationPolicyHours
     }
 
     // MARK: - Title
@@ -521,7 +578,22 @@ struct CalendarView: View {
             } else {
                 VStack(spacing: SnoutTheme.Spacing.sm) {
                     ForEach(visits, id: \.id) { v in
-                        visitCard(v)
+                        NavigationLink {
+                            VisitDetailView(
+                                reservation: v,
+                                serviceName: vm.serviceName(for: v),
+                                module: vm.module(for: v),
+                                pets: vm.pets(for: v),
+                                locationName: locationName(for: v),
+                                cancellationHours: cancellationHours(for: v),
+                                onCancelled: {
+                                    Task { await loadIfReady() }
+                                }
+                            )
+                        } label: {
+                            visitCard(v)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
