@@ -18,7 +18,6 @@ xcuserdata/
 # Swift Package Manager artifacts (resolved dependencies cached locally)
 .swiftpm/
 .build/
-Package.resolved
 
 # fastlane (future)
 fastlane/report.xml
