@@ -119,8 +119,7 @@ struct WebcamListView: View {
 
     private func errorState(_ message: String) -> some View {
         VStack(spacing: SnoutTheme.Spacing.md) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 40))
+            SnoutGlyph("exclamationmark.triangle", size: 40)
                 .foregroundStyle(.orange)
             Text("Couldn't load cameras")
                 .font(SnoutTheme.body(17, weight: .semibold))
@@ -139,7 +138,7 @@ struct WebcamRow: View {
 
     var body: some View {
         HStack(spacing: SnoutTheme.Spacing.md) {
-            Image(systemName: "video.fill")
+            SnoutGlyph("video.fill", size: 16)
                 .foregroundStyle(SnoutTheme.accent)
                 .frame(width: 36, height: 36)
                 .background(SnoutTheme.accent.opacity(0.12))

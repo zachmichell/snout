@@ -61,14 +61,7 @@ struct PetsStep: View {
             }
         } label: {
             HStack(spacing: SnoutTheme.Spacing.md) {
-                ZStack {
-                    Circle()
-                        .fill(SnoutTheme.vanilla.opacity(0.7))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "pawprint.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(SnoutTheme.accent)
-                }
+                PetAvatar(pet: pet, size: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(pet.name)
                         .font(SnoutTheme.body(15, weight: .semibold))

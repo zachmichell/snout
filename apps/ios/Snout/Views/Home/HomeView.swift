@@ -13,6 +13,34 @@
 
 import SwiftUI
 
+/// Minimal invoice projection for the Home unpaid banner. The full Invoice
+/// model lives in Models/ and gets built in the turn that ports the Invoices
+/// list page; for now we only need the few fields the banner reads.
+///
+/// "Unpaid" = invoice_status IN ('sent', 'partial', 'overdue'). We deliberately
+/// exclude 'draft' (facility hasn't issued it yet) and 'void' (cancelled).
+struct UnpaidInvoiceSummary: Decodable, Identifiable {
+    let id: String
+    let invoiceNumber: String?
+    let status: String
+    let totalCents: Int
+    let amountPaidCents: Int
+    let currency: String
+    let dueAt: Date?
+
+    var amountOwedCents: Int { max(0, totalCents - amountPaidCents) }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case invoiceNumber = "invoice_number"
+        case status
+        case totalCents = "total_cents"
+        case amountPaidCents = "amount_paid_cents"
+        case currency
+        case dueAt = "due_at"
+    }
+}
+
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published var pets: [Pet] = []
@@ -20,6 +48,7 @@ final class HomeViewModel: ObservableObject {
     @Published var nextReservation: Reservation?       // upcoming
     @Published var orgName: String?
     @Published var locations: [Location] = []
+    @Published var unpaidInvoices: [UnpaidInvoiceSummary] = []
     @Published var isLoading: Bool = false
 
     private let client = SupabaseClientProvider.shared
@@ -32,6 +61,7 @@ final class HomeViewModel: ObservableObject {
         async let reservationsTask: [Reservation] = loadReservations(ownerId: ownerId)
         async let orgTask: String? = loadOrgName(organizationId: organizationId)
         async let locationsTask: [Location] = loadLocations(organizationId: organizationId)
+        async let unpaidTask: [UnpaidInvoiceSummary] = loadUnpaidInvoices(ownerId: ownerId)
 
         let pets = (try? await petsTask) ?? []
         let reservations = (try? await reservationsTask) ?? []
@@ -45,6 +75,12 @@ final class HomeViewModel: ObservableObject {
 
         self.orgName = (try? await orgTask) ?? nil
         self.locations = (try? await locationsTask) ?? []
+        self.unpaidInvoices = (try? await unpaidTask) ?? []
+    }
+
+    /// Total amount owed across all unpaid invoices (cents).
+    var totalUnpaidCents: Int {
+        unpaidInvoices.reduce(0) { $0 + $1.amountOwedCents }
     }
 
     /// The location to surface in the header. Priority:
@@ -104,6 +140,22 @@ final class HomeViewModel: ObservableObject {
             .execute()
             .value
     }
+
+    /// Pull invoices the parent owes money on. Status filter mirrors the web
+    /// portal's unpaid view: 'sent' (issued, not yet paid), 'partial' (some
+    /// payment received but not in full), 'overdue' (past due_at). We sort by
+    /// due_at ascending so the most-overdue one appears first in any UI.
+    private func loadUnpaidInvoices(ownerId: String) async throws -> [UnpaidInvoiceSummary] {
+        try await client
+            .from("invoices")
+            .select("id, invoice_number, status, total_cents, amount_paid_cents, currency, due_at")
+            .eq("owner_id", value: ownerId)
+            .is("deleted_at", value: nil)
+            .in("status", values: ["sent", "partial", "overdue"])
+            .order("due_at", ascending: true)
+            .execute()
+            .value
+    }
 }
 
 struct HomeView: View {
@@ -118,6 +170,10 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: SnoutTheme.Spacing.xl) {
                         facilityHeader
+                        // Unpaid-invoice nudge sits BEFORE the greeting because
+                        // the user explicitly asked for emphasis on outstanding
+                        // balances. Hidden when there's nothing owed.
+                        unpaidInvoicesBanner
                         greeting
                         heroCard
                         creditsCard
@@ -199,6 +255,82 @@ struct HomeView: View {
         return mono.isEmpty ? "•" : mono.uppercased()
     }
 
+    // MARK: - Unpaid invoices banner
+    //
+    // Pet-parent's first stop on Home when they owe money. We deliberately
+    // pick a warm but elevated treatment — cotton-pink card, full-width,
+    // a circular icon tile in the brand `accent` (Soft Camel) so it reads
+    // as "actionable" rather than "error". Tapping pushes into the More tab's
+    // Invoices list.
+    //
+    // Visibility: hidden entirely when there are no unpaid invoices, so
+    // there's zero noise for parents up to date. When one or more exist,
+    // the banner is the first interactive element on the page.
+
+    @ViewBuilder
+    private var unpaidInvoicesBanner: some View {
+        if !vm.unpaidInvoices.isEmpty {
+            NavigationLink(destination: InvoicesListView()) {
+                HStack(spacing: SnoutTheme.Spacing.lg) {
+                    ZStack {
+                        Circle().fill(SnoutTheme.accent).frame(width: 44, height: 44)
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(SnoutTheme.onAccent)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(unpaidHeadline)
+                            .font(SnoutTheme.body(15, weight: .semibold))
+                            .foregroundStyle(SnoutTheme.onSurface)
+                        Text(unpaidSubhead)
+                            .font(SnoutTheme.bodySM)
+                            .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    SnoutGlyph("chevron.right", size: 14, weight: .semibold)
+                        .foregroundStyle(SnoutTheme.onSurface)
+                }
+                .padding(SnoutTheme.Spacing.lg)
+                .background(SnoutTheme.cotton.opacity(0.85))
+                .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusTile, style: .continuous))
+                .shadow(color: SnoutTheme.cardShadowColor,
+                        radius: SnoutTheme.cardShadowRadius,
+                        x: 0, y: SnoutTheme.cardShadowY)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var unpaidHeadline: String {
+        let count = vm.unpaidInvoices.count
+        let amount = Money.formatCents(vm.totalUnpaidCents,
+                                       currency: vm.unpaidInvoices.first?.currency ?? "CAD")
+        if count == 1 {
+            return "Invoice due · \(amount)"
+        }
+        return "\(count) invoices due · \(amount)"
+    }
+
+    private var unpaidSubhead: String {
+        // Surface the most pressing one (earliest due_at). Already sorted
+        // ascending by the loader, so .first is the most overdue / soonest.
+        guard let first = vm.unpaidInvoices.first else {
+            return "Tap to review and pay"
+        }
+        if let due = first.dueAt {
+            let cal = Calendar.current
+            let days = cal.dateComponents([.day], from: cal.startOfDay(for: Date()),
+                                          to: cal.startOfDay(for: due)).day ?? 0
+            if days < 0   { return "Past due — please pay as soon as possible" }
+            if days == 0  { return "Due today — tap to review and pay" }
+            if days == 1  { return "Due tomorrow — tap to review and pay" }
+            if days <= 7  { return "Due in \(days) days — tap to review and pay" }
+            return "Tap to review and pay"
+        }
+        return "Tap to review and pay"
+    }
+
     // MARK: - Greeting
 
     private var greeting: some View {
@@ -254,6 +386,7 @@ struct HomeView: View {
             headline: "\(pet.name) is at \(vm.orgName ?? "your facility")",
             subhead: "Checked in · having a great day",
             symbol: "pawprint.circle.fill",
+            pet: pet,
             badge: "LIVE"
         )
     }
@@ -265,6 +398,7 @@ struct HomeView: View {
             headline: "\(pet.name)'s \(serviceLabel(for: reservation))",
             subhead: Format.relativeDateLabel(reservation.startAt),
             symbol: "calendar.circle.fill",
+            pet: pet,
             badge: nil
         )
     }
@@ -276,6 +410,7 @@ struct HomeView: View {
             headline: "\(pet.name) is at home",
             subhead: "No upcoming visits scheduled",
             symbol: "house.circle.fill",
+            pet: pet,
             badge: nil
         )
     }
@@ -287,6 +422,7 @@ struct HomeView: View {
             headline: "Let's get set up",
             subhead: "Your facility will add your pet shortly",
             symbol: "pawprint.circle.fill",
+            pet: nil,
             badge: nil
         )
     }
@@ -327,11 +463,37 @@ struct HomeView: View {
                     creditColumn(value: nights, label: nights == 1 ? "Night" : "Nights")
                 }
             } else {
-                Text("No credits on your account yet. Your facility can add a package when you book.")
+                Text("No credits on your account yet. Buy a package to lock in discounted visits.")
                     .font(SnoutTheme.bodyMD)
                     .foregroundStyle(SnoutTheme.onSurfaceMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            // Buy-more CTA — outlined when credits exist (so the existing
+            // counts stay the visual focus), filled accent when empty (so
+            // the path forward is unmistakable). Pushes to BuyCreditsView
+            // via the navigation stack.
+            NavigationLink {
+                BuyCreditsView()
+            } label: {
+                HStack(spacing: SnoutTheme.Spacing.sm) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text(hasAny ? "Buy more credits" : "Buy credits")
+                        .font(SnoutTheme.body(14, weight: .semibold))
+                }
+                .foregroundStyle(hasAny ? SnoutTheme.onSurface : SnoutTheme.onAccent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, SnoutTheme.Spacing.sm)
+                .background(hasAny ? SnoutTheme.surface : SnoutTheme.accent)
+                .clipShape(Capsule())
+                .overlay(
+                    hasAny
+                        ? Capsule().stroke(SnoutTheme.divider, lineWidth: 1)
+                        : nil
+                )
+            }
+            .buttonStyle(.plain)
         }
         .snoutTinted(SnoutTheme.cotton)
     }
@@ -357,7 +519,10 @@ private struct HeroCard: View {
     let eyebrow: String
     let headline: String
     let subhead: String
+    /// Symbol used when `pet` is nil (welcome / empty states). When a pet
+    /// is present we always show the pet's photo (or initial fallback).
     let symbol: String
+    let pet: Pet?
     let badge: String?
 
     var body: some View {
@@ -384,13 +549,22 @@ private struct HeroCard: View {
             }
 
             HStack(alignment: .center, spacing: SnoutTheme.Spacing.md) {
-                ZStack {
-                    Circle()
-                        .fill(SnoutTheme.surface)
-                        .frame(width: 48, height: 48)
-                    Image(systemName: symbol)
-                        .font(.system(size: 22))
-                        .foregroundStyle(SnoutTheme.accent)
+                // Pet present → real avatar (photo or initial). No pet →
+                // SF symbol on a white surface tile (welcome / setup state).
+                if pet != nil {
+                    PetAvatar(pet: pet, size: 48, tintOverride: SnoutTheme.surface)
+                } else {
+                    ZStack {
+                        Circle()
+                            .fill(SnoutTheme.surface)
+                            .frame(width: 48, height: 48)
+                        // SnoutGlyph routes through the asset catalog, so
+                        // pawprint.circle.fill / calendar.circle.fill /
+                        // house.circle.fill resolve to whichever Boho
+                        // artwork the catalog has aliased to those names.
+                        SnoutGlyph(symbol, size: 22)
+                            .foregroundStyle(SnoutTheme.accent)
+                    }
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(headline)

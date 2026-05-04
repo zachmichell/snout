@@ -2,8 +2,10 @@
 //  MainTabView.swift
 //  Snout
 //
-//  Tab bar order: Home · Messages · Book · Calendar · Settings.
-//  - Cameras and Report Cards live in Settings → Library (not top-level tabs).
+//  Tab bar order: Home · Messages · Book · Calendar · More.
+//  - Cameras and Report Cards live in More → Library (not top-level tabs).
+//  - Account self-service (client details, payment methods, pets, invoices,
+//    agreements) lives in More → its sectioned hub.
 //
 //  We deliberately do NOT use SwiftUI's TabView. On iOS 17 the system tab bar's
 //  background material can leak through behind a custom floating bar even when
@@ -33,7 +35,7 @@ struct MainTabView: View {
         .init(icon: "bubble.left.and.bubble.right",   label: "Messages"),
         .init(icon: "plus.circle.fill",               label: "Book"),
         .init(icon: "calendar",                       label: "Calendar"),
-        .init(icon: "person.crop.circle",             label: "Settings")
+        .init(icon: "ellipsis.circle.fill",           label: "More")
     ]
 
     var body: some View {
@@ -48,7 +50,7 @@ struct MainTabView: View {
                 tab(1) { ConversationListView() }
                 tab(2) { BookView() }
                 tab(3) { CalendarView() }
-                tab(4) { SettingsView() }
+                tab(4) { MoreView() }
             }
             // Reserve room at the bottom for the floating tab bar so content
             // doesn't slide under it. Inset collapses to 0 when the bar is

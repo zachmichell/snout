@@ -66,8 +66,7 @@ struct BookingCalendarGrid: View {
     private var monthHeader: some View {
         HStack {
             Button { shiftMonth(by: -1) } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
+                SnoutGlyph("chevron.left", size: 14, weight: .semibold)
                     .foregroundStyle(SnoutTheme.onSurface)
                     .frame(width: 32, height: 32)
                     .background(SnoutTheme.background)
@@ -84,8 +83,7 @@ struct BookingCalendarGrid: View {
             Spacer()
 
             Button { shiftMonth(by: 1) } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
+                SnoutGlyph("chevron.right", size: 14, weight: .semibold)
                     .foregroundStyle(SnoutTheme.onSurface)
                     .frame(width: 32, height: 32)
                     .background(SnoutTheme.background)

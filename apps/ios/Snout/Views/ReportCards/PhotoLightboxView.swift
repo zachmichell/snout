@@ -40,8 +40,7 @@ struct PhotoLightboxView: View {
             VStack {
                 HStack {
                     Button(action: onClose) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 18, weight: .semibold))
+                        SnoutGlyph("xmark", size: 18, weight: .semibold)
                             .foregroundStyle(.white)
                             .padding(10)
                             .background(.black.opacity(0.5))

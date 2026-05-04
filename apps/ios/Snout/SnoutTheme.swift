@@ -49,6 +49,17 @@ enum SnoutTheme {
     /// (White on Soft Camel fails AA at ~2.5:1.)
     static let onAccent          = Color(red: 0.20, green: 0.15, blue: 0.13)      // #332620
 
+    // MARK: - Destructive action
+    /// Background for destructive primary buttons (e.g. "Cancel visit"). We
+    /// deliberately do NOT use system red — it clashes with the Boho palette
+    /// and reads as a generic iOS error rather than a considered facility
+    /// action. Instead we use the same deep warm brown as `onSurface`, which
+    /// hits AAA contrast against white text and stays inside the brand
+    /// family. The dark fill carries the visual gravitas; the explicit
+    /// "Cancel visit" label carries the meaning.
+    static let destructive       = onSurface                                     // #332620
+    static let onDestructive     = Color.white
+
     // MARK: - Status semantic colors (mapped to palette tones, never raw red/green)
     static func statusBackground(for status: ReservationStatus) -> Color {
         switch status {

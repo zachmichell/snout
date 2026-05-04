@@ -29,6 +29,9 @@ struct Pet: Codable, Identifiable, Hashable {
     let sex: Sex
     let dateOfBirth: String?
     let weightKg: Double?
+    let color: String?
+    let microchipId: String?
+    let spayedNeutered: Bool?
     let photoURL: String?
     let allergies: String?
     let medicationNotes: String?
@@ -42,9 +45,11 @@ struct Pet: Codable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id
         case organizationId    = "organization_id"
-        case name, species, breed, sex
+        case name, species, breed, sex, color
         case dateOfBirth       = "date_of_birth"
         case weightKg          = "weight_kg"
+        case microchipId       = "microchip_id"
+        case spayedNeutered    = "spayed_neutered"
         case photoURL          = "photo_url"
         case allergies
         case medicationNotes   = "medication_notes"
