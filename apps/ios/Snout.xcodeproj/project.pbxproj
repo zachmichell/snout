@@ -1,0 +1,982 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		04058123421BC2A5BAA372CC /* MoreShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F018C04AECF12952F7FB042 /* MoreShared.swift */; };
+		07C1DFBF2BCAD08EC3F03863 /* ConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 160E1DC45286237BCCFAE248 /* ConversationListView.swift */; };
+		0A0209A515ADE84A418C83EF /* PhotoLightboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA644024CD4165E2EC739DC2 /* PhotoLightboxView.swift */; };
+		0A9C36D254F3C7457AD757F8 /* BookingWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 471C1E6F121C2592F2E95E1E /* BookingWizardView.swift */; };
+		0D3FD1846AD890BE1FFC8274 /* Montserrat-Italic-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7273E187B94F83178E6EF88B /* Montserrat-Italic-VariableFont_wght.ttf */; };
+		0E4FC85936A18B042CCBF51D /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = AE613A5D5887DB86917A3853 /* Supabase */; };
+		1290337E98AA0BFBD2425D79 /* PetAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6931DE85CCC444D50B8172 /* PetAvatar.swift */; };
+		13516631DD5294B50B5C30FA /* InvoicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2D40E026383D2D561EB5A16 /* InvoicesView.swift */; };
+		13ED736B8CD71216BAE2490F /* DateTimeStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930229CDBA1EF94B5A5D7612 /* DateTimeStep.swift */; };
+		18CF661A700F5FCB0694E68F /* Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 616B72B147362A8C4C901679 /* Service.swift */; };
+		1A8EEFD70312B9731977F992 /* ClientDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E8B548D4270D97C997AE0D /* ClientDetailsView.swift */; };
+		1BE473E076A361EDC4D1A002 /* TabBarVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E65EE19A4F682DE287E2DC /* TabBarVisibility.swift */; };
+		2185CC8AA04AD5B6C2B4F752 /* Groomer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E89365A033EB0D5A210084AF /* Groomer.swift */; };
+		227FBDB083FFCB203B789421 /* SlotPickerStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73503668041819BEB8C03832 /* SlotPickerStep.swift */; };
+		27D413AC6466A57BD58571AD /* VisitDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C184406EC41E908339F754 /* VisitDetailView.swift */; };
+		27F23542A02B876A027EB51B /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CD495EF8BCE2CD7602251E4 /* SignInView.swift */; };
+		2D7DB67B82D053B5B01B4036 /* PetsStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C245448E38C2E663F38AED4 /* PetsStep.swift */; };
+		3AE17A5AAFDBDA1BC47F020C /* ReviewStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5084FC94E419EEFB15C47FED /* ReviewStep.swift */; };
+		41AF63DBCD2772378B3B4C79 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6566F57E37981E92EDDB0FD7 /* MainTabView.swift */; };
+		4551D068BA3198CAAA690D63 /* PaymentMethodsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3246EDE8E699B5A8B85FA58 /* PaymentMethodsView.swift */; };
+		47442157A4644A9301789BB3 /* Config.plist in Resources */ = {isa = PBXBuildFile; fileRef = FC15079CB6F74B2383A2BC6D /* Config.plist */; };
+		48392160F76F1E452FFA1BB0 /* Reservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561CF4D5362FBF69D5AC668E /* Reservation.swift */; };
+		4A2745F8C121208E41ABF47E /* UnreadMessagesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234EC242A4BD96B1FAE25D71 /* UnreadMessagesService.swift */; };
+		4A7E2C09E22F97868E1D708F /* Montserrat-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9529ABDF697FAD5652D9B264 /* Montserrat-Medium.ttf */; };
+		5E616BEE967C0B1AE7089549 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25140E42F0D40D3CCC63B87F /* Money.swift */; };
+		5F0E91B8ADEF6D709DF4BB1C /* SnoutUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E4034F5632E3A03B400C9B /* SnoutUITestsLaunchTests.swift */; };
+		60B8516AD076A6F5BD875FA7 /* ReservationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 362CDF5FEDDD5590EC3A5625 /* ReservationListView.swift */; };
+		62D518EF6B6D65FB4D8D4A99 /* BookingHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E3ACCC328ED3AD6C3444BDD /* BookingHelpers.swift */; };
+		687747FF46B4B95C80B5BDCB /* ReservationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5718ED3941AFC5BA90FA5BD9 /* ReservationDetailView.swift */; };
+		70EF5B4D3796E03E32E026B6 /* PushService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0178A791BE7BEF4D22C4A855 /* PushService.swift */; };
+		716E547A9EC7362CDDE78AC2 /* ReportCardListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD63E6AF045CA09BDC5A5F0 /* ReportCardListView.swift */; };
+		724595BA44CCCE63DA01515A /* Pet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21052497D93C63199E50D8E /* Pet.swift */; };
+		763F0CB1C5A153C0B085E86F /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B40A367CA69CD481A21400 /* AuthService.swift */; };
+		79903EEDDF687137705EC25D /* Montserrat-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */; };
+		79DB2DE784A03CF1FCD9AE36 /* CurrentOwnerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365BBF119E0D455737AC3D48 /* CurrentOwnerService.swift */; };
+		7D9B0B40C015B948CE35FF69 /* GrandifloraOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C70949BE448EC661E53E0047 /* GrandifloraOne-Regular.ttf */; };
+		82A9D1BC74FB77A6366B1D4E /* PetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADD4BE3C648D77EC3CCB9F86 /* PetsView.swift */; };
+		88FEB03EA443711D37E8392D /* AgreementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45D71535692E2147C92526D6 /* AgreementsView.swift */; };
+		8983C3F970CC7BBED3DEB80A /* BuyCreditsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD09A9C25B5F21CE3F09BD6B /* BuyCreditsView.swift */; };
+		8AA8957DAC06646D290ED059 /* StorageDownloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04FA2E9482420226195959A2 /* StorageDownloadTests.swift */; };
+		94675F7EFE18426FEAD1EEF6 /* WebcamPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54E114C51FDADD1185151FF3 /* WebcamPlayerView.swift */; };
+		9CCC704FEF6F6E77488DD467 /* CustomTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6255C7047A847BF4366279C9 /* CustomTabBar.swift */; };
+		9E7C6A8617F1D109B599CE6E /* SnoutTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC59E49D7967A4D071DEC62A /* SnoutTheme.swift */; };
+		9F456E8F6BC6175A99A510A1 /* SnoutGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0838E23E300C1F88A7E171 /* SnoutGlyph.swift */; };
+		A08D50D5223DE6725305EE73 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF2C63E9AEFE4928E3670D6D /* Conversation.swift */; };
+		A151CF1DCB7F9FD0C321966D /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1D7CADB21ACF9CC8434EA3 /* Message.swift */; };
+		A3B6772161AD4B75DF563970 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0033A8FE50318339C4802FBE /* AppConfig.swift */; };
+		A4A3261EA81EF8B41FD4638A /* ServiceStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D9C76162444AB432B42EAC2 /* ServiceStep.swift */; };
+		A52377E80D292A51F1B8A88C /* Owner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6488B51BD6CB91E540D62E86 /* Owner.swift */; };
+		A6C8CA16674F63DCE3B3F6F2 /* Montserrat-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FB91B04834035FE119B4DD01 /* Montserrat-VariableFont_wght.ttf */; };
+		A8815847FB980C82ADFDAA4F /* ReportCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE319EB2102236C2C68D35F /* ReportCard.swift */; };
+		A951F7CD1D5EF6F5A609B1B7 /* SnoutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAD638D6923420E3CE34F8F /* SnoutApp.swift */; };
+		B2CF6DDA71CEB060A5A05B16 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9514D919EF95322F6BD880B6 /* HomeView.swift */; };
+		B3A1D3C0F106397C0762AB4E /* WebcamListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59441346B40044DEE6A626FC /* WebcamListView.swift */; };
+		B502FEA0DA2E6CC19F8D557A /* Montserrat-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5E8E754B62B4ED5F854C5263 /* Montserrat-Bold.ttf */; };
+		B868217DCF63B014B83FEA6A /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F5A279A825B442007855F1 /* Format.swift */; };
+		C179E26E86BDD23579F2BC01 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E445263623AE34747FDB5F2 /* CalendarView.swift */; };
+		C33C444ED28379A5027C5B93 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86510617A869D0A280071FBA /* RootView.swift */; };
+		C4A42AB45C2E71F26FCDB7E8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBBABB053024509A3594B7B3 /* SettingsView.swift */; };
+		CA48E70B94141C8D6E9B7B96 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489E8CA3A6903FF293A185CF /* Profile.swift */; };
+		CB920838EA5950BBDFDACB5F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AB8E80F5405DC6C5687AD9C3 /* Assets.xcassets */; };
+		CCD864FB19409A8A1A5FE616 /* Config.example.plist in Resources */ = {isa = PBXBuildFile; fileRef = BD24E49994534BA5FE289161 /* Config.example.plist */; };
+		CFF6143EF2666FE280E30021 /* StorageDownload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9ADE80E2335314B7BCB01A /* StorageDownload.swift */; };
+		D030CB7C2AE65237A14470DF /* MoneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37395971423D4790AF352C5C /* MoneyTests.swift */; };
+		D246AC674E854C4615B8A770 /* GroomerStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3402645D368940D1AE0246FB /* GroomerStep.swift */; };
+		D5F5CC8F1D2602FCC714F593 /* Montserrat-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FAFCC8BF123999927A4F93A3 /* Montserrat-Regular.ttf */; };
+		DAC1D614844611AC486268C0 /* Webcam.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F01F7B155B930058452221A /* Webcam.swift */; };
+		E1335942E7C2246F55612C7C /* BookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B363070496D8A809BA06184 /* BookView.swift */; };
+		E3727EC992C431E5BC821B2E /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A6CF1FBAD8985204CE1553 /* ConversationView.swift */; };
+		E4D706BD356D7B12C4D8BC17 /* FormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1707792E682BE2F5F6D425D9 /* FormatTests.swift */; };
+		E570A48F98BABDECA5DB52E1 /* Location.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEA7B39535EB30BD63C3629 /* Location.swift */; };
+		F09BB476089288A16E6628B2 /* ReportCardDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44EF06CCA7EB6C816C2A9F41 /* ReportCardDetailView.swift */; };
+		F22810744674D08A0FB6D182 /* BookingWizardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2807AC82DD6A7D17A440AE8 /* BookingWizardViewModel.swift */; };
+		FA49B1D170EF0F10993222B0 /* BookingCalendarGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643CC857E7ABCD867A06282B /* BookingCalendarGrid.swift */; };
+		FF3FA268B5C27571C8F6B4FC /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F6B35B5DFBF242F688D2919 /* SupabaseClient.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		59AC36061D8EAE9D77292A99 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F6FD89B4608FF1D70DEB77FA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 88CC3B0467BD0E57BCA6A89F;
+			remoteInfo = Snout;
+		};
+		756047CE2033DD92E7F00E03 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F6FD89B4608FF1D70DEB77FA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 88CC3B0467BD0E57BCA6A89F;
+			remoteInfo = Snout;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0033A8FE50318339C4802FBE /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		0178A791BE7BEF4D22C4A855 /* PushService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushService.swift; sourceTree = "<group>"; };
+		04FA2E9482420226195959A2 /* StorageDownloadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDownloadTests.swift; sourceTree = "<group>"; };
+		06A6CF1FBAD8985204CE1553 /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
+		0D9C76162444AB432B42EAC2 /* ServiceStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceStep.swift; sourceTree = "<group>"; };
+		0E9ADE80E2335314B7BCB01A /* StorageDownload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDownload.swift; sourceTree = "<group>"; };
+		0F6B35B5DFBF242F688D2919 /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
+		160E1DC45286237BCCFAE248 /* ConversationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationListView.swift; sourceTree = "<group>"; };
+		1707792E682BE2F5F6D425D9 /* FormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatTests.swift; sourceTree = "<group>"; };
+		1C0838E23E300C1F88A7E171 /* SnoutGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoutGlyph.swift; sourceTree = "<group>"; };
+		21E4034F5632E3A03B400C9B /* SnoutUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoutUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		234EC242A4BD96B1FAE25D71 /* UnreadMessagesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnreadMessagesService.swift; sourceTree = "<group>"; };
+		25140E42F0D40D3CCC63B87F /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Money.swift; sourceTree = "<group>"; };
+		2B363070496D8A809BA06184 /* BookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookView.swift; sourceTree = "<group>"; };
+		2FEA7B39535EB30BD63C3629 /* Location.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Location.swift; sourceTree = "<group>"; };
+		3402645D368940D1AE0246FB /* GroomerStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroomerStep.swift; sourceTree = "<group>"; };
+		362CDF5FEDDD5590EC3A5625 /* ReservationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReservationListView.swift; sourceTree = "<group>"; };
+		365BBF119E0D455737AC3D48 /* CurrentOwnerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrentOwnerService.swift; sourceTree = "<group>"; };
+		37395971423D4790AF352C5C /* MoneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyTests.swift; sourceTree = "<group>"; };
+		3F018C04AECF12952F7FB042 /* MoreShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreShared.swift; sourceTree = "<group>"; };
+		44EF06CCA7EB6C816C2A9F41 /* ReportCardDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportCardDetailView.swift; sourceTree = "<group>"; };
+		45D71535692E2147C92526D6 /* AgreementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgreementsView.swift; sourceTree = "<group>"; };
+		471C1E6F121C2592F2E95E1E /* BookingWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookingWizardView.swift; sourceTree = "<group>"; };
+		489E8CA3A6903FF293A185CF /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
+		4D5BF0EEC0AFB216751D3ED4 /* Snout.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Snout.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5084FC94E419EEFB15C47FED /* ReviewStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStep.swift; sourceTree = "<group>"; };
+		54E114C51FDADD1185151FF3 /* WebcamPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebcamPlayerView.swift; sourceTree = "<group>"; };
+		561CF4D5362FBF69D5AC668E /* Reservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reservation.swift; sourceTree = "<group>"; };
+		5718ED3941AFC5BA90FA5BD9 /* ReservationDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReservationDetailView.swift; sourceTree = "<group>"; };
+		59441346B40044DEE6A626FC /* WebcamListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebcamListView.swift; sourceTree = "<group>"; };
+		5C245448E38C2E663F38AED4 /* PetsStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetsStep.swift; sourceTree = "<group>"; };
+		5E8E754B62B4ED5F854C5263 /* Montserrat-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-Bold.ttf"; sourceTree = "<group>"; };
+		5F01F7B155B930058452221A /* Webcam.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Webcam.swift; sourceTree = "<group>"; };
+		616B72B147362A8C4C901679 /* Service.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Service.swift; sourceTree = "<group>"; };
+		6255C7047A847BF4366279C9 /* CustomTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomTabBar.swift; sourceTree = "<group>"; };
+		643CC857E7ABCD867A06282B /* BookingCalendarGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookingCalendarGrid.swift; sourceTree = "<group>"; };
+		6488B51BD6CB91E540D62E86 /* Owner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Owner.swift; sourceTree = "<group>"; };
+		6566F57E37981E92EDDB0FD7 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		6AD63E6AF045CA09BDC5A5F0 /* ReportCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportCardListView.swift; sourceTree = "<group>"; };
+		713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-SemiBold.ttf"; sourceTree = "<group>"; };
+		71603313865283C4E4A3984B /* SnoutTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SnoutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7273E187B94F83178E6EF88B /* Montserrat-Italic-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-Italic-VariableFont_wght.ttf"; sourceTree = "<group>"; };
+		73503668041819BEB8C03832 /* SlotPickerStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlotPickerStep.swift; sourceTree = "<group>"; };
+		86510617A869D0A280071FBA /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		8B6931DE85CCC444D50B8172 /* PetAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetAvatar.swift; sourceTree = "<group>"; };
+		8E445263623AE34747FDB5F2 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
+		930229CDBA1EF94B5A5D7612 /* DateTimeStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateTimeStep.swift; sourceTree = "<group>"; };
+		9514D919EF95322F6BD880B6 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		9529ABDF697FAD5652D9B264 /* Montserrat-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-Medium.ttf"; sourceTree = "<group>"; };
+		95F5A279A825B442007855F1 /* Format.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Format.swift; sourceTree = "<group>"; };
+		9CD495EF8BCE2CD7602251E4 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
+		9E3ACCC328ED3AD6C3444BDD /* BookingHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookingHelpers.swift; sourceTree = "<group>"; };
+		A5E65EE19A4F682DE287E2DC /* TabBarVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarVisibility.swift; sourceTree = "<group>"; };
+		A998D2825402B4B0BB55A3CD /* SnoutUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SnoutUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA644024CD4165E2EC739DC2 /* PhotoLightboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLightboxView.swift; sourceTree = "<group>"; };
+		AB8E80F5405DC6C5687AD9C3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		ADD4BE3C648D77EC3CCB9F86 /* PetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetsView.swift; sourceTree = "<group>"; };
+		B2807AC82DD6A7D17A440AE8 /* BookingWizardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookingWizardViewModel.swift; sourceTree = "<group>"; };
+		B4DD5F6F717F3C192D60555A /* Snout.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Snout.entitlements; sourceTree = "<group>"; };
+		BD24E49994534BA5FE289161 /* Config.example.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Config.example.plist; sourceTree = "<group>"; };
+		BFD4CBB507BD7C7A2E4FE692 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		C2D40E026383D2D561EB5A16 /* InvoicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvoicesView.swift; sourceTree = "<group>"; };
+		C70949BE448EC661E53E0047 /* GrandifloraOne-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GrandifloraOne-Regular.ttf"; sourceTree = "<group>"; };
+		CAE319EB2102236C2C68D35F /* ReportCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportCard.swift; sourceTree = "<group>"; };
+		CBBABB053024509A3594B7B3 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		CC59E49D7967A4D071DEC62A /* SnoutTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoutTheme.swift; sourceTree = "<group>"; };
+		D21052497D93C63199E50D8E /* Pet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pet.swift; sourceTree = "<group>"; };
+		DD09A9C25B5F21CE3F09BD6B /* BuyCreditsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuyCreditsView.swift; sourceTree = "<group>"; };
+		DF2C63E9AEFE4928E3670D6D /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
+		E0C184406EC41E908339F754 /* VisitDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisitDetailView.swift; sourceTree = "<group>"; };
+		E3246EDE8E699B5A8B85FA58 /* PaymentMethodsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentMethodsView.swift; sourceTree = "<group>"; };
+		E89365A033EB0D5A210084AF /* Groomer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Groomer.swift; sourceTree = "<group>"; };
+		E8B40A367CA69CD481A21400 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		F8E8B548D4270D97C997AE0D /* ClientDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientDetailsView.swift; sourceTree = "<group>"; };
+		FAFCC8BF123999927A4F93A3 /* Montserrat-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-Regular.ttf"; sourceTree = "<group>"; };
+		FB91B04834035FE119B4DD01 /* Montserrat-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-VariableFont_wght.ttf"; sourceTree = "<group>"; };
+		FC15079CB6F74B2383A2BC6D /* Config.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Config.plist; sourceTree = "<group>"; };
+		FC1D7CADB21ACF9CC8434EA3 /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
+		FD92AE80746E46C0CBF75BC0 /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
+		FFAD638D6923420E3CE34F8F /* SnoutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoutApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		646E03D1CAD5E19414D17144 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0E4FC85936A18B042CCBF51D /* Supabase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		02482F02CCAEEC6B41A72EA1 /* ReportCards */ = {
+			isa = PBXGroup;
+			children = (
+				AA644024CD4165E2EC739DC2 /* PhotoLightboxView.swift */,
+				44EF06CCA7EB6C816C2A9F41 /* ReportCardDetailView.swift */,
+				6AD63E6AF045CA09BDC5A5F0 /* ReportCardListView.swift */,
+			);
+			path = ReportCards;
+			sourceTree = "<group>";
+		};
+		052BFD737B4ED5BBFF0982F2 /* Calendar */ = {
+			isa = PBXGroup;
+			children = (
+				8E445263623AE34747FDB5F2 /* CalendarView.swift */,
+				E0C184406EC41E908339F754 /* VisitDetailView.swift */,
+			);
+			path = Calendar;
+			sourceTree = "<group>";
+		};
+		063ECDAC97F5D9F0B3D65CD0 = {
+			isa = PBXGroup;
+			children = (
+				9655B38710455227EF7ABA4A /* Snout */,
+				D79A1424741D8FCDDA53536F /* SnoutTests */,
+				78C77BAA8783F575111FEBBB /* SnoutUITests */,
+				3EADB822246DF6A0FE88B992 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		1CD75AE5B35D5B8190F9EFD6 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				FD92AE80746E46C0CBF75BC0 /* .gitkeep */,
+				C70949BE448EC661E53E0047 /* GrandifloraOne-Regular.ttf */,
+				5E8E754B62B4ED5F854C5263 /* Montserrat-Bold.ttf */,
+				7273E187B94F83178E6EF88B /* Montserrat-Italic-VariableFont_wght.ttf */,
+				9529ABDF697FAD5652D9B264 /* Montserrat-Medium.ttf */,
+				FAFCC8BF123999927A4F93A3 /* Montserrat-Regular.ttf */,
+				713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */,
+				FB91B04834035FE119B4DD01 /* Montserrat-VariableFont_wght.ttf */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		28F35C219D684984F9A5596A /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				9CD495EF8BCE2CD7602251E4 /* SignInView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		2B36926F737DA721243E6129 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				9E3ACCC328ED3AD6C3444BDD /* BookingHelpers.swift */,
+				95F5A279A825B442007855F1 /* Format.swift */,
+				25140E42F0D40D3CCC63B87F /* Money.swift */,
+				0E9ADE80E2335314B7BCB01A /* StorageDownload.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		2CD95B7F881F2AFE725AC108 /* Book */ = {
+			isa = PBXGroup;
+			children = (
+				85338A9A63EE39AB43C1484A /* Steps */,
+				643CC857E7ABCD867A06282B /* BookingCalendarGrid.swift */,
+				471C1E6F121C2592F2E95E1E /* BookingWizardView.swift */,
+				B2807AC82DD6A7D17A440AE8 /* BookingWizardViewModel.swift */,
+				2B363070496D8A809BA06184 /* BookView.swift */,
+			);
+			path = Book;
+			sourceTree = "<group>";
+		};
+		361F8CC2B19278E9F615C457 /* Reservations */ = {
+			isa = PBXGroup;
+			children = (
+				5718ED3941AFC5BA90FA5BD9 /* ReservationDetailView.swift */,
+				362CDF5FEDDD5590EC3A5625 /* ReservationListView.swift */,
+			);
+			path = Reservations;
+			sourceTree = "<group>";
+		};
+		3EADB822246DF6A0FE88B992 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4D5BF0EEC0AFB216751D3ED4 /* Snout.app */,
+				71603313865283C4E4A3984B /* SnoutTests.xctest */,
+				A998D2825402B4B0BB55A3CD /* SnoutUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		41A1945569E5B29C42958136 /* More */ = {
+			isa = PBXGroup;
+			children = (
+				45D71535692E2147C92526D6 /* AgreementsView.swift */,
+				F8E8B548D4270D97C997AE0D /* ClientDetailsView.swift */,
+				C2D40E026383D2D561EB5A16 /* InvoicesView.swift */,
+				3F018C04AECF12952F7FB042 /* MoreShared.swift */,
+				E3246EDE8E699B5A8B85FA58 /* PaymentMethodsView.swift */,
+				ADD4BE3C648D77EC3CCB9F86 /* PetsView.swift */,
+			);
+			path = More;
+			sourceTree = "<group>";
+		};
+		508BBF2F838AAF487C7AEF1F /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				DF2C63E9AEFE4928E3670D6D /* Conversation.swift */,
+				E89365A033EB0D5A210084AF /* Groomer.swift */,
+				2FEA7B39535EB30BD63C3629 /* Location.swift */,
+				FC1D7CADB21ACF9CC8434EA3 /* Message.swift */,
+				6488B51BD6CB91E540D62E86 /* Owner.swift */,
+				D21052497D93C63199E50D8E /* Pet.swift */,
+				489E8CA3A6903FF293A185CF /* Profile.swift */,
+				CAE319EB2102236C2C68D35F /* ReportCard.swift */,
+				561CF4D5362FBF69D5AC668E /* Reservation.swift */,
+				616B72B147362A8C4C901679 /* Service.swift */,
+				5F01F7B155B930058452221A /* Webcam.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		7268F860935DB00ED347C2CE /* Webcams */ = {
+			isa = PBXGroup;
+			children = (
+				59441346B40044DEE6A626FC /* WebcamListView.swift */,
+				54E114C51FDADD1185151FF3 /* WebcamPlayerView.swift */,
+			);
+			path = Webcams;
+			sourceTree = "<group>";
+		};
+		75E7A3FB5DDA6C40A092EBA8 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				28F35C219D684984F9A5596A /* Auth */,
+				2CD95B7F881F2AFE725AC108 /* Book */,
+				052BFD737B4ED5BBFF0982F2 /* Calendar */,
+				A6020409C852E1F8CF372020 /* Components */,
+				F43925F8F89392E228EE01AA /* Home */,
+				D7ECE03C660499879B6FAE61 /* Messages */,
+				41A1945569E5B29C42958136 /* More */,
+				02482F02CCAEEC6B41A72EA1 /* ReportCards */,
+				361F8CC2B19278E9F615C457 /* Reservations */,
+				7268F860935DB00ED347C2CE /* Webcams */,
+				6255C7047A847BF4366279C9 /* CustomTabBar.swift */,
+				6566F57E37981E92EDDB0FD7 /* MainTabView.swift */,
+				86510617A869D0A280071FBA /* RootView.swift */,
+				CBBABB053024509A3594B7B3 /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		78B89F5AF0443F9332ED575E /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				1CD75AE5B35D5B8190F9EFD6 /* Fonts */,
+				AB8E80F5405DC6C5687AD9C3 /* Assets.xcassets */,
+				BD24E49994534BA5FE289161 /* Config.example.plist */,
+				FC15079CB6F74B2383A2BC6D /* Config.plist */,
+				BFD4CBB507BD7C7A2E4FE692 /* Info.plist */,
+				B4DD5F6F717F3C192D60555A /* Snout.entitlements */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		78C77BAA8783F575111FEBBB /* SnoutUITests */ = {
+			isa = PBXGroup;
+			children = (
+				21E4034F5632E3A03B400C9B /* SnoutUITestsLaunchTests.swift */,
+			);
+			path = SnoutUITests;
+			sourceTree = "<group>";
+		};
+		85338A9A63EE39AB43C1484A /* Steps */ = {
+			isa = PBXGroup;
+			children = (
+				930229CDBA1EF94B5A5D7612 /* DateTimeStep.swift */,
+				3402645D368940D1AE0246FB /* GroomerStep.swift */,
+				5C245448E38C2E663F38AED4 /* PetsStep.swift */,
+				5084FC94E419EEFB15C47FED /* ReviewStep.swift */,
+				0D9C76162444AB432B42EAC2 /* ServiceStep.swift */,
+				73503668041819BEB8C03832 /* SlotPickerStep.swift */,
+			);
+			path = Steps;
+			sourceTree = "<group>";
+		};
+		9655B38710455227EF7ABA4A /* Snout */ = {
+			isa = PBXGroup;
+			children = (
+				508BBF2F838AAF487C7AEF1F /* Models */,
+				78B89F5AF0443F9332ED575E /* Resources */,
+				D72BBF10DCD6427127750264 /* Services */,
+				2B36926F737DA721243E6129 /* Utilities */,
+				75E7A3FB5DDA6C40A092EBA8 /* Views */,
+				0033A8FE50318339C4802FBE /* AppConfig.swift */,
+				FFAD638D6923420E3CE34F8F /* SnoutApp.swift */,
+				CC59E49D7967A4D071DEC62A /* SnoutTheme.swift */,
+			);
+			path = Snout;
+			sourceTree = "<group>";
+		};
+		A6020409C852E1F8CF372020 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				8B6931DE85CCC444D50B8172 /* PetAvatar.swift */,
+				1C0838E23E300C1F88A7E171 /* SnoutGlyph.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		D72BBF10DCD6427127750264 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				E8B40A367CA69CD481A21400 /* AuthService.swift */,
+				365BBF119E0D455737AC3D48 /* CurrentOwnerService.swift */,
+				0178A791BE7BEF4D22C4A855 /* PushService.swift */,
+				0F6B35B5DFBF242F688D2919 /* SupabaseClient.swift */,
+				A5E65EE19A4F682DE287E2DC /* TabBarVisibility.swift */,
+				234EC242A4BD96B1FAE25D71 /* UnreadMessagesService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		D79A1424741D8FCDDA53536F /* SnoutTests */ = {
+			isa = PBXGroup;
+			children = (
+				1707792E682BE2F5F6D425D9 /* FormatTests.swift */,
+				37395971423D4790AF352C5C /* MoneyTests.swift */,
+				04FA2E9482420226195959A2 /* StorageDownloadTests.swift */,
+			);
+			path = SnoutTests;
+			sourceTree = "<group>";
+		};
+		D7ECE03C660499879B6FAE61 /* Messages */ = {
+			isa = PBXGroup;
+			children = (
+				160E1DC45286237BCCFAE248 /* ConversationListView.swift */,
+				06A6CF1FBAD8985204CE1553 /* ConversationView.swift */,
+			);
+			path = Messages;
+			sourceTree = "<group>";
+		};
+		F43925F8F89392E228EE01AA /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				DD09A9C25B5F21CE3F09BD6B /* BuyCreditsView.swift */,
+				9514D919EF95322F6BD880B6 /* HomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5FC1734B65E45422D5BABEEB /* SnoutUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1E345CBB86441C949BD77919 /* Build configuration list for PBXNativeTarget "SnoutUITests" */;
+			buildPhases = (
+				75F25274BE1A0B8431CDCF13 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				56545EE106C5F38DCD34DF15 /* PBXTargetDependency */,
+			);
+			name = SnoutUITests;
+			packageProductDependencies = (
+			);
+			productName = SnoutUITests;
+			productReference = A998D2825402B4B0BB55A3CD /* SnoutUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		88CC3B0467BD0E57BCA6A89F /* Snout */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C5E7E90D97A5DD52C534E2AA /* Build configuration list for PBXNativeTarget "Snout" */;
+			buildPhases = (
+				8B5C9593DD6FB8255401B512 /* Sources */,
+				5BFEBC8F8116247959F21F71 /* Resources */,
+				646E03D1CAD5E19414D17144 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Snout;
+			packageProductDependencies = (
+				AE613A5D5887DB86917A3853 /* Supabase */,
+			);
+			productName = Snout;
+			productReference = 4D5BF0EEC0AFB216751D3ED4 /* Snout.app */;
+			productType = "com.apple.product-type.application";
+		};
+		9E32B3268A2C75FF7C1B10B7 /* SnoutTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8E155C2A57972387BDFD9E9F /* Build configuration list for PBXNativeTarget "SnoutTests" */;
+			buildPhases = (
+				DA6B6CD056C7BBA98F25E784 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				03948FC525D4B84160D2609E /* PBXTargetDependency */,
+			);
+			name = SnoutTests;
+			packageProductDependencies = (
+			);
+			productName = SnoutTests;
+			productReference = 71603313865283C4E4A3984B /* SnoutTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F6FD89B4608FF1D70DEB77FA /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					5FC1734B65E45422D5BABEEB = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 88CC3B0467BD0E57BCA6A89F;
+					};
+					88CC3B0467BD0E57BCA6A89F = {
+						ProvisioningStyle = Automatic;
+					};
+					9E32B3268A2C75FF7C1B10B7 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = D56092C7AC536D3B7B05C761 /* Build configuration list for PBXProject "Snout" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 063ECDAC97F5D9F0B3D65CD0;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CCDAB3CDB26550A9587B0B63 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 3EADB822246DF6A0FE88B992 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				88CC3B0467BD0E57BCA6A89F /* Snout */,
+				9E32B3268A2C75FF7C1B10B7 /* SnoutTests */,
+				5FC1734B65E45422D5BABEEB /* SnoutUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5BFEBC8F8116247959F21F71 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CB920838EA5950BBDFDACB5F /* Assets.xcassets in Resources */,
+				CCD864FB19409A8A1A5FE616 /* Config.example.plist in Resources */,
+				47442157A4644A9301789BB3 /* Config.plist in Resources */,
+				7D9B0B40C015B948CE35FF69 /* GrandifloraOne-Regular.ttf in Resources */,
+				B502FEA0DA2E6CC19F8D557A /* Montserrat-Bold.ttf in Resources */,
+				0D3FD1846AD890BE1FFC8274 /* Montserrat-Italic-VariableFont_wght.ttf in Resources */,
+				4A7E2C09E22F97868E1D708F /* Montserrat-Medium.ttf in Resources */,
+				D5F5CC8F1D2602FCC714F593 /* Montserrat-Regular.ttf in Resources */,
+				79903EEDDF687137705EC25D /* Montserrat-SemiBold.ttf in Resources */,
+				A6C8CA16674F63DCE3B3F6F2 /* Montserrat-VariableFont_wght.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		75F25274BE1A0B8431CDCF13 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5F0E91B8ADEF6D709DF4BB1C /* SnoutUITestsLaunchTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B5C9593DD6FB8255401B512 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				88FEB03EA443711D37E8392D /* AgreementsView.swift in Sources */,
+				A3B6772161AD4B75DF563970 /* AppConfig.swift in Sources */,
+				763F0CB1C5A153C0B085E86F /* AuthService.swift in Sources */,
+				E1335942E7C2246F55612C7C /* BookView.swift in Sources */,
+				FA49B1D170EF0F10993222B0 /* BookingCalendarGrid.swift in Sources */,
+				62D518EF6B6D65FB4D8D4A99 /* BookingHelpers.swift in Sources */,
+				0A9C36D254F3C7457AD757F8 /* BookingWizardView.swift in Sources */,
+				F22810744674D08A0FB6D182 /* BookingWizardViewModel.swift in Sources */,
+				8983C3F970CC7BBED3DEB80A /* BuyCreditsView.swift in Sources */,
+				C179E26E86BDD23579F2BC01 /* CalendarView.swift in Sources */,
+				1A8EEFD70312B9731977F992 /* ClientDetailsView.swift in Sources */,
+				A08D50D5223DE6725305EE73 /* Conversation.swift in Sources */,
+				07C1DFBF2BCAD08EC3F03863 /* ConversationListView.swift in Sources */,
+				E3727EC992C431E5BC821B2E /* ConversationView.swift in Sources */,
+				79DB2DE784A03CF1FCD9AE36 /* CurrentOwnerService.swift in Sources */,
+				9CCC704FEF6F6E77488DD467 /* CustomTabBar.swift in Sources */,
+				13ED736B8CD71216BAE2490F /* DateTimeStep.swift in Sources */,
+				B868217DCF63B014B83FEA6A /* Format.swift in Sources */,
+				2185CC8AA04AD5B6C2B4F752 /* Groomer.swift in Sources */,
+				D246AC674E854C4615B8A770 /* GroomerStep.swift in Sources */,
+				B2CF6DDA71CEB060A5A05B16 /* HomeView.swift in Sources */,
+				13516631DD5294B50B5C30FA /* InvoicesView.swift in Sources */,
+				E570A48F98BABDECA5DB52E1 /* Location.swift in Sources */,
+				41AF63DBCD2772378B3B4C79 /* MainTabView.swift in Sources */,
+				A151CF1DCB7F9FD0C321966D /* Message.swift in Sources */,
+				5E616BEE967C0B1AE7089549 /* Money.swift in Sources */,
+				04058123421BC2A5BAA372CC /* MoreShared.swift in Sources */,
+				A52377E80D292A51F1B8A88C /* Owner.swift in Sources */,
+				4551D068BA3198CAAA690D63 /* PaymentMethodsView.swift in Sources */,
+				724595BA44CCCE63DA01515A /* Pet.swift in Sources */,
+				1290337E98AA0BFBD2425D79 /* PetAvatar.swift in Sources */,
+				2D7DB67B82D053B5B01B4036 /* PetsStep.swift in Sources */,
+				82A9D1BC74FB77A6366B1D4E /* PetsView.swift in Sources */,
+				0A0209A515ADE84A418C83EF /* PhotoLightboxView.swift in Sources */,
+				CA48E70B94141C8D6E9B7B96 /* Profile.swift in Sources */,
+				70EF5B4D3796E03E32E026B6 /* PushService.swift in Sources */,
+				A8815847FB980C82ADFDAA4F /* ReportCard.swift in Sources */,
+				F09BB476089288A16E6628B2 /* ReportCardDetailView.swift in Sources */,
+				716E547A9EC7362CDDE78AC2 /* ReportCardListView.swift in Sources */,
+				48392160F76F1E452FFA1BB0 /* Reservation.swift in Sources */,
+				687747FF46B4B95C80B5BDCB /* ReservationDetailView.swift in Sources */,
+				60B8516AD076A6F5BD875FA7 /* ReservationListView.swift in Sources */,
+				3AE17A5AAFDBDA1BC47F020C /* ReviewStep.swift in Sources */,
+				C33C444ED28379A5027C5B93 /* RootView.swift in Sources */,
+				18CF661A700F5FCB0694E68F /* Service.swift in Sources */,
+				A4A3261EA81EF8B41FD4638A /* ServiceStep.swift in Sources */,
+				C4A42AB45C2E71F26FCDB7E8 /* SettingsView.swift in Sources */,
+				27F23542A02B876A027EB51B /* SignInView.swift in Sources */,
+				227FBDB083FFCB203B789421 /* SlotPickerStep.swift in Sources */,
+				A951F7CD1D5EF6F5A609B1B7 /* SnoutApp.swift in Sources */,
+				9F456E8F6BC6175A99A510A1 /* SnoutGlyph.swift in Sources */,
+				9E7C6A8617F1D109B599CE6E /* SnoutTheme.swift in Sources */,
+				CFF6143EF2666FE280E30021 /* StorageDownload.swift in Sources */,
+				FF3FA268B5C27571C8F6B4FC /* SupabaseClient.swift in Sources */,
+				1BE473E076A361EDC4D1A002 /* TabBarVisibility.swift in Sources */,
+				4A2745F8C121208E41ABF47E /* UnreadMessagesService.swift in Sources */,
+				27D413AC6466A57BD58571AD /* VisitDetailView.swift in Sources */,
+				DAC1D614844611AC486268C0 /* Webcam.swift in Sources */,
+				B3A1D3C0F106397C0762AB4E /* WebcamListView.swift in Sources */,
+				94675F7EFE18426FEAD1EEF6 /* WebcamPlayerView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA6B6CD056C7BBA98F25E784 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E4D706BD356D7B12C4D8BC17 /* FormatTests.swift in Sources */,
+				D030CB7C2AE65237A14470DF /* MoneyTests.swift in Sources */,
+				8AA8957DAC06646D290ED059 /* StorageDownloadTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		03948FC525D4B84160D2609E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 88CC3B0467BD0E57BCA6A89F /* Snout */;
+			targetProxy = 756047CE2033DD92E7F00E03 /* PBXContainerItemProxy */;
+		};
+		56545EE106C5F38DCD34DF15 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 88CC3B0467BD0E57BCA6A89F /* Snout */;
+			targetProxy = 59AC36061D8EAE9D77292A99 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1E950EC3D14F4303F9500998 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = L98L7C792K;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.snout.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Snout.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Snout";
+			};
+			name = Debug;
+		};
+		39F516C45A10990F3F431F3A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		AFFD7F7B3E767F874AAE8F6F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = L98L7C792K;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.snout.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Snout.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Snout";
+			};
+			name = Release;
+		};
+		C7D850844BE4B705E3410D29 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.snout.ios.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Snout;
+			};
+			name = Release;
+		};
+		C7F761F846640E6AA0107290 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				DEVELOPMENT_TEAM = W55RNZ9Q4Q;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Snout/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Snout App";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.snoutapp.snout;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D0B94531CC3D3E6069E6AE37 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				DEVELOPMENT_TEAM = W55RNZ9Q4Q;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Snout/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Snout App";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.snoutapp.snout;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D2C5C181BAC839EB6252F5A4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = L98L7C792K;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.snout.ios.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Snout;
+			};
+			name = Debug;
+		};
+		D4B29F71089D2B9F73C530B9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1E345CBB86441C949BD77919 /* Build configuration list for PBXNativeTarget "SnoutUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D2C5C181BAC839EB6252F5A4 /* Debug */,
+				C7D850844BE4B705E3410D29 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8E155C2A57972387BDFD9E9F /* Build configuration list for PBXNativeTarget "SnoutTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1E950EC3D14F4303F9500998 /* Debug */,
+				AFFD7F7B3E767F874AAE8F6F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C5E7E90D97A5DD52C534E2AA /* Build configuration list for PBXNativeTarget "Snout" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D0B94531CC3D3E6069E6AE37 /* Debug */,
+				C7F761F846640E6AA0107290 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D56092C7AC536D3B7B05C761 /* Build configuration list for PBXProject "Snout" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4B29F71089D2B9F73C530B9 /* Debug */,
+				39F516C45A10990F3F431F3A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CCDAB3CDB26550A9587B0B63 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase-community/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AE613A5D5887DB86917A3853 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCDAB3CDB26550A9587B0B63 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = F6FD89B4608FF1D70DEB77FA /* Project object */;
+}

@@ -5,8 +5,6 @@ DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 
-# xcodegen output — regenerated from project.yml on every dev's machine
-Snout.xcodeproj/
 
 # Local secrets — committed as Config.example.plist instead
 Snout/Resources/Config.plist
