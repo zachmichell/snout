@@ -122,37 +122,66 @@ struct VisitDetailView: View {
                 dismiss()
             }
         }
-        // Inside-the-window: stronger warning + reason field.
-        .alert("Late cancellation", isPresented: $showLateWarning) {
-            TextField("Reason (optional)", text: $cancelReason)
-            Button("Cancel anyway", role: .destructive) {
-                Task {
-                    await vm.cancel(
-                        reservation: reservation,
-                        isGrooming: module == .grooming,
-                        reason: cancelReason
-                    )
-                }
+        // Custom Boho confirm dialogs replace the native iOS .alert because
+        // UIAlertController can't be restyled — its destructive button is
+        // always system red, which clashes with the warm Boho palette and
+        // reads as a generic OS error rather than a considered facility
+        // action. The overlay is attached to the root ZStack so it covers
+        // the navigation bar's bottom inset and the action buttons behind it.
+        .overlay {
+            // Outside-the-window: lighter "are you sure?" confirm.
+            if showCancelConfirm {
+                SnoutConfirmDialog(
+                    tone: .standard,
+                    title: "Cancel this visit?",
+                    message: "This will tell your facility you're not coming. They may need to confirm any rebooking on their end.",
+                    reasonBinding: nil,
+                    confirmTitle: "Confirm cancellation",
+                    keepTitle: "Keep visit",
+                    isWorking: vm.isCancelling,
+                    onConfirm: {
+                        Task {
+                            await vm.cancel(
+                                reservation: reservation,
+                                isGrooming: module == .grooming,
+                                reason: nil
+                            )
+                            showCancelConfirm = false
+                        }
+                    },
+                    onKeep: { showCancelConfirm = false }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                .zIndex(10)
             }
-            Button("Keep visit", role: .cancel) {}
-        } message: {
-            Text(lateWarningMessage)
-        }
-        // Outside-the-window: lighter "are you sure?" confirm.
-        .alert("Cancel this visit?", isPresented: $showCancelConfirm) {
-            Button("Cancel visit", role: .destructive) {
-                Task {
-                    await vm.cancel(
-                        reservation: reservation,
-                        isGrooming: module == .grooming,
-                        reason: nil
-                    )
-                }
+            // Inside-the-window: stronger warning + reason field.
+            if showLateWarning {
+                SnoutConfirmDialog(
+                    tone: .warning,
+                    title: "Late cancellation",
+                    message: lateWarningMessage,
+                    reasonBinding: $cancelReason,
+                    confirmTitle: "Confirm cancellation",
+                    keepTitle: "Keep visit",
+                    isWorking: vm.isCancelling,
+                    onConfirm: {
+                        Task {
+                            await vm.cancel(
+                                reservation: reservation,
+                                isGrooming: module == .grooming,
+                                reason: cancelReason
+                            )
+                            showLateWarning = false
+                        }
+                    },
+                    onKeep: { showLateWarning = false }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                .zIndex(10)
             }
-            Button("Keep visit", role: .cancel) {}
-        } message: {
-            Text("This will tell your facility you're not coming. They may need to confirm any rebooking on their end.")
         }
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: showCancelConfirm)
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: showLateWarning)
     }
 
     // MARK: - Header
@@ -161,18 +190,14 @@ struct VisitDetailView: View {
         HStack(spacing: 0) {
             Rectangle().fill(module.color).frame(width: 6)
             HStack(spacing: SnoutTheme.Spacing.md) {
-                ZStack {
-                    Circle().fill(SnoutTheme.surface).frame(width: 48, height: 48)
-                    if let pet = pets.first {
-                        Text(initials(for: pet.name))
-                            .font(SnoutTheme.body(16, weight: .semibold))
-                            .foregroundStyle(SnoutTheme.onSurface)
-                    } else {
-                        Image(systemName: "pawprint.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(module.color)
-                    }
-                }
+                // Pet photo, or initial fallback in a neutral surface tile
+                // (so it doesn't fight the module-color stripe + bg).
+                PetAvatar(
+                    pet: pets.first,
+                    size: 48,
+                    symbolFallback: "pawprint.fill",
+                    tintOverride: SnoutTheme.surface
+                )
                 VStack(alignment: .leading, spacing: 2) {
                     Text(serviceName)
                         .font(SnoutTheme.body(17, weight: .semibold))
@@ -319,14 +344,14 @@ struct VisitDetailView: View {
                     }
                 } label: {
                     HStack(spacing: SnoutTheme.Spacing.sm) {
-                        if vm.isCancelling { ProgressView().tint(.white) }
+                        if vm.isCancelling { ProgressView().tint(SnoutTheme.onDestructive) }
                         Text(vm.isCancelling ? "Cancelling…" : "Cancel visit")
                             .font(SnoutTheme.body(15, weight: .semibold))
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SnoutTheme.onDestructive)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, SnoutTheme.Spacing.md)
-                    .background(Color.red.opacity(0.85))
+                    .background(SnoutTheme.destructive)
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -388,5 +413,139 @@ struct VisitDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(SnoutTheme.cotton.opacity(0.6))
             .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusSM, style: .continuous))
+    }
+}
+
+// MARK: - SnoutConfirmDialog
+//
+// Boho-styled centered confirmation dialog. Replaces the native iOS .alert for
+// destructive flows where we want the destructive action to use our brand
+// `destructive` token (deep warm brown) instead of the system red that
+// UIAlertController can't be talked out of.
+//
+// The dialog has two tones:
+//   - .standard — neutral cream backdrop. For "are you sure?" confirms
+//     outside the cancellation window.
+//   - .warning  — cotton-tinted top accent strip. For late-cancellation
+//     warnings inside the window, where the user may incur a fee.
+//
+// The card is centered, dimmed scrim behind, animates in via opacity+scale.
+// Tapping the scrim is intentionally NOT bound to keep — destructive actions
+// should require a deliberate button tap to dismiss.
+
+private struct SnoutConfirmDialog: View {
+    enum Tone { case standard, warning }
+
+    let tone: Tone
+    let title: String
+    let message: String
+    /// When non-nil, an optional-reason text field is shown above the buttons.
+    /// Only used by the late-cancellation flow today.
+    var reasonBinding: Binding<String>?
+    let confirmTitle: String
+    let keepTitle: String
+    let isWorking: Bool
+    let onConfirm: () -> Void
+    let onKeep: () -> Void
+
+    var body: some View {
+        ZStack {
+            // Dimmed scrim — warm-tinted black so it harmonizes with the
+            // cream background instead of looking like a harsh mask.
+            Color(red: 0.20, green: 0.15, blue: 0.13).opacity(0.45)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // Tone accent strip — only visible for warnings.
+                if tone == .warning {
+                    HStack(spacing: SnoutTheme.Spacing.sm) {
+                        SnoutGlyph("exclamationmark.triangle.fill", size: 14, weight: .semibold)
+                            .foregroundStyle(SnoutTheme.onSurface)
+                        Text("Heads up")
+                            .font(SnoutTheme.labelSM)
+                            .tracking(0.6)
+                            .foregroundStyle(SnoutTheme.onSurface)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, SnoutTheme.Spacing.sm)
+                    .background(SnoutTheme.cotton)
+                }
+
+                VStack(alignment: .leading, spacing: SnoutTheme.Spacing.md) {
+                    Text(title)
+                        .font(SnoutTheme.titleMD)
+                        .foregroundStyle(SnoutTheme.onSurface)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text(message)
+                        .font(SnoutTheme.bodyMD)
+                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let reasonBinding {
+                        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.xs) {
+                            Text("REASON (OPTIONAL)")
+                                .font(SnoutTheme.labelSM)
+                                .tracking(0.6)
+                                .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                            TextField("e.g. pet is sick", text: reasonBinding)
+                                .font(SnoutTheme.bodyMD)
+                                .foregroundStyle(SnoutTheme.onSurface)
+                                .padding(.horizontal, SnoutTheme.Spacing.md)
+                                .padding(.vertical, SnoutTheme.Spacing.sm)
+                                .background(SnoutTheme.background)
+                                .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusSM, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: SnoutTheme.radiusSM, style: .continuous)
+                                        .stroke(SnoutTheme.divider, lineWidth: 1)
+                                )
+                        }
+                        .padding(.top, SnoutTheme.Spacing.xs)
+                    }
+
+                    VStack(spacing: SnoutTheme.Spacing.sm) {
+                        // Destructive primary — Boho deep warm brown.
+                        Button(action: onConfirm) {
+                            HStack(spacing: SnoutTheme.Spacing.sm) {
+                                if isWorking { ProgressView().tint(SnoutTheme.onDestructive) }
+                                Text(isWorking ? "Cancelling…" : confirmTitle)
+                                    .font(SnoutTheme.body(15, weight: .semibold))
+                            }
+                            .foregroundStyle(SnoutTheme.onDestructive)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, SnoutTheme.Spacing.md)
+                            .background(SnoutTheme.destructive)
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isWorking)
+
+                        // Keep — outline style.
+                        Button(action: onKeep) {
+                            Text(keepTitle)
+                                .font(SnoutTheme.body(15, weight: .semibold))
+                                .foregroundStyle(SnoutTheme.onSurface)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, SnoutTheme.Spacing.md)
+                                .background(SnoutTheme.surface)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(SnoutTheme.divider, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isWorking)
+                    }
+                    .padding(.top, SnoutTheme.Spacing.xs)
+                }
+                .padding(SnoutTheme.Spacing.xl)
+            }
+            .background(SnoutTheme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusHero, style: .continuous))
+            .shadow(color: SnoutTheme.heroShadowColor,
+                    radius: SnoutTheme.heroShadowRadius,
+                    x: 0, y: SnoutTheme.heroShadowY)
+            .padding(.horizontal, SnoutTheme.Spacing.xl)
+            .frame(maxWidth: 420)
+        }
     }
 }

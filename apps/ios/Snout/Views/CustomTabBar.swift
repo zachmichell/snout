@@ -62,8 +62,11 @@ struct CustomTabBar: View {
         } label: {
             VStack(spacing: 2) {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: item.icon)
-                        .font(.system(size: 18, weight: .semibold))
+                    // SnoutGlyph prefers the custom Boho asset when present
+                    // in Assets.xcassets/Glyphs and falls back to the SF
+                    // Symbol of the same name when it isn't. Sizing matches
+                    // the previous SF Symbol (18pt semibold) for parity.
+                    SnoutGlyph(item.icon, size: 18, weight: .semibold)
                     if let count = unreadCounts[index], count > 0 {
                         badge(count: count)
                             .offset(x: 10, y: -8)
@@ -72,9 +75,15 @@ struct CustomTabBar: View {
                 Text(item.label)
                     .font(.system(size: 10, weight: .medium))
                     .lineLimit(1)
+                    // "Messages" is the longest label and was getting clipped
+                    // at the previous 10pt horizontal padding. Tighten by a
+                    // touch and allow a small scale-down so every label fits
+                    // even on the narrowest devices (iPhone SE / mini).
+                    .minimumScaleFactor(0.85)
+                    .allowsTightening(true)
             }
             .foregroundStyle(isSelected ? SnoutTheme.onAccent : SnoutTheme.onSurfaceMuted)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 6)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
             // Active pill goes BEHIND the VStack content via `.background` so it
@@ -115,7 +124,7 @@ struct CustomTabBar: View {
                         .init(icon: "bubble.left.and.bubble.right", label: "Messages"),
                         .init(icon: "plus.circle.fill", label: "Book"),
                         .init(icon: "calendar", label: "Calendar"),
-                        .init(icon: "person.crop.circle", label: "Settings")
+                        .init(icon: "ellipsis.circle.fill", label: "More")
                     ],
                     unreadCounts: [1: 2]
                 )

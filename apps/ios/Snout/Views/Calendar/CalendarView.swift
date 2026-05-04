@@ -372,8 +372,7 @@ struct CalendarView: View {
             Button {
                 shiftMonth(by: -1)
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
+                SnoutGlyph("chevron.left", size: 16, weight: .semibold)
                     .foregroundStyle(SnoutTheme.onSurface)
                     .frame(width: 36, height: 36)
                     .background(SnoutTheme.surface)
@@ -400,8 +399,7 @@ struct CalendarView: View {
             Button {
                 shiftMonth(by: 1)
             } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .semibold))
+                SnoutGlyph("chevron.right", size: 16, weight: .semibold)
                     .foregroundStyle(SnoutTheme.onSurface)
                     .frame(width: 36, height: 36)
                     .background(SnoutTheme.surface)
@@ -557,8 +555,7 @@ struct CalendarView: View {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { selectedDay = nil }
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .semibold))
+                    SnoutGlyph("xmark", size: 13, weight: .semibold)
                         .foregroundStyle(SnoutTheme.onSurfaceMuted)
                         .frame(width: 28, height: 28)
                         .background(SnoutTheme.surface)
@@ -648,24 +645,26 @@ struct CalendarView: View {
         .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
     }
 
-    /// Pet avatar — initials on a tinted circle until we wire up `photo_url`.
-    /// The tint defaults to surface so the avatar stays neutral on a colored
-    /// card; passing `fallbackTint` lets callers tint it when there's no pet.
+    /// Pet avatar — pet photo when available, initial fallback otherwise.
+    /// Tile is the neutral white surface so the avatar reads cleanly on the
+    /// module-tinted card; `fallbackTint` colors the pawprint glyph when
+    /// there's no pet at all (rare).
     private func petAvatar(pet: Pet?, fallbackTint: Color) -> some View {
-        ZStack {
-            Circle()
-                .fill(SnoutTheme.surface)
-                .frame(width: 40, height: 40)
-            if let pet {
-                Text(initials(for: pet.name))
-                    .font(SnoutTheme.body(14, weight: .semibold))
-                    .foregroundStyle(SnoutTheme.onSurface)
+        // PetAvatar already handles the photo / initial fallback path. We
+        // only need a special case when there's no pet on the reservation
+        // — in that case we want the pawprint tinted by the module color
+        // for visual continuity with the card.
+        Group {
+            if pet != nil {
+                PetAvatar(pet: pet, size: 40, tintOverride: SnoutTheme.surface)
             } else {
-                // No pet on this reservation (rare) — pawprint placeholder
-                // with the module tint so the card still feels complete.
-                Image(systemName: "pawprint.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(fallbackTint)
+                ZStack {
+                    Circle()
+                        .fill(SnoutTheme.surface)
+                        .frame(width: 40, height: 40)
+                    SnoutGlyph("pawprint.fill", size: 14, weight: .semibold)
+                        .foregroundStyle(fallbackTint)
+                }
             }
         }
     }
