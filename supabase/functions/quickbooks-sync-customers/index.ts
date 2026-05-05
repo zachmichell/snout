@@ -42,6 +42,14 @@ const INTUIT_CLIENT_SECRET = Deno.env.get("INTUIT_CLIENT_SECRET");
 
 const BATCH_LIMIT = 100;
 
+// Intuit caps a realm at 500 requests per minute. We pace ourselves
+// to ~460/min by sleeping 130ms between QBO writes within a batch.
+// At 100 writes per batch this means a single invocation stays under
+// the rate limit cleanly even when invoked back-to-back from the
+// front end's "Sync all" loop.
+const INTRA_BATCH_DELAY_MS = 130;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -65,17 +73,32 @@ Deno.serve(async (req) => {
       return json({ error: "QuickBooks is not connected for this organization" }, 400);
     }
 
-    // Pull owners for this org. Limit + simple ordering keeps the
-    // batch deterministic across re-runs.
+    // Pull the next batch of owners that still need syncing. The
+    // qbo_unsynced_owner_ids RPC returns ids where the mapping is
+    // missing or in a non-synced state, so a "Sync all" loop on the
+    // client terminates cleanly when there's nothing left.
+    const { data: idRows, error: idErr } = await admin.rpc("qbo_unsynced_owner_ids", {
+      _org_id: ctx.orgId,
+      _limit: BATCH_LIMIT,
+    });
+    if (idErr) {
+      console.error("qbo_unsynced_owner_ids failed:", idErr);
+      return json({ error: "Could not list pending owners", details: idErr.message }, 500);
+    }
+    const pendingIds = (idRows ?? []).map((r: { owner_id: string }) => r.owner_id);
+
+    if (pendingIds.length === 0) {
+      // Also report a total count of owners so the client can render
+      // "8463 / 8463 synced" without having to query separately.
+      return json({ ok: true, processed: 0, created: 0, updated: 0, unchanged: 0, failed: 0, has_more: false, failures: [], batch_limit: BATCH_LIMIT });
+    }
+
     const { data: owners, error: ownersErr } = await admin
       .from("owners")
       .select(
         "id, first_name, last_name, email, phone, street_address, city, state_province, postal_code, notes",
       )
-      .eq("organization_id", ctx.orgId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: true })
-      .limit(BATCH_LIMIT);
+      .in("id", pendingIds);
     if (ownersErr) {
       console.error("owners query failed:", ownersErr);
       return json({ error: "Could not load owners", details: ownersErr.message }, 500);
@@ -99,7 +122,14 @@ Deno.serve(async (req) => {
     let failed = 0;
     const failures: Array<{ snout_id: string; reason: string }> = [];
 
+    let processedCount = 0;
     for (const owner of owners ?? []) {
+      // Pace ourselves between QBO writes so a single batch stays
+      // well under Intuit's 500-requests-per-minute cap. First
+      // iteration runs immediately; subsequent iterations wait.
+      if (processedCount > 0) await sleep(INTRA_BATCH_DELAY_MS);
+      processedCount += 1;
+
       const input = ownerToCustomerInput(owner);
       const hash = await payloadHash(input);
       const existing = mappingByOwner.get(owner.id);
@@ -190,6 +220,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    // has_more is "did we hit the batch limit?". If we did, there are
+    // probably more rows pending; the client loop should call again.
+    const hasMore = (owners?.length ?? 0) >= BATCH_LIMIT;
+
     return json({
       ok: true,
       processed: owners?.length ?? 0,
@@ -197,6 +231,7 @@ Deno.serve(async (req) => {
       updated,
       unchanged,
       failed,
+      has_more: hasMore,
       failures: failures.slice(0, 20),
       batch_limit: BATCH_LIMIT,
     });

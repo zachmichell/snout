@@ -33,6 +33,12 @@ const INTUIT_CLIENT_SECRET = Deno.env.get("INTUIT_CLIENT_SECRET");
 
 const BATCH_LIMIT = 100;
 
+// Pace QBO writes within a batch so a single invocation stays well
+// under Intuit's 500-requests-per-minute realm cap. See the matching
+// constant in quickbooks-sync-customers for the rationale.
+const INTRA_BATCH_DELAY_MS = 130;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -70,13 +76,37 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Pull the next batch of services that still need syncing via the
+    // qbo_unsynced_service_ids RPC; same termination logic as the
+    // customer sync.
+    const { data: idRows, error: idErr } = await admin.rpc("qbo_unsynced_service_ids", {
+      _org_id: ctx.orgId,
+      _limit: BATCH_LIMIT,
+    });
+    if (idErr) {
+      console.error("qbo_unsynced_service_ids failed:", idErr);
+      return json({ error: "Could not list pending services", details: idErr.message }, 500);
+    }
+    const pendingIds = (idRows ?? []).map((r: { service_id: string }) => r.service_id);
+    if (pendingIds.length === 0) {
+      return json({
+        ok: true,
+        processed: 0,
+        created: 0,
+        updated: 0,
+        unchanged: 0,
+        failed: 0,
+        has_more: false,
+        failures: [],
+        batch_limit: BATCH_LIMIT,
+        income_account: { id: incomeAccount.value, name: incomeAccount.name },
+      });
+    }
+
     const { data: services, error: servicesErr } = await admin
       .from("services")
       .select("id, name, description, base_price_cents, active")
-      .eq("organization_id", ctx.orgId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: true })
-      .limit(BATCH_LIMIT);
+      .in("id", pendingIds);
     if (servicesErr) {
       console.error("services query failed:", servicesErr);
       return json({ error: "Could not load services", details: servicesErr.message }, 500);
@@ -99,7 +129,11 @@ Deno.serve(async (req) => {
     let failed = 0;
     const failures: Array<{ snout_id: string; reason: string }> = [];
 
+    let processedCount = 0;
     for (const svc of services ?? []) {
+      if (processedCount > 0) await sleep(INTRA_BATCH_DELAY_MS);
+      processedCount += 1;
+
       const input = serviceToItemInput(svc, incomeAccount);
       const hash = await payloadHash(input);
       const existing = mappingByService.get(svc.id);
@@ -193,6 +227,8 @@ Deno.serve(async (req) => {
       }
     }
 
+    const hasMore = (services?.length ?? 0) >= BATCH_LIMIT;
+
     return json({
       ok: true,
       processed: services?.length ?? 0,
@@ -200,6 +236,7 @@ Deno.serve(async (req) => {
       updated,
       unchanged,
       failed,
+      has_more: hasMore,
       failures: failures.slice(0, 20),
       batch_limit: BATCH_LIMIT,
       income_account: { id: incomeAccount.value, name: incomeAccount.name },

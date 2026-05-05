@@ -42,8 +42,11 @@ import {
   useQuickBooksMappingCounts,
   useSyncQuickBooksCustomers,
   useSyncQuickBooksItems,
+  useSyncAllQuickBooksCustomers,
+  useSyncAllQuickBooksItems,
   type SyncResult,
   type SyncCounts,
+  type SyncAllProgress,
 } from "@/hooks/useQuickBooksSync";
 import { formatDateTime } from "@/lib/money";
 
@@ -265,18 +268,20 @@ export default function QuickBooksTab() {
 }
 
 // Sync panel: per-entity-type cards showing total/synced/pending/failed
-// counts, a "Sync now" button per type, and a result toast that
-// surfaces the first failure if any. Triggered manually in 6.2; an
-// auto-trigger on insert/update lands in 6.3 alongside invoice sync.
+// counts, a "Sync now" (single batch) and "Sync all" (loops until done)
+// button per type, plus a live progress strip while a sync-all is
+// running.
 function SyncPanel() {
   const counts = useQuickBooksMappingCounts();
   const syncCustomers = useSyncQuickBooksCustomers();
   const syncItems = useSyncQuickBooksItems();
+  const allCustomers = useSyncAllQuickBooksCustomers();
+  const allItems = useSyncAllQuickBooksItems();
 
   const ownerCounts = counts.data?.find((c) => c.table === "owners");
   const serviceCounts = counts.data?.find((c) => c.table === "services");
 
-  const handleSync = async (
+  const handleSyncOne = async (
     label: string,
     mut: { mutateAsync: () => Promise<SyncResult>; isPending: boolean },
   ) => {
@@ -288,6 +293,10 @@ function SyncPanel() {
           `${label} sync finished with ${res.failed} failure${res.failed === 1 ? "" : "s"}. First: ${
             firstFailure?.reason ?? "unknown"
           }`,
+        );
+      } else if (res.has_more) {
+        toast.success(
+          `${label} batch complete: ${res.created} created, ${res.updated} updated, ${res.unchanged} unchanged. More remaining; click Sync all to finish.`,
         );
       } else {
         toast.success(
@@ -305,8 +314,8 @@ function SyncPanel() {
       <h4 className="font-medium text-foreground">Sync to QuickBooks</h4>
       <p className="mt-1 text-xs text-text-secondary">
         Push the current Snout entities to QuickBooks. Re-running is safe; only
-        new or changed rows are sent. Each sync processes up to 100 rows; for
-        bigger backfills, run it more than once.
+        new or changed rows are sent. Each sync batch processes up to 100 rows;
+        Sync all loops batches until everything is in QBO.
       </p>
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -316,7 +325,10 @@ function SyncPanel() {
           counts={ownerCounts}
           loading={counts.isLoading}
           syncing={syncCustomers.isPending}
-          onSync={() => handleSync("Customer", syncCustomers)}
+          progress={allCustomers.progress}
+          onSync={() => handleSyncOne("Customer", syncCustomers)}
+          onSyncAll={() => allCustomers.start()}
+          onCancel={() => allCustomers.cancel()}
         />
         <SyncCard
           title="Items"
@@ -324,7 +336,10 @@ function SyncPanel() {
           counts={serviceCounts}
           loading={counts.isLoading}
           syncing={syncItems.isPending}
-          onSync={() => handleSync("Item", syncItems)}
+          progress={allItems.progress}
+          onSync={() => handleSyncOne("Item", syncItems)}
+          onSyncAll={() => allItems.start()}
+          onCancel={() => allItems.cancel()}
         />
       </div>
     </div>
@@ -337,19 +352,28 @@ function SyncCard({
   counts,
   loading,
   syncing,
+  progress,
   onSync,
+  onSyncAll,
+  onCancel,
 }: {
   title: string;
   subtitle: string;
   counts: SyncCounts | undefined;
   loading: boolean;
   syncing: boolean;
+  progress: SyncAllProgress;
   onSync: () => void;
+  onSyncAll: () => void;
+  onCancel: () => void;
 }) {
   const synced = counts?.synced ?? 0;
   const total = counts?.total ?? 0;
   const failed = counts?.failed ?? 0;
+  const allRunning = progress.running;
 
+  // While Sync all is running we hide the per-batch button to avoid
+  // double-invocation and surface the progress strip instead.
   return (
     <div className="rounded-md border border-border bg-background p-4">
       <div className="flex items-start justify-between gap-2">
@@ -357,10 +381,65 @@ function SyncCard({
           <div className="font-medium text-foreground">{title}</div>
           <div className="mt-0.5 text-xs text-text-tertiary">{subtitle}</div>
         </div>
-        <Button onClick={onSync} disabled={syncing} size="sm">
-          {syncing ? "Syncing..." : "Sync now"}
-        </Button>
+        {allRunning ? (
+          <Button onClick={onCancel} size="sm" variant="outline">
+            Cancel
+          </Button>
+        ) : (
+          <div className="flex shrink-0 gap-1">
+            <Button onClick={onSync} disabled={syncing} size="sm" variant="outline">
+              {syncing ? "..." : "Sync now"}
+            </Button>
+            <Button onClick={onSyncAll} disabled={syncing} size="sm">
+              Sync all
+            </Button>
+          </div>
+        )}
       </div>
+
+      {allRunning && (
+        <div className="mt-3 rounded-md border border-accent/30 bg-accent-light/40 p-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-foreground">
+              Syncing... {synced + progress.totalCreated + progress.totalUpdated} / {total}
+            </span>
+            <span className="text-text-tertiary">
+              batch {progress.batches}
+            </span>
+          </div>
+          <div className="mt-1 text-text-tertiary">
+            {progress.totalCreated} created, {progress.totalUpdated} updated,{" "}
+            {progress.totalUnchanged} unchanged
+            {progress.totalFailed > 0 && (
+              <>, {progress.totalFailed} failed</>
+            )}
+          </div>
+          {/* Visual progress bar; the count math above is what's authoritative. */}
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-background">
+            <div
+              className="h-full bg-accent transition-all duration-500"
+              style={{
+                width: `${total > 0 ? Math.min(100, ((synced + progress.totalCreated + progress.totalUpdated) / total) * 100) : 0}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {!allRunning && progress.batches > 0 && (
+        <div className="mt-3 rounded-md border border-border-subtle bg-background p-2 text-xs text-text-secondary">
+          Last sync all: {progress.batches} batch{progress.batches === 1 ? "" : "es"},{" "}
+          {progress.totalCreated} created, {progress.totalUpdated} updated,{" "}
+          {progress.totalUnchanged} unchanged
+          {progress.totalFailed > 0 && (
+            <>, <span className="text-destructive">{progress.totalFailed} failed</span></>
+          )}
+          {progress.lastError && (
+            <div className="mt-1 text-destructive">Stopped: {progress.lastError}</div>
+          )}
+        </div>
+      )}
+
       <div className="mt-3 flex items-center gap-3 text-xs">
         {loading ? (
           <span className="text-text-tertiary">Loading counts...</span>
