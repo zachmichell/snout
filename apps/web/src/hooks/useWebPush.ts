@@ -106,11 +106,17 @@ export function useWebPush() {
       }
 
       const existing = await reg.pushManager.getSubscription();
+      // TypeScript 5.7+ narrows Uint8Array's buffer type; the
+      // PushManager applicationServerKey field still expects the
+      // legacy BufferSource, so we cast through unknown to bridge.
+      const appServerKey = urlBase64ToUint8Array(
+        VAPID_PUBLIC_KEY!,
+      ) as unknown as BufferSource;
       const sub =
         existing ??
         (await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!),
+          applicationServerKey: appServerKey,
         }));
 
       const json = sub.toJSON();

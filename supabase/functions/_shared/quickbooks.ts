@@ -247,3 +247,278 @@ export function generateOAuthState(): string {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
+// =============================================================================
+// 6.2: Sync helpers used by the customer and item sync edge functions.
+// =============================================================================
+
+export type QboTokenContext = {
+  accessToken: string;
+  realmId: string;
+  environment: QboEnvironment;
+};
+
+/**
+ * Resolve a usable access token for the org, refreshing through Intuit
+ * if the stored access token is at or near expiry. Persists the new
+ * tokens via update_quickbooks_tokens before returning.
+ *
+ * Returns null if the org has no live QBO connection.
+ */
+export async function getTokenContext(args: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any; // SupabaseClient typed loosely so this file has no SDK dep
+  orgId: string;
+  clientId: string;
+  clientSecret: string;
+  refreshLeewaySeconds?: number;
+}): Promise<QboTokenContext | null> {
+  const { data, error } = await args.admin.rpc("get_quickbooks_tokens", {
+    _org_id: args.orgId,
+  });
+  if (error) {
+    console.error("get_quickbooks_tokens failed:", error);
+    return null;
+  }
+  if (!Array.isArray(data) || data.length === 0) return null;
+  const row = data[0] as {
+    access_token: string;
+    refresh_token: string;
+    realm_id: string;
+    environment: string;
+    access_token_expires_at: string | null;
+  };
+
+  const leeway = (args.refreshLeewaySeconds ?? 120) * 1000;
+  const expiresAt = row.access_token_expires_at
+    ? new Date(row.access_token_expires_at).getTime()
+    : 0;
+  const env = row.environment as QboEnvironment;
+
+  if (Date.now() < expiresAt - leeway) {
+    return {
+      accessToken: row.access_token,
+      realmId: row.realm_id,
+      environment: env,
+    };
+  }
+
+  const refreshed = await refreshAccessToken({
+    clientId: args.clientId,
+    clientSecret: args.clientSecret,
+    refreshToken: row.refresh_token,
+  });
+  if (!refreshed.ok) {
+    await args.admin
+      .from("quickbooks_accounts")
+      .update({
+        status: "restricted",
+        last_verification_error: refreshed.error,
+      })
+      .eq("organization_id", args.orgId);
+    return null;
+  }
+  const newExpiresAt = new Date(
+    Date.now() + refreshed.data.expires_in * 1000,
+  ).toISOString();
+  await args.admin.rpc("update_quickbooks_tokens", {
+    _org_id: args.orgId,
+    _access_token: refreshed.data.access_token,
+    _refresh_token: refreshed.data.refresh_token,
+    _access_expires_at: newExpiresAt,
+  });
+  return {
+    accessToken: refreshed.data.access_token,
+    realmId: row.realm_id,
+    environment: env,
+  };
+}
+
+/**
+ * Generic authenticated request to a QBO data API endpoint. Returns
+ * a structured QboResult so callers can branch on ok without
+ * try/catching network errors.
+ */
+export async function qboRequest<T = unknown>(args: {
+  ctx: QboTokenContext;
+  method: "GET" | "POST";
+  path: string; // e.g. "/v3/company/<realmId>/customer?minorversion=70"
+  body?: unknown;
+}): Promise<QboResult<T>> {
+  const url = `${dataBase(args.ctx.environment)}${args.path}`;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${args.ctx.accessToken}`,
+    Accept: "application/json",
+  };
+  if (args.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: args.method,
+      headers,
+      body: args.body !== undefined ? JSON.stringify(args.body) : undefined,
+    });
+  } catch (err) {
+    return { ok: false, status: 0, error: (err as Error).message };
+  }
+  const text = await res.text();
+  let parsed: any = null;
+  if (text) {
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = { Fault: { Error: [{ Message: text }] } };
+    }
+  }
+  if (!res.ok) {
+    const fault = parsed?.Fault?.Error?.[0];
+    const message =
+      fault?.Message ??
+      fault?.Detail ??
+      parsed?.Fault?.type ??
+      `QBO returned ${res.status}`;
+    return { ok: false, status: res.status, error: String(message) };
+  }
+  return { ok: true, status: res.status, data: parsed as T };
+}
+
+// ----- Customer ----------------------------------------------------------
+
+export type QboCustomerInput = {
+  DisplayName: string;
+  GivenName?: string;
+  FamilyName?: string;
+  PrimaryEmailAddr?: { Address: string };
+  PrimaryPhone?: { FreeFormNumber: string };
+  BillAddr?: {
+    Line1?: string;
+    City?: string;
+    CountrySubDivisionCode?: string;
+    PostalCode?: string;
+    Country?: string;
+  };
+  Notes?: string;
+};
+
+export type QboCustomer = QboCustomerInput & {
+  Id: string;
+  SyncToken: string;
+  Active?: boolean;
+};
+
+export function createCustomer(ctx: QboTokenContext, input: QboCustomerInput) {
+  return qboRequest<{ Customer: QboCustomer }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/customer?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updateCustomer(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: QboCustomerInput,
+) {
+  // Intuit expects a sparse update with explicit "sparse: true" plus
+  // Id and SyncToken. Without sparse, omitting a field deletes it.
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ Customer: QboCustomer }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/customer?minorversion=70`,
+    body,
+  });
+}
+
+// ----- Item -------------------------------------------------------------
+
+export type QboItemType = "Service" | "NonInventory" | "Inventory";
+
+export type QboItemInput = {
+  Name: string;
+  Type: QboItemType;
+  IncomeAccountRef: { value: string; name?: string };
+  Description?: string;
+  UnitPrice?: number; // QBO accepts decimal; cents-to-dollars conversion is the caller's job
+  Active?: boolean;
+};
+
+export type QboItem = QboItemInput & {
+  Id: string;
+  SyncToken: string;
+};
+
+export function createItem(ctx: QboTokenContext, input: QboItemInput) {
+  return qboRequest<{ Item: QboItem }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/item?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updateItem(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: Partial<QboItemInput>,
+) {
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ Item: QboItem }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/item?minorversion=70`,
+    body,
+  });
+}
+
+// ----- Account (read-only for picking IncomeAccountRef on items) --------
+
+export type QboAccount = {
+  Id: string;
+  Name: string;
+  AccountType: string; // "Income", "Expense", "Bank", etc.
+  AccountSubType?: string;
+  Active: boolean;
+};
+
+export async function listIncomeAccounts(ctx: QboTokenContext): Promise<QboResult<QboAccount[]>> {
+  const query = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Income' and Active = true MAXRESULTS 100`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Account ?? [] };
+}
+
+// ----- Hashing ----------------------------------------------------------
+
+/**
+ * Stable hash of a payload object so we can skip re-pushing entities
+ * whose Snout-side data has not changed since the last successful
+ * sync. Order-insensitive at the top level via sorted-key serialization.
+ */
+export async function payloadHash(payload: unknown): Promise<string> {
+  const canonical = canonicalize(payload);
+  const buf = new TextEncoder().encode(canonical);
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  const bytes = new Uint8Array(digest);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function canonicalize(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalize).join(",")}]`;
+  }
+  const keys = Object.keys(value as Record<string, unknown>).sort();
+  return `{${keys
+    .map((k) => `${JSON.stringify(k)}:${canonicalize((value as Record<string, unknown>)[k])}`)
+    .join(",")}}`;
+}

@@ -1331,6 +1331,82 @@ export type Database = {
           },
         ]
       }
+      groomer_availability: {
+        Row: {
+          created_at: string
+          date: string
+          end_time: string
+          groomer_id: string
+          id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          end_time: string
+          groomer_id: string
+          id?: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          end_time?: string
+          groomer_id?: string
+          id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groomer_availability_groomer_id_fkey"
+            columns: ["groomer_id"]
+            isOneToOne: false
+            referencedRelation: "groomers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groomer_working_hours: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          groomer_id: string
+          id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          groomer_id: string
+          id?: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          groomer_id?: string
+          id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groomer_working_hours_groomer_id_fkey"
+            columns: ["groomer_id"]
+            isOneToOne: false
+            referencedRelation: "groomers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       groomers: {
         Row: {
           bio: string | null
@@ -2552,6 +2628,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          attachments: Json
           body: string
           conversation_id: string
           created_at: string
@@ -2561,6 +2638,7 @@ export type Database = {
           sender_type: Database["public"]["Enums"]["message_sender_type"]
         }
         Insert: {
+          attachments?: Json
           body: string
           conversation_id: string
           created_at?: string
@@ -2570,6 +2648,7 @@ export type Database = {
           sender_type: Database["public"]["Enums"]["message_sender_type"]
         }
         Update: {
+          attachments?: Json
           body?: string
           conversation_id?: string
           created_at?: string
@@ -2623,11 +2702,13 @@ export type Database = {
       }
       organizations: {
         Row: {
+          cancellation_policy_hours: number
           country: Database["public"]["Enums"]["country_enum"]
           created_at: string
           credit_expiration_days: number | null
           currency: Database["public"]["Enums"]["currency_enum"]
           deleted_at: string | null
+          grooming_cancellation_policy_hours: number
           id: string
           invoice_counter: number
           name: string
@@ -2639,11 +2720,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancellation_policy_hours?: number
           country: Database["public"]["Enums"]["country_enum"]
           created_at?: string
           credit_expiration_days?: number | null
           currency: Database["public"]["Enums"]["currency_enum"]
           deleted_at?: string | null
+          grooming_cancellation_policy_hours?: number
           id?: string
           invoice_counter?: number
           name: string
@@ -2655,11 +2738,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancellation_policy_hours?: number
           country?: Database["public"]["Enums"]["country_enum"]
           created_at?: string
           credit_expiration_days?: number | null
           currency?: Database["public"]["Enums"]["currency_enum"]
           deleted_at?: string | null
+          grooming_cancellation_policy_hours?: number
           id?: string
           invoice_counter?: number
           name?: string
@@ -2683,6 +2768,7 @@ export type Database = {
           purchased_at: string
           remaining_credits: Json
           status: string
+          stripe_checkout_session_id: string | null
           updated_at: string
         }
         Insert: {
@@ -2695,6 +2781,7 @@ export type Database = {
           purchased_at?: string
           remaining_credits?: Json
           status?: string
+          stripe_checkout_session_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -2707,6 +2794,7 @@ export type Database = {
           purchased_at?: string
           remaining_credits?: Json
           status?: string
+          stripe_checkout_session_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -4017,6 +4105,8 @@ export type Database = {
           access_token_secret_id: string
           company_name: string | null
           created_at: string
+          default_income_account_id: string | null
+          default_income_account_name: string | null
           deleted_at: string | null
           environment: string
           id: string
@@ -4033,6 +4123,8 @@ export type Database = {
           access_token_secret_id: string
           company_name?: string | null
           created_at?: string
+          default_income_account_id?: string | null
+          default_income_account_name?: string | null
           deleted_at?: string | null
           environment?: string
           id?: string
@@ -4049,6 +4141,8 @@ export type Database = {
           access_token_secret_id?: string
           company_name?: string | null
           created_at?: string
+          default_income_account_id?: string | null
+          default_income_account_name?: string | null
           deleted_at?: string | null
           environment?: string
           id?: string
@@ -4063,6 +4157,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "quickbooks_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quickbooks_entity_mappings: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          organization_id: string
+          payload_hash: string | null
+          qbo_entity_type: string
+          qbo_id: string
+          snout_id: string
+          snout_table: string
+          sync_state: string
+          sync_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          organization_id: string
+          payload_hash?: string | null
+          qbo_entity_type: string
+          qbo_id: string
+          snout_id: string
+          snout_table: string
+          sync_state?: string
+          sync_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          organization_id?: string
+          payload_hash?: string | null
+          qbo_entity_type?: string
+          qbo_id?: string
+          snout_id?: string
+          snout_table?: string
+          sync_state?: string
+          sync_token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_entity_mappings_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -4740,6 +4893,7 @@ export type Database = {
           active: boolean
           base_price_cents: number
           created_at: string
+          default_duration_minutes: number | null
           deleted_at: string | null
           description: string | null
           duration_minutes: number | null
@@ -4758,6 +4912,7 @@ export type Database = {
           active?: boolean
           base_price_cents?: number
           created_at?: string
+          default_duration_minutes?: number | null
           deleted_at?: string | null
           description?: string | null
           duration_minutes?: number | null
@@ -4776,6 +4931,7 @@ export type Database = {
           active?: boolean
           base_price_cents?: number
           created_at?: string
+          default_duration_minutes?: number | null
           deleted_at?: string | null
           description?: string | null
           duration_minutes?: number | null
@@ -5975,6 +6131,19 @@ export type Database = {
         Returns: undefined
       }
       expire_credits: { Args: { p_organization_id: string }; Returns: Json }
+      get_groomer_available_dates: {
+        Args: { p_end_date: string; p_groomer_id: string; p_start_date: string }
+        Returns: Json
+      }
+      get_groomer_available_slots: {
+        Args: {
+          p_date: string
+          p_duration_minutes?: number
+          p_groomer_id: string
+          p_slot_step_minutes?: number
+        }
+        Returns: Json
+      }
       get_helcim_api_token: { Args: { _org_id: string }; Returns: string }
       get_helcim_webhook_verifier: {
         Args: { _org_id: string }
@@ -5992,6 +6161,10 @@ export type Database = {
       }
       is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       is_org_member: { Args: { _org_id: string }; Returns: boolean }
+      mark_conversation_read_by_owner: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
       mark_invoice_paid_offline: {
         Args: { invoice_id: string; method?: string }
         Returns: undefined
@@ -6079,6 +6252,7 @@ export type Database = {
         | "full_day"
         | "overnight"
         | "multi_night"
+        | "flat"
       intake_status_enum:
         | "pending_review"
         | "approved"
@@ -6268,6 +6442,7 @@ export const Constants = {
         "full_day",
         "overnight",
         "multi_night",
+        "flat",
       ],
       intake_status_enum: [
         "pending_review",

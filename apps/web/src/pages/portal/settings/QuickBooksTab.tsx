@@ -38,6 +38,13 @@ import {
   useDetachQuickBooks,
   useQuickBooksLiveCheck,
 } from "@/hooks/useQuickBooks";
+import {
+  useQuickBooksMappingCounts,
+  useSyncQuickBooksCustomers,
+  useSyncQuickBooksItems,
+  type SyncResult,
+  type SyncCounts,
+} from "@/hooks/useQuickBooksSync";
 import { formatDateTime } from "@/lib/money";
 
 export default function QuickBooksTab() {
@@ -212,18 +219,16 @@ export default function QuickBooksTab() {
         </div>
       </div>
 
+      <SyncPanel />
+
       <div className="rounded-lg border border-border bg-surface p-6 shadow-card">
         <h4 className="font-medium text-foreground">What syncs to QuickBooks</h4>
         <ul className="mt-2 space-y-1 text-sm text-text-secondary">
-          <li>Customers (Snout owners) and items (services, products)</li>
-          <li>Invoices, with tax overridden to match Snout's authoritative number</li>
-          <li>Payments and refunds</li>
-          <li>Processor fees and tips, reconciled daily as journal entries</li>
+          <li>Customers (Snout owners) and items (services). 6.2 ships these.</li>
+          <li>Invoices, with tax overridden to match Snout's authoritative number. 6.3.</li>
+          <li>Payments and refunds. 6.4.</li>
+          <li>Processor fees and tips, reconciled daily as journal entries. 6.6.</li>
         </ul>
-        <p className="mt-3 text-xs text-text-tertiary">
-          Sync configuration and history are coming in subsequent batches. The
-          connection itself works as soon as the status above shows Active.
-        </p>
       </div>
 
       <div className="rounded-lg border border-border bg-surface p-6 shadow-card">
@@ -254,6 +259,125 @@ export default function QuickBooksTab() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Sync panel: per-entity-type cards showing total/synced/pending/failed
+// counts, a "Sync now" button per type, and a result toast that
+// surfaces the first failure if any. Triggered manually in 6.2; an
+// auto-trigger on insert/update lands in 6.3 alongside invoice sync.
+function SyncPanel() {
+  const counts = useQuickBooksMappingCounts();
+  const syncCustomers = useSyncQuickBooksCustomers();
+  const syncItems = useSyncQuickBooksItems();
+
+  const ownerCounts = counts.data?.find((c) => c.table === "owners");
+  const serviceCounts = counts.data?.find((c) => c.table === "services");
+
+  const handleSync = async (
+    label: string,
+    mut: { mutateAsync: () => Promise<SyncResult>; isPending: boolean },
+  ) => {
+    try {
+      const res = await mut.mutateAsync();
+      if (res.failed > 0) {
+        const firstFailure = res.failures[0];
+        toast.warning(
+          `${label} sync finished with ${res.failed} failure${res.failed === 1 ? "" : "s"}. First: ${
+            firstFailure?.reason ?? "unknown"
+          }`,
+        );
+      } else {
+        toast.success(
+          `${label} sync complete: ${res.created} created, ${res.updated} updated, ${res.unchanged} unchanged.`,
+        );
+      }
+    } catch (e: any) {
+      const message = e?.context?.error ?? e?.message ?? "Sync failed";
+      toast.error(message);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-6 shadow-card">
+      <h4 className="font-medium text-foreground">Sync to QuickBooks</h4>
+      <p className="mt-1 text-xs text-text-secondary">
+        Push the current Snout entities to QuickBooks. Re-running is safe; only
+        new or changed rows are sent. Each sync processes up to 100 rows; for
+        bigger backfills, run it more than once.
+      </p>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <SyncCard
+          title="Customers"
+          subtitle="From Snout owners"
+          counts={ownerCounts}
+          loading={counts.isLoading}
+          syncing={syncCustomers.isPending}
+          onSync={() => handleSync("Customer", syncCustomers)}
+        />
+        <SyncCard
+          title="Items"
+          subtitle="From Snout services. First sync auto-picks an Income account in QBO."
+          counts={serviceCounts}
+          loading={counts.isLoading}
+          syncing={syncItems.isPending}
+          onSync={() => handleSync("Item", syncItems)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SyncCard({
+  title,
+  subtitle,
+  counts,
+  loading,
+  syncing,
+  onSync,
+}: {
+  title: string;
+  subtitle: string;
+  counts: SyncCounts | undefined;
+  loading: boolean;
+  syncing: boolean;
+  onSync: () => void;
+}) {
+  const synced = counts?.synced ?? 0;
+  const total = counts?.total ?? 0;
+  const failed = counts?.failed ?? 0;
+
+  return (
+    <div className="rounded-md border border-border bg-background p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-medium text-foreground">{title}</div>
+          <div className="mt-0.5 text-xs text-text-tertiary">{subtitle}</div>
+        </div>
+        <Button onClick={onSync} disabled={syncing} size="sm">
+          {syncing ? "Syncing..." : "Sync now"}
+        </Button>
+      </div>
+      <div className="mt-3 flex items-center gap-3 text-xs">
+        {loading ? (
+          <span className="text-text-tertiary">Loading counts...</span>
+        ) : (
+          <>
+            <span className="text-foreground">
+              <span className="font-semibold">{synced}</span>
+              <span className="text-text-tertiary"> / {total}</span>
+              <span className="ml-1 text-text-tertiary">synced</span>
+            </span>
+            {failed > 0 && (
+              <span className="rounded-full border border-destructive/30 bg-destructive-light px-2 py-0.5 font-medium text-destructive">
+                {failed} failed
+              </span>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
