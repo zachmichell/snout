@@ -497,6 +497,133 @@ export async function listIncomeAccounts(ctx: QboTokenContext): Promise<QboResul
   return { ok: true, status: res.status, data: res.data?.QueryResponse?.Account ?? [] };
 }
 
+// =============================================================================
+// 6.2.2: per-entity sync helpers used by both the manual batch sync edge
+// functions and the auto-sync worker. Centralizes the
+// create-vs-update-vs-skip decision, payload-hash check, mapping write, and
+// QBO call so adding a new sync type (invoices in 6.3, payments in 6.4) is
+// a matter of writing the input mapper and reusing this same control flow.
+// =============================================================================
+
+export type EntitySyncOutcome =
+  | { ok: true; state: "created" | "updated" | "unchanged"; qboId: string }
+  | { ok: false; error: string };
+
+/**
+ * Sync one Snout entity to QuickBooks. Idempotent: looks up the
+ * existing mapping, computes a hash of the new payload, and decides
+ * to create / update / skip based on what changed. Writes the mapping
+ * row regardless of outcome so the Failed Syncs panel surfaces failures.
+ */
+export async function syncOneEntity<T extends { Id: string; SyncToken: string }>(args: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any;
+  orgId: string;
+  snoutTable: string;
+  snoutId: string;
+  qboEntityType: string;
+  payload: unknown;
+  create: () => Promise<QboResult<{ [key: string]: T } | T>>;
+  update: (current: { Id: string; SyncToken: string }) => Promise<QboResult<{ [key: string]: T } | T>>;
+  extractIdSyncToken: (data: { [key: string]: T } | T) => { id: string; syncToken: string };
+}): Promise<EntitySyncOutcome> {
+  const hash = await payloadHash(args.payload);
+
+  const { data: existingRows } = await args.admin
+    .from("quickbooks_entity_mappings")
+    .select("id, qbo_id, sync_token, payload_hash, sync_state")
+    .eq("organization_id", args.orgId)
+    .eq("snout_table", args.snoutTable)
+    .eq("snout_id", args.snoutId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const existing = existingRows as
+    | {
+        id: string;
+        qbo_id: string;
+        sync_token: string | null;
+        payload_hash: string | null;
+        sync_state: string;
+      }
+    | null;
+
+  if (existing && existing.sync_state === "synced" && existing.payload_hash === hash) {
+    return { ok: true, state: "unchanged", qboId: existing.qbo_id };
+  }
+
+  if (existing && existing.qbo_id && existing.sync_token) {
+    const result = await args.update({ Id: existing.qbo_id, SyncToken: existing.sync_token });
+    if (!result.ok) {
+      await args.admin
+        .from("quickbooks_entity_mappings")
+        .update({ sync_state: "failed", last_error: result.error })
+        .eq("id", existing.id);
+      return { ok: false, error: result.error };
+    }
+    const idTok = args.extractIdSyncToken(result.data);
+    await args.admin
+      .from("quickbooks_entity_mappings")
+      .update({
+        sync_token: idTok.syncToken,
+        payload_hash: hash,
+        sync_state: "synced",
+        last_error: null,
+        last_synced_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+    return { ok: true, state: "updated", qboId: idTok.id };
+  }
+
+  const result = await args.create();
+  if (!result.ok) {
+    if (existing) {
+      await args.admin
+        .from("quickbooks_entity_mappings")
+        .update({ sync_state: "failed", last_error: result.error, payload_hash: hash })
+        .eq("id", existing.id);
+    } else {
+      await args.admin.from("quickbooks_entity_mappings").insert({
+        organization_id: args.orgId,
+        snout_table: args.snoutTable,
+        snout_id: args.snoutId,
+        qbo_entity_type: args.qboEntityType,
+        qbo_id: "",
+        payload_hash: hash,
+        sync_state: "failed",
+        last_error: result.error,
+      });
+    }
+    return { ok: false, error: result.error };
+  }
+  const idTok = args.extractIdSyncToken(result.data);
+  if (existing) {
+    await args.admin
+      .from("quickbooks_entity_mappings")
+      .update({
+        qbo_id: idTok.id,
+        sync_token: idTok.syncToken,
+        payload_hash: hash,
+        sync_state: "synced",
+        last_error: null,
+        last_synced_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+  } else {
+    await args.admin.from("quickbooks_entity_mappings").insert({
+      organization_id: args.orgId,
+      snout_table: args.snoutTable,
+      snout_id: args.snoutId,
+      qbo_entity_type: args.qboEntityType,
+      qbo_id: idTok.id,
+      sync_token: idTok.syncToken,
+      payload_hash: hash,
+      sync_state: "synced",
+      last_synced_at: new Date().toISOString(),
+    });
+  }
+  return { ok: true, state: "created", qboId: idTok.id };
+}
+
 // ----- Hashing ----------------------------------------------------------
 
 /**

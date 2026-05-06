@@ -339,16 +339,16 @@ export function useQuickBooksFailedMappings() {
   });
 }
 
-/** Reset a single mapping back to pending so the next sync re-tries it. */
+/** Reset a single mapping back to pending and enqueue it for the
+ * auto-sync worker. The qbo_retry_failed_mapping RPC handles both. */
 export function useRetryFailedMapping() {
   const qc = useQueryClient();
   const { membership } = useAuth();
   return useMutation({
     mutationFn: async (mappingId: string) => {
-      const { error } = await supabase
-        .from("quickbooks_entity_mappings")
-        .update({ sync_state: "pending", last_error: null })
-        .eq("id", mappingId);
+      const { error } = await supabase.rpc("qbo_retry_failed_mapping", {
+        _mapping_id: mappingId,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -358,6 +358,46 @@ export function useRetryFailedMapping() {
       qc.invalidateQueries({
         queryKey: ["quickbooks-mapping-counts", membership?.organization_id],
       });
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-sync-queue-status", membership?.organization_id],
+      });
+    },
+  });
+}
+
+// =============================================================================
+// 6.2.2: auto-sync queue status. Powers the "Auto-sync activity" panel.
+// =============================================================================
+
+export type SyncQueueStatus = {
+  pending_count: number;
+  processing_count: number;
+  failed_in_queue_count: number;
+  last_processed_at: string | null;
+  oldest_pending_at: string | null;
+};
+
+export function useQuickBooksSyncQueueStatus() {
+  const { membership } = useAuth();
+  return useQuery({
+    queryKey: ["quickbooks-sync-queue-status", membership?.organization_id],
+    enabled: !!membership?.organization_id,
+    // Auto-sync runs on a 1-minute cron tick; refetching every 30s
+    // keeps the operator's view fresh without piling on the DB.
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<SyncQueueStatus> => {
+      const { data, error } = await supabase.rpc("qbo_sync_queue_status", {
+        _org_id: membership!.organization_id,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        pending_count: Number(row?.pending_count ?? 0),
+        processing_count: Number(row?.processing_count ?? 0),
+        failed_in_queue_count: Number(row?.failed_in_queue_count ?? 0),
+        last_processed_at: row?.last_processed_at ?? null,
+        oldest_pending_at: row?.oldest_pending_at ?? null,
+      };
     },
   });
 }

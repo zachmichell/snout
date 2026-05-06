@@ -47,6 +47,7 @@ import {
   useQuickBooksFailedMappings,
   useRetryFailedMapping,
   useResetFailedMappings,
+  useQuickBooksSyncQueueStatus,
   type SyncResult,
   type SyncCounts,
   type SyncAllProgress,
@@ -227,6 +228,8 @@ export default function QuickBooksTab() {
       </div>
 
       <SyncPanel />
+
+      <AutoSyncPanel />
 
       <FailedSyncsPanel />
 
@@ -463,6 +466,96 @@ function SyncCard({
       </div>
     </div>
   );
+}
+
+// Auto-sync panel: shows the live state of the outbox + cron pipeline.
+// Always rendered when QBO is connected so operators can see that
+// auto-sync is healthy (or notice when it isn't). Polls every 30s.
+function AutoSyncPanel() {
+  const { data: status, isLoading } = useQuickBooksSyncQueueStatus();
+  if (isLoading || !status) return null;
+
+  const pending = status.pending_count;
+  const processing = status.processing_count;
+  const lastProcessed = status.last_processed_at;
+  const oldestPending = status.oldest_pending_at;
+
+  // Health heuristic: if the oldest pending row has been waiting more
+  // than 5 minutes, something is probably stuck. Surface a warning.
+  const stuck =
+    oldestPending && Date.now() - new Date(oldestPending).getTime() > 5 * 60 * 1000;
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-6 shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="font-medium text-foreground">Auto-sync activity</h4>
+          <p className="mt-1 text-xs text-text-secondary">
+            New customers and services added in Snout sync to QuickBooks
+            automatically. The worker runs every minute; expect changes to land
+            in QBO within ~60 seconds.
+          </p>
+        </div>
+        {stuck && (
+          <span className="rounded-full border border-warning/40 bg-warning-light px-2.5 py-1 text-xs font-medium text-warning">
+            Backlog
+          </span>
+        )}
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Stat label="Waiting" value={pending} hint={pending === 0 ? "all caught up" : "in queue"} />
+        <Stat
+          label="Retrying"
+          value={processing}
+          hint={processing === 0 ? "no retries pending" : "with backoff"}
+        />
+        <Stat
+          label="Last sync"
+          value={lastProcessed ? formatRelativeShort(lastProcessed) : "never"}
+          hint={lastProcessed ? new Date(lastProcessed).toLocaleString() : "waiting for first event"}
+        />
+      </div>
+
+      {stuck && oldestPending && (
+        <p className="mt-3 rounded-md border border-warning/40 bg-warning-light p-3 text-xs text-warning">
+          The oldest pending item has been waiting since{" "}
+          {new Date(oldestPending).toLocaleString()}. Check that the cron
+          service-role key is configured (one-time setup), and look for entries
+          in the Failed Syncs panel.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: number | string;
+  hint: string;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-background p-3">
+      <div className="text-xs uppercase tracking-wider text-text-tertiary">{label}</div>
+      <div className="mt-1 font-display text-xl font-semibold text-foreground">{value}</div>
+      <div className="mt-0.5 text-xs text-text-tertiary">{hint}</div>
+    </div>
+  );
+}
+
+function formatRelativeShort(iso: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 // Failed Syncs panel: lists every mapping in 'failed' state with the

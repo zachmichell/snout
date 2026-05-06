@@ -4265,6 +4265,56 @@ export type Database = {
           },
         ]
       }
+      quickbooks_sync_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          enqueued_at: string
+          id: string
+          last_error: string | null
+          next_attempt_at: string
+          op: string
+          organization_id: string
+          processed_at: string | null
+          snout_id: string
+          snout_table: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          enqueued_at?: string
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          op?: string
+          organization_id: string
+          processed_at?: string | null
+          snout_id: string
+          snout_table: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          enqueued_at?: string
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          op?: string
+          organization_id?: string
+          processed_at?: string | null
+          snout_id?: string
+          snout_table?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_sync_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurring_reservation_groups: {
         Row: {
           created_at: string
@@ -6159,6 +6209,7 @@ export type Database = {
           refresh_token: string
         }[]
       }
+      invoke_quickbooks_process_queue: { Args: never; Returns: number }
       is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       is_org_member: { Args: { _org_id: string }; Returns: boolean }
       mark_conversation_read_by_owner: {
@@ -6178,9 +6229,39 @@ export type Database = {
           sync_state: string
         }[]
       }
+      qbo_mark_queue_failed: {
+        Args: { _error: string; _id: string }
+        Returns: undefined
+      }
+      qbo_mark_queue_processed: { Args: { _id: string }; Returns: undefined }
+      qbo_pickup_queue_batch: {
+        Args: { _limit?: number }
+        Returns: {
+          attempts: number
+          id: string
+          op: string
+          organization_id: string
+          snout_id: string
+          snout_table: string
+        }[]
+      }
       qbo_reset_failed_mappings: {
         Args: { _org_id: string; _snout_table?: string }
         Returns: number
+      }
+      qbo_retry_failed_mapping: {
+        Args: { _mapping_id: string }
+        Returns: undefined
+      }
+      qbo_sync_queue_status: {
+        Args: { _org_id: string }
+        Returns: {
+          failed_in_queue_count: number
+          last_processed_at: string
+          oldest_pending_at: string
+          pending_count: number
+          processing_count: number
+        }[]
       }
       qbo_unsynced_owner_ids: {
         Args: { _limit?: number; _org_id: string }
