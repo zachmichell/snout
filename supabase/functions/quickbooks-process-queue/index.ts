@@ -382,22 +382,27 @@ async function syncInvoice(
     };
   }
 
-  // Pull lines and resolve any service refs.
+  // Pull lines and resolve any service refs. (6.4.5d) qbo_tax_code_id
+  // is the per-line override; null falls through to the service's
+  // qbo_tax_code_id which we resolve below.
   const { data: lines, error: linesErr } = await admin
     .from("invoice_lines")
-    .select("id, service_id, description, quantity, unit_price_cents, line_total_cents, line_type")
+    .select(
+      "id, service_id, description, quantity, unit_price_cents, line_total_cents, line_type, qbo_tax_code_id",
+    )
     .eq("invoice_id", invoiceId)
     .order("created_at");
   if (linesErr) {
     return { ok: false as const, error: `Could not load invoice lines: ${linesErr.message}` };
   }
 
-  // Service id -> mapping lookup batch
+  // Service id -> mapping + tax code lookup batch.
   const serviceIds = (lines ?? [])
     .map((l: { service_id: string | null }) => l.service_id)
     .filter((id: string | null): id is string => !!id);
   const uniqueServiceIds = Array.from(new Set(serviceIds));
   const serviceMappings: Record<string, { qbo_id: string; sync_state: string }> = {};
+  const serviceTaxCodes: Record<string, string | null> = {};
   if (uniqueServiceIds.length > 0) {
     const { data: svcMaps } = await admin
       .from("quickbooks_entity_mappings")
@@ -408,6 +413,13 @@ async function syncInvoice(
       .is("deleted_at", null);
     for (const m of svcMaps ?? []) {
       serviceMappings[m.snout_id] = { qbo_id: m.qbo_id, sync_state: m.sync_state };
+    }
+    const { data: svcRows } = await admin
+      .from("services")
+      .select("id, qbo_tax_code_id")
+      .in("id", uniqueServiceIds);
+    for (const s of svcRows ?? []) {
+      serviceTaxCodes[s.id] = s.qbo_tax_code_id ?? null;
     }
   }
 
@@ -422,6 +434,38 @@ async function syncInvoice(
     }
   }
 
+  // (6.4.5d) Resolve every distinct Snout-side qbo_tax_code_id (line
+  // override OR service default) into the QBO TaxCode Id text. We fetch
+  // in one batch and put the results in a map keyed by Snout uuid so
+  // each line's mapper can resolve in O(1).
+  const taxCodeUuids = new Set<string>();
+  for (const l of lines ?? []) {
+    if (l.qbo_tax_code_id) {
+      taxCodeUuids.add(l.qbo_tax_code_id);
+    } else if (l.service_id && serviceTaxCodes[l.service_id]) {
+      taxCodeUuids.add(serviceTaxCodes[l.service_id] as string);
+    }
+  }
+  const taxCodeQboIds: Record<string, string> = {};
+  if (taxCodeUuids.size > 0) {
+    const { data: codes } = await admin
+      .from("qbo_tax_codes")
+      .select("id, qbo_id")
+      .in("id", Array.from(taxCodeUuids));
+    for (const c of codes ?? []) {
+      taxCodeQboIds[c.id] = c.qbo_id;
+    }
+  }
+
+  function resolveLineTaxCodeRef(
+    line: { service_id: string | null; qbo_tax_code_id: string | null },
+  ): { value: string } | undefined {
+    const uuid = line.qbo_tax_code_id ?? (line.service_id ? serviceTaxCodes[line.service_id] : null);
+    if (!uuid) return undefined;
+    const qboId = taxCodeQboIds[uuid];
+    return qboId ? { value: qboId } : undefined;
+  }
+
   // Build line items. Cents -> dollars for QBO's decimal Amount.
   const qboLines: QboInvoiceLine[] = (lines ?? []).map((l: {
     service_id: string | null;
@@ -429,10 +473,12 @@ async function syncInvoice(
     quantity: number | string;
     unit_price_cents: number;
     line_total_cents: number;
+    qbo_tax_code_id: string | null;
   }) => {
     const lineTotal = Number((l.line_total_cents / 100).toFixed(2));
     const unitPrice = Number((l.unit_price_cents / 100).toFixed(2));
     const qty = typeof l.quantity === "string" ? parseFloat(l.quantity) : l.quantity;
+    const taxCodeRef = resolveLineTaxCodeRef(l);
 
     if (l.service_id && serviceMappings[l.service_id]) {
       const m = serviceMappings[l.service_id];
@@ -444,6 +490,7 @@ async function syncInvoice(
           ItemRef: { value: m.qbo_id },
           Qty: qty,
           UnitPrice: unitPrice,
+          ...(taxCodeRef ? { TaxCodeRef: taxCodeRef } : {}),
         },
       };
     }
@@ -456,9 +503,17 @@ async function syncInvoice(
     };
   });
 
-  // Build invoice payload. Tax flows through TxnTaxDetail.TotalTax so
-  // QBO's invoice total ends up matching Snout's authoritative total.
-  const taxDollars = Number((invoice.tax_cents / 100).toFixed(2));
+  // (6.4.5d) Build invoice payload. We no longer override TxnTaxDetail
+  // .TotalTax: in QBO Canada (Automated Sales Tax mode) the field is
+  // ignored unless paired with a TxnTaxCodeRef and matching TaxLine
+  // entries. Instead, every taxable line carries its own TaxCodeRef
+  // and QBO computes the total from those. Snout's authoritative
+  // tax_cents stays correct because both sides derive from the same
+  // per-service tax-code attribution.
+  //
+  // GlobalTaxCalculation = TaxExcluded says "line UnitPrice/Amount are
+  // pre-tax, please add tax on top." NotApplicable disables AST in
+  // companies that haven't configured it. We keep both legs.
   const input: QboInvoiceInput = {
     CustomerRef: { value: ownerMapping.qbo_id },
     Line: qboLines,
@@ -472,9 +527,6 @@ async function syncInvoice(
   }
   if (invoice.due_at) {
     input.DueDate = invoice.due_at.slice(0, 10);
-  }
-  if (invoice.tax_cents > 0) {
-    input.TxnTaxDetail = { TotalTax: taxDollars };
   }
 
   return syncOneEntity({
