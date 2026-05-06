@@ -52,6 +52,7 @@ import {
   useEnqueuePaymentBackfill,
   useQuickBooksTaxCodes,
   useRefreshQuickBooksTaxCodes,
+  useDownloadQuickBooksMappingReport,
   type SyncResult,
   type SyncCounts,
   type SyncAllProgress,
@@ -395,8 +396,45 @@ function SyncPanel() {
         />
       </div>
 
-      <div className="mt-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
         <TaxCodesCard />
+        <ReconciliationCard />
+      </div>
+    </div>
+  );
+}
+
+// 6.5: Reconciliation export. One click downloads a CSV listing every
+// QBO entity mapping with the Snout-side display name + amount, so the
+// operator can spot-check against a QBO transaction list at month end.
+function ReconciliationCard() {
+  const download = useDownloadQuickBooksMappingReport();
+  return (
+    <div className="rounded-md border border-border bg-background p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-medium text-foreground">Reconciliation</div>
+          <div className="mt-0.5 text-xs text-text-tertiary">
+            Download a CSV of every QBO entity mapping with display name,
+            amount, and sync state. Use it at month end to spot-check
+            against a QBO transaction list.
+          </div>
+        </div>
+        <Button
+          onClick={async () => {
+            try {
+              const n = await download.mutateAsync();
+              toast.success(`Exported ${n} mapping${n === 1 ? "" : "s"}.`);
+            } catch (e: any) {
+              toast.error(e?.message ?? "Could not export mappings");
+            }
+          }}
+          disabled={download.isPending}
+          size="sm"
+          variant="outline"
+        >
+          {download.isPending ? "Building CSV..." : "Download CSV"}
+        </Button>
       </div>
     </div>
   );

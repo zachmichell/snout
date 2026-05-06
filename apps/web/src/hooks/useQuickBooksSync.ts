@@ -528,6 +528,97 @@ export function useResetFailedMappings() {
 }
 
 // =============================================================================
+// 6.5: Reconciliation export. Per-org CSV of every QBO entity mapping with
+// the Snout-side display name and amount. Operators download this at month
+// end and spot-check it against a QBO transaction list to confirm parity.
+// =============================================================================
+
+export type MappingReportRow = {
+  snout_table: string;
+  snout_id: string;
+  qbo_entity_type: string;
+  qbo_id: string;
+  display_name: string | null;
+  amount_cents: number | null;
+  currency: string | null;
+  sync_state: string;
+  last_synced_at: string | null;
+  last_error: string | null;
+};
+
+export function useDownloadQuickBooksMappingReport() {
+  const { membership } = useAuth();
+  return useMutation({
+    mutationFn: async () => {
+      if (!membership?.organization_id) throw new Error("No organization");
+      const { data, error } = await supabase.rpc("qbo_mapping_report", {
+        _org: membership.organization_id,
+      });
+      if (error) throw error;
+      const rows = (data ?? []) as MappingReportRow[];
+      const csv = mappingsToCsv(rows);
+      // Browser-side blob download. No server round-trip; the rows
+      // already arrived in the previous RPC response.
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `quickbooks-mappings-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      return rows.length;
+    },
+  });
+}
+
+function mappingsToCsv(rows: MappingReportRow[]): string {
+  const header = [
+    "Entity Type",
+    "Snout ID",
+    "QBO Entity",
+    "QBO ID",
+    "Display Name",
+    "Amount",
+    "Currency",
+    "Sync State",
+    "Last Synced At",
+    "Last Error",
+  ];
+  const lines = [header.join(",")];
+  for (const r of rows) {
+    const amount =
+      r.amount_cents != null ? (r.amount_cents / 100).toFixed(2) : "";
+    lines.push(
+      [
+        r.snout_table,
+        r.snout_id,
+        r.qbo_entity_type,
+        r.qbo_id,
+        csvField(r.display_name ?? ""),
+        amount,
+        r.currency ?? "",
+        r.sync_state,
+        r.last_synced_at ?? "",
+        csvField(r.last_error ?? ""),
+      ].join(","),
+    );
+  }
+  return lines.join("\n");
+}
+
+function csvField(s: string): string {
+  // RFC 4180-ish: wrap fields containing commas, quotes, or newlines in
+  // double quotes; double any embedded quotes. Our display names and
+  // error messages are user-supplied so we always escape defensively.
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+// =============================================================================
 // 6.4.5a: QBO tax-code cache. Read-only list (used by service editors and
 // the settings tab) and a manual refresh that re-pulls from QBO.
 // =============================================================================

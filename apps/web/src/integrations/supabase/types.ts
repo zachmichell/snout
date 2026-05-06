@@ -1839,8 +1839,11 @@ export type Database = {
           line_total_cents: number
           line_type: string
           organization_id: string
+          qbo_tax_code_id: string | null
           quantity: number
           service_id: string | null
+          tax_breakdown: Json | null
+          tax_cents: number
           unit_price_cents: number
         }
         Insert: {
@@ -1851,8 +1854,11 @@ export type Database = {
           line_total_cents: number
           line_type?: string
           organization_id: string
+          qbo_tax_code_id?: string | null
           quantity?: number
           service_id?: string | null
+          tax_breakdown?: Json | null
+          tax_cents?: number
           unit_price_cents: number
         }
         Update: {
@@ -1863,8 +1869,11 @@ export type Database = {
           line_total_cents?: number
           line_type?: string
           organization_id?: string
+          qbo_tax_code_id?: string | null
           quantity?: number
           service_id?: string | null
+          tax_breakdown?: Json | null
+          tax_cents?: number
           unit_price_cents?: number
         }
         Relationships: [
@@ -1880,6 +1889,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_qbo_tax_code_id_fkey"
+            columns: ["qbo_tax_code_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_tax_codes"
             referencedColumns: ["id"]
           },
           {
@@ -6413,6 +6429,21 @@ export type Database = {
           sync_state: string
         }[]
       }
+      qbo_mapping_report: {
+        Args: { _org: string }
+        Returns: {
+          amount_cents: number
+          currency: string
+          display_name: string
+          last_error: string
+          last_synced_at: string
+          qbo_entity_type: string
+          qbo_id: string
+          snout_id: string
+          snout_table: string
+          sync_state: string
+        }[]
+      }
       qbo_mark_queue_failed: {
         Args: { _error: string; _id: string }
         Returns: undefined
@@ -6483,10 +6514,15 @@ export type Database = {
           service_id: string
         }[]
       }
+      recalculate_invoice_taxes: {
+        Args: { _invoice_id: string }
+        Returns: undefined
+      }
       refresh_owner_credit_cache: {
         Args: { p_owner_id: string }
         Returns: undefined
       }
+      resolve_line_tax_code: { Args: { _line_id: string }; Returns: string }
       set_helcim_api_token: {
         Args: { _api_token: string; _org_id: string }
         Returns: string
