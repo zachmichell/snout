@@ -21,6 +21,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { centsToDollarString, parseDollarsToCents, formatCentsShort } from "@/lib/money";
+import { TaxCodeSelect } from "@/components/portal/TaxCodeSelect";
 
 const CATEGORIES = [
   { v: "food", l: "Food" },
@@ -37,6 +38,7 @@ type Product = {
   description: string | null; price_cents: number; cost_cents: number;
   stock_quantity: number; reorder_point: number;
   manufacturer: string | null; vendor: string | null; active: boolean;
+  qbo_tax_code_id: string | null;
 };
 
 function emptyForm() {
@@ -45,6 +47,7 @@ function emptyForm() {
     price_dollars: "0.00", cost_dollars: "0.00",
     stock_quantity: "0", reorder_point: "0",
     manufacturer: "", vendor: "", active: true,
+    qbo_tax_code_id: null as string | null,
   };
 }
 
@@ -81,6 +84,7 @@ export function PosProductsSection({ showHeader = true }: { showHeader?: boolean
       reorder_point: String(p.reorder_point),
       manufacturer: p.manufacturer ?? "", vendor: p.vendor ?? "",
       active: p.active,
+      qbo_tax_code_id: p.qbo_tax_code_id ?? null,
     });
     setOpen(true);
   };
@@ -100,6 +104,7 @@ export function PosProductsSection({ showHeader = true }: { showHeader?: boolean
         manufacturer: form.manufacturer.trim() || null,
         vendor: form.vendor.trim() || null,
         active: form.active, organization_id: orgId!,
+        qbo_tax_code_id: form.qbo_tax_code_id,
       };
       if (editing) {
         const { error } = await supabase.from("retail_products").update(payload).eq("id", editing.id);
@@ -232,6 +237,13 @@ export function PosProductsSection({ showHeader = true }: { showHeader?: boolean
                 <Input value={form.manufacturer} onChange={(e) => setForm({ ...form, manufacturer: e.target.value })} /></div>
               <div className="space-y-1.5"><Label className="text-xs">Vendor</Label>
                 <Input value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} /></div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tax Code</Label>
+              <TaxCodeSelect
+                value={form.qbo_tax_code_id}
+                onChange={(v) => setForm({ ...form, qbo_tax_code_id: v })}
+              />
             </div>
             <div className="flex items-center gap-3">
               <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />

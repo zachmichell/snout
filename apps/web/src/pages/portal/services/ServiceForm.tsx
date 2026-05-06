@@ -16,6 +16,7 @@ import { useOrgModules } from "@/hooks/useOrgModules";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import { centsToDollarString, parseDollarsToCents } from "@/lib/money";
+import { TaxCodeSelect } from "@/components/portal/TaxCodeSelect";
 
 type ModuleEnum = Database["public"]["Enums"]["module_enum"];
 type DurationEnum = Database["public"]["Enums"]["duration_type_enum"];
@@ -29,6 +30,7 @@ type FormState = {
   max_pets_per_booking: string;
   active: boolean;
   location_id: string;
+  qbo_tax_code_id: string | null;
 };
 
 const empty: FormState = {
@@ -40,6 +42,7 @@ const empty: FormState = {
   max_pets_per_booking: "",
   active: true,
   location_id: "",
+  qbo_tax_code_id: null,
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -125,6 +128,7 @@ export default function ServiceForm() {
           (existing as any).max_pets_per_booking != null ? String((existing as any).max_pets_per_booking) : "",
         active: existing.active ?? true,
         location_id: existing.location_id ?? "",
+        qbo_tax_code_id: (existing as any).qbo_tax_code_id ?? null,
       });
     }
   }, [existing]);
@@ -169,6 +173,7 @@ export default function ServiceForm() {
       active: form.active,
       location_id: form.location_id || null,
       organization_id: membership.organization_id,
+      qbo_tax_code_id: form.qbo_tax_code_id,
     };
 
     if (isEdit) {
@@ -272,6 +277,16 @@ export default function ServiceForm() {
                   value={form.max_pets_per_booking}
                   onChange={(e) => update("max_pets_per_booking", e.target.value)}
                   placeholder="—"
+                />
+              </Field>
+              <Field
+                label="Tax Code"
+                span={2}
+                hint="Imported from QuickBooks. Determines the tax applied on invoices for this service."
+              >
+                <TaxCodeSelect
+                  value={form.qbo_tax_code_id}
+                  onChange={(v) => update("qbo_tax_code_id", v)}
                 />
               </Field>
             </Section>

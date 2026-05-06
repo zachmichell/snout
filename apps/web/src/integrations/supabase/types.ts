@@ -5011,6 +5011,7 @@ export type Database = {
           organization_id: string
           photo_url: string | null
           price_cents: number
+          qbo_tax_code_id: string | null
           reorder_point: number
           sku: string | null
           stock_quantity: number
@@ -5030,6 +5031,7 @@ export type Database = {
           organization_id: string
           photo_url?: string | null
           price_cents?: number
+          qbo_tax_code_id?: string | null
           reorder_point?: number
           sku?: string | null
           stock_quantity?: number
@@ -5049,13 +5051,22 @@ export type Database = {
           organization_id?: string
           photo_url?: string | null
           price_cents?: number
+          qbo_tax_code_id?: string | null
           reorder_point?: number
           sku?: string | null
           stock_quantity?: number
           updated_at?: string
           vendor?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "retail_products_qbo_tax_code_id_fkey"
+            columns: ["qbo_tax_code_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_tax_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       service_deposit_overrides: {
         Row: {
@@ -5110,6 +5121,7 @@ export type Database = {
           module: Database["public"]["Enums"]["module_enum"]
           name: string
           organization_id: string
+          qbo_tax_code_id: string | null
           time_windows: Json
           updated_at: string
         }
@@ -5129,6 +5141,7 @@ export type Database = {
           module: Database["public"]["Enums"]["module_enum"]
           name: string
           organization_id: string
+          qbo_tax_code_id?: string | null
           time_windows?: Json
           updated_at?: string
         }
@@ -5148,6 +5161,7 @@ export type Database = {
           module?: Database["public"]["Enums"]["module_enum"]
           name?: string
           organization_id?: string
+          qbo_tax_code_id?: string | null
           time_windows?: Json
           updated_at?: string
         }
@@ -5164,6 +5178,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_qbo_tax_code_id_fkey"
+            columns: ["qbo_tax_code_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_tax_codes"
             referencedColumns: ["id"]
           },
         ]
