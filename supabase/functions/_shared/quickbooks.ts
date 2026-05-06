@@ -590,6 +590,103 @@ export async function findInvoiceByDocNumber(
   return { ok: true, status: res.status, data: res.data?.QueryResponse?.Invoice?.[0] ?? null };
 }
 
+// ----- Payment ----------------------------------------------------------
+
+export type QboPaymentLine = {
+  // Each line links the payment to one or more invoices. For Snout
+  // we always have a 1:1 invoice<->payment relationship.
+  Amount: number;
+  LinkedTxn: Array<{
+    TxnId: string; // QBO Invoice Id
+    TxnType: "Invoice";
+  }>;
+};
+
+export type QboPaymentInput = {
+  CustomerRef: { value: string; name?: string };
+  TotalAmt: number; // major units
+  Line?: QboPaymentLine[];
+  TxnDate?: string; // YYYY-MM-DD
+  PrivateNote?: string;
+  PaymentRefNum?: string; // e.g. Stripe payment_intent id, Helcim transaction id
+  CurrencyRef?: { value: "CAD" | "USD" };
+  // Where the money lands. Required when QBO has multiple bank /
+  // undeposited-funds accounts; we auto-pick on first sync.
+  DepositToAccountRef?: { value: string; name?: string };
+};
+
+export type QboPayment = QboPaymentInput & {
+  Id: string;
+  SyncToken: string;
+};
+
+export function createPayment(ctx: QboTokenContext, input: QboPaymentInput) {
+  return qboRequest<{ Payment: QboPayment }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/payment?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updatePayment(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: QboPaymentInput,
+) {
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ Payment: QboPayment }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/payment?minorversion=70`,
+    body,
+  });
+}
+
+/**
+ * Find a Payment by PaymentRefNum (the processor's transaction id).
+ * Used for adopt-on-duplicate when the operator has previously
+ * imported payments by hand. Less common than customer/item dups but
+ * the path costs nothing to provide.
+ */
+export async function findPaymentByRefNum(
+  ctx: QboTokenContext,
+  refNum: string,
+): Promise<QboResult<QboPayment | null>> {
+  const escaped = refNum.replace(/'/g, "''");
+  const query = `select Id, SyncToken, PaymentRefNum from Payment where PaymentRefNum = '${escaped}' MAXRESULTS 1`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Payment?: QboPayment[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Payment?.[0] ?? null };
+}
+
+/**
+ * List candidate deposit accounts. Preference order, in callers:
+ *   1. Other Current Asset > Undeposited Funds (the "holding" account
+ *      QBO uses by default for payments before deposit)
+ *   2. Any active Bank account
+ *
+ * QBO requires DepositToAccountRef when the company has more than
+ * one viable account; we pick once and persist on
+ * quickbooks_accounts.default_deposit_account_id.
+ */
+export async function listDepositAccounts(ctx: QboTokenContext): Promise<QboResult<QboAccount[]>> {
+  const query = `select Id, Name, AccountType, AccountSubType, Active from Account where (AccountType = 'Bank' or AccountSubType = 'UndepositedFunds') and Active = true MAXRESULTS 100`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Account ?? [] };
+}
+
 // ----- Lookup-by-name (for duplicate adoption) -------------------------
 
 /**

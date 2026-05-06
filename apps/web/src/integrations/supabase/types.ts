@@ -4105,6 +4105,8 @@ export type Database = {
           access_token_secret_id: string
           company_name: string | null
           created_at: string
+          default_deposit_account_id: string | null
+          default_deposit_account_name: string | null
           default_income_account_id: string | null
           default_income_account_name: string | null
           deleted_at: string | null
@@ -4123,6 +4125,8 @@ export type Database = {
           access_token_secret_id: string
           company_name?: string | null
           created_at?: string
+          default_deposit_account_id?: string | null
+          default_deposit_account_name?: string | null
           default_income_account_id?: string | null
           default_income_account_name?: string | null
           deleted_at?: string | null
@@ -4141,6 +4145,8 @@ export type Database = {
           access_token_secret_id?: string
           company_name?: string | null
           created_at?: string
+          default_deposit_account_id?: string | null
+          default_deposit_account_name?: string | null
           default_income_account_id?: string | null
           default_income_account_name?: string | null
           deleted_at?: string | null
@@ -6225,6 +6231,10 @@ export type Database = {
         Args: { _limit?: number; _org_id: string }
         Returns: number
       }
+      qbo_enqueue_unsynced_payments: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: number
+      }
       qbo_mapping_counts: {
         Args: { _org_id: string }
         Returns: {
@@ -6277,6 +6287,12 @@ export type Database = {
         Args: { _limit?: number; _org_id: string }
         Returns: {
           owner_id: string
+        }[]
+      }
+      qbo_unsynced_payment_ids: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: {
+          payment_id: string
         }[]
       }
       qbo_unsynced_service_ids: {

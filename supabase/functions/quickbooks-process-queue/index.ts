@@ -19,19 +19,24 @@ import {
   createCustomer,
   createInvoice,
   createItem,
+  createPayment,
   findCustomerByDisplayName,
   findInvoiceByDocNumber,
   findItemByName,
+  findPaymentByRefNum,
   getTokenContext,
+  listDepositAccounts,
   listIncomeAccounts,
   syncOneEntity,
   updateCustomer,
   updateInvoice,
   updateItem,
+  updatePayment,
   type QboCustomerInput,
   type QboInvoiceInput,
   type QboInvoiceLine,
   type QboItemInput,
+  type QboPaymentInput,
   type QboTokenContext,
 } from "../_shared/quickbooks.ts";
 
@@ -101,6 +106,7 @@ Deno.serve(async (req) => {
   // multiple entities for the same org are in the same batch.
   const tokenCache = new Map<string, QboTokenContext | null>();
   const incomeAccountCache = new Map<string, { value: string; name: string } | null>();
+  const depositAccountCache = new Map<string, { value: string; name: string } | null>();
 
   let succeeded = 0;
   let failed = 0;
@@ -143,6 +149,34 @@ Deno.serve(async (req) => {
         }
       } else if (row.snout_table === "invoices") {
         const result = await syncInvoice(admin, ctx, row.organization_id, row.snout_id);
+        if (result.ok) {
+          await admin.rpc("qbo_mark_queue_processed", { _id: row.id });
+          succeeded += 1;
+        } else {
+          await admin.rpc("qbo_mark_queue_failed", { _id: row.id, _error: result.error });
+          failed += 1;
+        }
+      } else if (row.snout_table === "payments") {
+        let depositAccount = depositAccountCache.get(row.organization_id);
+        if (depositAccount === undefined) {
+          depositAccount = await ensureDepositAccount(admin, row.organization_id, ctx);
+          depositAccountCache.set(row.organization_id, depositAccount);
+        }
+        if (!depositAccount) {
+          await admin.rpc("qbo_mark_queue_failed", {
+            _id: row.id,
+            _error: "No active Bank or Undeposited Funds account in QBO",
+          });
+          failed += 1;
+          continue;
+        }
+        const result = await syncPayment(
+          admin,
+          ctx,
+          row.organization_id,
+          row.snout_id,
+          depositAccount,
+        );
         if (result.ok) {
           await admin.rpc("qbo_mark_queue_processed", { _id: row.id });
           succeeded += 1;
@@ -471,6 +505,167 @@ async function syncInvoice(
         }
       : undefined,
   });
+}
+
+// Sync one Snout payment to QuickBooks as a Payment entity linked to
+// the corresponding invoice. Pre-flight: invoice must already be
+// synced (so we can use its QBO Invoice Id as the LinkedTxn target),
+// and via the invoice the owner mapping is already in place too.
+//
+// Refunds (status='refunded') are out of scope for 6.4 and skip with
+// a no-op until 6.4b lands the RefundReceipt flow.
+async function syncPayment(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any,
+  ctx: QboTokenContext,
+  orgId: string,
+  paymentId: string,
+  depositAccount: { value: string; name: string },
+) {
+  const { data: payment } = await admin
+    .from("payments")
+    .select(
+      "id, organization_id, invoice_id, amount_cents, currency, method, status, stripe_payment_intent_id, helcim_transaction_id, processed_at, deleted_at, refund_reason_id",
+    )
+    .eq("id", paymentId)
+    .maybeSingle();
+  if (!payment) return { ok: false as const, error: "Payment not found" };
+  if (payment.deleted_at) {
+    return { ok: true as const, state: "unchanged" as const, qboId: "" };
+  }
+  if (payment.status === "pending" || payment.status === "failed") {
+    return { ok: true as const, state: "unchanged" as const, qboId: "" };
+  }
+  if (payment.status === "refunded") {
+    // 6.4b will create a RefundReceipt for this. For now we don't
+    // overwrite the original Payment on QBO; we just leave the queue
+    // row marked processed so we don't burn rate limit retrying it.
+    return { ok: true as const, state: "unchanged" as const, qboId: "" };
+  }
+  if (payment.status !== "succeeded") {
+    return { ok: false as const, error: `Unexpected payment status: ${payment.status}` };
+  }
+
+  // Resolve the invoice (and through it the customer) via mappings.
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("id, owner_id")
+    .eq("id", payment.invoice_id)
+    .maybeSingle();
+  if (!invoice) return { ok: false as const, error: "Payment's invoice not found" };
+
+  const { data: invoiceMapping } = await admin
+    .from("quickbooks_entity_mappings")
+    .select("qbo_id, sync_state")
+    .eq("organization_id", orgId)
+    .eq("snout_table", "invoices")
+    .eq("snout_id", payment.invoice_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!invoiceMapping || invoiceMapping.sync_state !== "synced" || !invoiceMapping.qbo_id) {
+    return {
+      ok: false as const,
+      error: `Payment's invoice (${payment.invoice_id}) is not yet synced to QBO. Will retry once the invoice sync completes.`,
+    };
+  }
+
+  const { data: ownerMapping } = await admin
+    .from("quickbooks_entity_mappings")
+    .select("qbo_id, sync_state")
+    .eq("organization_id", orgId)
+    .eq("snout_table", "owners")
+    .eq("snout_id", invoice.owner_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!ownerMapping || ownerMapping.sync_state !== "synced" || !ownerMapping.qbo_id) {
+    return {
+      ok: false as const,
+      error: `Payment's owner (${invoice.owner_id}) is not yet synced to QBO. Will retry once the owner sync completes.`,
+    };
+  }
+
+  const amountDollars = Number((payment.amount_cents / 100).toFixed(2));
+  // Prefer Stripe payment-intent id over Helcim transaction id when
+  // both are present (only one ever should be).
+  const refNum =
+    payment.stripe_payment_intent_id ?? payment.helcim_transaction_id ?? payment.id.slice(0, 21);
+  // QBO PaymentRefNum cap at 21 chars; truncate defensively.
+  const truncatedRef = refNum.slice(0, 21);
+
+  const input: QboPaymentInput = {
+    CustomerRef: { value: ownerMapping.qbo_id },
+    TotalAmt: amountDollars,
+    Line: [
+      {
+        Amount: amountDollars,
+        LinkedTxn: [{ TxnId: invoiceMapping.qbo_id, TxnType: "Invoice" }],
+      },
+    ],
+    PaymentRefNum: truncatedRef,
+    DepositToAccountRef: depositAccount,
+    CurrencyRef: { value: payment.currency as "CAD" | "USD" },
+  };
+  if (payment.processed_at) {
+    input.TxnDate = payment.processed_at.slice(0, 10);
+  }
+
+  return syncOneEntity({
+    admin,
+    orgId,
+    snoutTable: "payments",
+    snoutId: paymentId,
+    qboEntityType: "Payment",
+    payload: input,
+    create: () => createPayment(ctx, input),
+    update: (current) => updatePayment(ctx, current, input),
+    extractIdSyncToken: (data) => {
+      const p = "Payment" in (data as Record<string, unknown>)
+        ? (data as { Payment: { Id: string; SyncToken: string } }).Payment
+        : (data as { Id: string; SyncToken: string });
+      return { id: p.Id, syncToken: p.SyncToken };
+    },
+    lookupExistingByName: input.PaymentRefNum
+      ? async () => {
+          const r = await findPaymentByRefNum(ctx, input.PaymentRefNum!);
+          if (!r.ok) return r;
+          return r.data
+            ? { ok: true as const, status: r.status, data: { Id: r.data.Id, SyncToken: r.data.SyncToken } }
+            : { ok: true as const, status: r.status, data: null };
+        }
+      : undefined,
+  });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function ensureDepositAccount(admin: any, orgId: string, ctx: QboTokenContext) {
+  const { data: account } = await admin
+    .from("quickbooks_accounts")
+    .select("default_deposit_account_id, default_deposit_account_name")
+    .eq("organization_id", orgId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (account?.default_deposit_account_id) {
+    return {
+      value: account.default_deposit_account_id,
+      name: account.default_deposit_account_name ?? "Deposit",
+    };
+  }
+  const accounts = await listDepositAccounts(ctx);
+  if (!accounts.ok || accounts.data.length === 0) return null;
+  // Prefer Undeposited Funds (it's the QBO standard for payments
+  // before they're deposited as a batch). Fall back to the first
+  // active Bank account.
+  const undeposited = accounts.data.find((a) => a.AccountSubType === "UndepositedFunds");
+  const bank = accounts.data.find((a) => a.AccountType === "Bank");
+  const pick = undeposited ?? bank ?? accounts.data[0];
+  await admin
+    .from("quickbooks_accounts")
+    .update({
+      default_deposit_account_id: pick.Id,
+      default_deposit_account_name: pick.Name,
+    })
+    .eq("organization_id", orgId);
+  return { value: pick.Id, name: pick.Name };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

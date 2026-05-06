@@ -50,6 +50,7 @@ export function useQuickBooksMappingCounts() {
         ["owners", emptyCounts("owners")],
         ["services", emptyCounts("services")],
         ["invoices", emptyCounts("invoices")],
+        ["payments", emptyCounts("payments")],
       ]);
       for (const r of (rows ?? []) as Array<{
         snout_table: string;
@@ -273,6 +274,30 @@ export function useEnqueueInvoiceBackfill() {
   });
 }
 
+export function useEnqueuePaymentBackfill() {
+  const qc = useQueryClient();
+  const { membership } = useAuth();
+  return useMutation({
+    mutationFn: async (limit: number = 1000): Promise<number> => {
+      if (!membership?.organization_id) throw new Error("No organization");
+      const { data, error } = await supabase.rpc("qbo_enqueue_unsynced_payments", {
+        _org_id: membership.organization_id,
+        _limit: limit,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-sync-queue-status", membership?.organization_id],
+      });
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-mapping-counts", membership?.organization_id],
+      });
+    },
+  });
+}
+
 // =============================================================================
 // Failed-mapping resolution surface. Lists the failed rows with their entity
 // names + Intuit's failure reason, lets operators retry individuals or the
@@ -281,10 +306,10 @@ export function useEnqueueInvoiceBackfill() {
 
 export type FailedMapping = {
   id: string;
-  snout_table: "owners" | "services" | "invoices";
+  snout_table: "owners" | "services" | "invoices" | "payments";
   snout_id: string;
   entity_name: string;
-  entity_secondary: string | null; // e.g. owner email, service description, invoice owner
+  entity_secondary: string | null; // e.g. owner email, service description, invoice owner, payment processor ref
   last_error: string | null;
   last_synced_at: string | null;
   updated_at: string;
@@ -319,8 +344,11 @@ export function useQuickBooksFailedMappings() {
       const invoiceIds = failures
         .filter((f) => f.snout_table === "invoices")
         .map((f) => f.snout_id);
+      const paymentIds = failures
+        .filter((f) => f.snout_table === "payments")
+        .map((f) => f.snout_id);
 
-      const [ownerLookup, serviceLookup, invoiceLookup] = await Promise.all([
+      const [ownerLookup, serviceLookup, invoiceLookup, paymentLookup] = await Promise.all([
         ownerIds.length === 0
           ? Promise.resolve({ data: [] as Array<{ id: string; first_name: string | null; last_name: string | null; email: string | null }> })
           : supabase
@@ -339,6 +367,12 @@ export function useQuickBooksFailedMappings() {
               .from("invoices")
               .select("id, invoice_number, total_cents, currency")
               .in("id", invoiceIds),
+        paymentIds.length === 0
+          ? Promise.resolve({ data: [] as Array<{ id: string; amount_cents: number; currency: string; method: string; stripe_payment_intent_id: string | null; helcim_transaction_id: string | null }> })
+          : supabase
+              .from("payments")
+              .select("id, amount_cents, currency, method, stripe_payment_intent_id, helcim_transaction_id")
+              .in("id", paymentIds),
       ]);
 
       const ownerById = new Map<
@@ -370,6 +404,17 @@ export function useQuickBooksFailedMappings() {
           secondary: `${(inv.total_cents / 100).toFixed(2)} ${inv.currency}`,
         });
       }
+      const paymentById = new Map<
+        string,
+        { name: string; secondary: string | null }
+      >();
+      for (const p of paymentLookup.data ?? []) {
+        const ref = p.stripe_payment_intent_id ?? p.helcim_transaction_id ?? p.id.slice(0, 8);
+        paymentById.set(p.id, {
+          name: `${(p.amount_cents / 100).toFixed(2)} ${p.currency}`,
+          secondary: `${p.method} · ${ref}`,
+        });
+      }
 
       return failures.map((f) => {
         const lookup =
@@ -377,10 +422,12 @@ export function useQuickBooksFailedMappings() {
             ? ownerById.get(f.snout_id)
             : f.snout_table === "services"
               ? serviceById.get(f.snout_id)
-              : invoiceById.get(f.snout_id);
+              : f.snout_table === "invoices"
+                ? invoiceById.get(f.snout_id)
+                : paymentById.get(f.snout_id);
         return {
           id: f.id as string,
-          snout_table: f.snout_table as "owners" | "services" | "invoices",
+          snout_table: f.snout_table as "owners" | "services" | "invoices" | "payments",
           snout_id: f.snout_id as string,
           entity_name: lookup?.name ?? `${f.snout_table} ${f.snout_id.slice(0, 8)}`,
           entity_secondary: lookup?.secondary ?? null,

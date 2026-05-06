@@ -49,6 +49,7 @@ import {
   useResetFailedMappings,
   useQuickBooksSyncQueueStatus,
   useEnqueueInvoiceBackfill,
+  useEnqueuePaymentBackfill,
   type SyncResult,
   type SyncCounts,
   type SyncAllProgress,
@@ -288,10 +289,12 @@ function SyncPanel() {
   const allCustomers = useSyncAllQuickBooksCustomers();
   const allItems = useSyncAllQuickBooksItems();
   const enqueueInvoices = useEnqueueInvoiceBackfill();
+  const enqueuePayments = useEnqueuePaymentBackfill();
 
   const ownerCounts = counts.data?.find((c) => c.table === "owners");
   const serviceCounts = counts.data?.find((c) => c.table === "services");
   const invoiceCounts = counts.data?.find((c) => c.table === "invoices");
+  const paymentCounts = counts.data?.find((c) => c.table === "payments");
 
   const handleSyncOne = async (
     label: string,
@@ -352,7 +355,7 @@ function SyncPanel() {
         />
       </div>
 
-      <div className="mt-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
         <InvoiceSyncCard
           counts={invoiceCounts}
           loading={counts.isLoading}
@@ -370,6 +373,85 @@ function SyncPanel() {
             }
           }}
         />
+        <PaymentSyncCard
+          counts={paymentCounts}
+          loading={counts.isLoading}
+          isPending={enqueuePayments.isPending}
+          onSyncAll={async () => {
+            try {
+              const n = await enqueuePayments.mutateAsync(1000);
+              if (n === 0) {
+                toast.success("All payments already up to date");
+              } else {
+                toast.success(`${n} payment${n === 1 ? "" : "s"} queued. Auto-sync worker drains them at ~50/minute; watch the activity panel below.`);
+              }
+            } catch (e: any) {
+              toast.error(e?.message ?? "Could not enqueue payments");
+            }
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Payment sync card. Same shape as InvoiceSyncCard. Refunds (status =
+// 'refunded') are skipped by the worker until 6.4b ships the
+// RefundReceipt flow, so the count math represents only the
+// succeeded path for now.
+function PaymentSyncCard({
+  counts,
+  loading,
+  isPending,
+  onSyncAll,
+}: {
+  counts: SyncCounts | undefined;
+  loading: boolean;
+  isPending: boolean;
+  onSyncAll: () => void;
+}) {
+  const synced = counts?.synced ?? 0;
+  const total = counts?.total ?? 0;
+  const failed = counts?.failed ?? 0;
+  const pending = total - synced - failed;
+
+  return (
+    <div className="rounded-md border border-border bg-background p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-medium text-foreground">Payments</div>
+          <div className="mt-0.5 text-xs text-text-tertiary">
+            From succeeded Snout payments. Each payment links to its QBO
+            invoice; first sync auto-picks an Undeposited Funds or Bank
+            account in QBO. Refunds are deferred to a follow-up batch.
+          </div>
+        </div>
+        <Button onClick={onSyncAll} disabled={isPending} size="sm">
+          {isPending ? "Queueing..." : "Sync all"}
+        </Button>
+      </div>
+      <div className="mt-3 flex items-center gap-3 text-xs">
+        {loading ? (
+          <span className="text-text-tertiary">Loading counts...</span>
+        ) : (
+          <>
+            <span className="text-foreground">
+              <span className="font-semibold">{synced}</span>
+              <span className="text-text-tertiary"> / {total}</span>
+              <span className="ml-1 text-text-tertiary">synced</span>
+            </span>
+            {pending > 0 && (
+              <span className="rounded-full border border-border bg-surface px-2 py-0.5 font-medium text-text-secondary">
+                {pending} pending
+              </span>
+            )}
+            {failed > 0 && (
+              <span className="rounded-full border border-destructive/30 bg-destructive-light px-2 py-0.5 font-medium text-destructive">
+                {failed} failed
+              </span>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -749,7 +831,9 @@ function FailedSyncsPanel() {
                     ? "Owner"
                     : f.snout_table === "services"
                       ? "Service"
-                      : "Invoice"}
+                      : f.snout_table === "invoices"
+                        ? "Invoice"
+                        : "Payment"}
                 </td>
                 <td className="px-3 py-2 align-top">
                   <div className="font-medium text-foreground">{f.entity_name}</div>
