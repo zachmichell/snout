@@ -44,9 +44,13 @@ import {
   useSyncQuickBooksItems,
   useSyncAllQuickBooksCustomers,
   useSyncAllQuickBooksItems,
+  useQuickBooksFailedMappings,
+  useRetryFailedMapping,
+  useResetFailedMappings,
   type SyncResult,
   type SyncCounts,
   type SyncAllProgress,
+  type FailedMapping,
 } from "@/hooks/useQuickBooksSync";
 import { formatDateTime } from "@/lib/money";
 
@@ -224,6 +228,8 @@ export default function QuickBooksTab() {
 
       <SyncPanel />
 
+      <FailedSyncsPanel />
+
       <div className="rounded-lg border border-border bg-surface p-6 shadow-card">
         <h4 className="font-medium text-foreground">What syncs to QuickBooks</h4>
         <ul className="mt-2 space-y-1 text-sm text-text-secondary">
@@ -288,11 +294,8 @@ function SyncPanel() {
     try {
       const res = await mut.mutateAsync();
       if (res.failed > 0) {
-        const firstFailure = res.failures[0];
         toast.warning(
-          `${label} sync finished with ${res.failed} failure${res.failed === 1 ? "" : "s"}. First: ${
-            firstFailure?.reason ?? "unknown"
-          }`,
+          `${label} sync finished with ${res.failed} failure${res.failed === 1 ? "" : "s"}. See the Failed Syncs panel below for details and a retry option.`,
         );
       } else if (res.has_more) {
         toast.success(
@@ -458,6 +461,142 @@ function SyncCard({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// Failed Syncs panel: lists every mapping in 'failed' state with the
+// entity name and Intuit's error message, plus per-row Retry and a
+// bulk "Retry all". Hidden entirely when there are no failures.
+function FailedSyncsPanel() {
+  const { data: failures, isLoading } = useQuickBooksFailedMappings();
+  const retryOne = useRetryFailedMapping();
+  const resetAll = useResetFailedMappings();
+  const allCustomers = useSyncAllQuickBooksCustomers();
+  const allItems = useSyncAllQuickBooksItems();
+
+  const handleRetryAll = async () => {
+    try {
+      const n = await resetAll.mutateAsync(undefined);
+      toast.success(`${n} mapping${n === 1 ? "" : "s"} reset to pending. Starting Sync all...`);
+      // Kick both syncs; each one quickly no-ops if there's nothing
+      // pending in its table.
+      allCustomers.start();
+      allItems.start();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not reset failed mappings");
+    }
+  };
+
+  const handleRetryOne = async (mapping: FailedMapping) => {
+    try {
+      await retryOne.mutateAsync(mapping.id);
+      toast.success("Marked for retry. Click Sync now or Sync all to push it.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not retry mapping");
+    }
+  };
+
+  if (isLoading) return null;
+  if (!failures || failures.length === 0) return null;
+
+  // Group failures by their last_error to show repeating reasons once
+  // with a count. Helps operators see "300 of these are duplicate name
+  // errors" at a glance.
+  const errorGroups = new Map<string, number>();
+  for (const f of failures) {
+    const key = f.last_error ?? "Unknown error";
+    errorGroups.set(key, (errorGroups.get(key) ?? 0) + 1);
+  }
+  const topErrors = Array.from(errorGroups.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  return (
+    <div className="rounded-lg border border-destructive/30 bg-destructive-light/30 p-6 shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="font-medium text-destructive">
+            {failures.length} sync failure{failures.length === 1 ? "" : "s"}
+          </h4>
+          <p className="mt-1 text-xs text-text-secondary">
+            These entities did not sync. Common causes: an entity with the same
+            name already exists in QuickBooks, or an email address is malformed.
+            Resolve in Snout or QuickBooks, then click Retry.
+          </p>
+        </div>
+        <Button
+          onClick={handleRetryAll}
+          disabled={resetAll.isPending}
+          size="sm"
+        >
+          {resetAll.isPending ? "Resetting..." : "Retry all failed"}
+        </Button>
+      </div>
+
+      {/* Error frequency summary so the operator can see patterns. */}
+      <div className="mt-4 rounded-md border border-border bg-background p-3 text-xs">
+        <div className="font-medium text-foreground">Most common errors</div>
+        <ul className="mt-2 space-y-1">
+          {topErrors.map(([err, count]) => (
+            <li key={err} className="flex items-start justify-between gap-3">
+              <span className="text-text-secondary truncate">{err}</span>
+              <span className="shrink-0 rounded-full border border-border bg-surface px-2 py-0.5 font-medium text-foreground">
+                {count}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Detailed list, capped to 50 visible rows; tell the operator
+          the cap if there are more. */}
+      <div className="mt-4 max-h-96 overflow-y-auto rounded-md border border-border bg-background">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-background-elevated/95">
+            <tr className="border-b border-border-subtle text-left text-text-tertiary">
+              <th className="px-3 py-2 font-medium">Type</th>
+              <th className="px-3 py-2 font-medium">Entity</th>
+              <th className="px-3 py-2 font-medium">Reason</th>
+              <th className="px-3 py-2 font-medium" />
+            </tr>
+          </thead>
+          <tbody>
+            {failures.slice(0, 50).map((f) => (
+              <tr key={f.id} className="border-b border-border-subtle last:border-b-0">
+                <td className="px-3 py-2 align-top text-text-tertiary">
+                  {f.snout_table === "owners" ? "Owner" : "Service"}
+                </td>
+                <td className="px-3 py-2 align-top">
+                  <div className="font-medium text-foreground">{f.entity_name}</div>
+                  {f.entity_secondary && (
+                    <div className="text-text-tertiary">{f.entity_secondary}</div>
+                  )}
+                </td>
+                <td className="px-3 py-2 align-top text-text-secondary">
+                  {f.last_error ?? "Unknown"}
+                </td>
+                <td className="px-3 py-2 align-top text-right">
+                  <Button
+                    onClick={() => handleRetryOne(f)}
+                    size="sm"
+                    variant="ghost"
+                    disabled={retryOne.isPending}
+                  >
+                    Retry
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {failures.length > 50 && (
+        <p className="mt-2 text-xs text-text-tertiary">
+          Showing the 50 most recent failures of {failures.length} total. Resolve these,
+          click Retry all failed to reset, then re-run Sync all.
+        </p>
+      )}
     </div>
   );
 }

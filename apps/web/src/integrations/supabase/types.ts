@@ -6170,6 +6170,30 @@ export type Database = {
         Returns: undefined
       }
       next_invoice_number: { Args: { _org_id: string }; Returns: string }
+      qbo_mapping_counts: {
+        Args: { _org_id: string }
+        Returns: {
+          n: number
+          snout_table: string
+          sync_state: string
+        }[]
+      }
+      qbo_reset_failed_mappings: {
+        Args: { _org_id: string; _snout_table?: string }
+        Returns: number
+      }
+      qbo_unsynced_owner_ids: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: {
+          owner_id: string
+        }[]
+      }
+      qbo_unsynced_service_ids: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: {
+          service_id: string
+        }[]
+      }
       refresh_owner_credit_cache: {
         Args: { p_owner_id: string }
         Returns: undefined
