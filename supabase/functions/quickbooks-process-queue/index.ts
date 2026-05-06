@@ -18,6 +18,8 @@ import { corsHeaders } from "../_shared/cors.ts";
 import {
   createCustomer,
   createItem,
+  findCustomerByDisplayName,
+  findItemByName,
   getTokenContext,
   listIncomeAccounts,
   syncOneEntity,
@@ -30,6 +32,12 @@ import {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// Optional explicit cron secret. Lets the operator decouple this
+// function's auth from Supabase's auto-injected SUPABASE_SERVICE_ROLE_KEY,
+// which has been seen to drift from the dashboard's current key on
+// some projects after key rotations or new-format-key migrations.
+// When set, the worker accepts a bearer token equal to either env var.
+const QBO_CRON_SECRET = Deno.env.get("QBO_CRON_SECRET");
 const INTUIT_CLIENT_ID = Deno.env.get("INTUIT_CLIENT_ID");
 const INTUIT_CLIENT_SECRET = Deno.env.get("INTUIT_CLIENT_SECRET");
 
@@ -43,10 +51,16 @@ Deno.serve(async (req) => {
 
   // Service-role gate: only the cron tick or a debugging service-role
   // invocation should be able to fire this. We compare the bearer
-  // token against the env var rather than verifying any user JWT.
+  // token against the auto-injected service-role key OR an explicit
+  // QBO_CRON_SECRET. The two-key fallback exists because Supabase's
+  // SUPABASE_SERVICE_ROLE_KEY auto-injection has been seen to lag
+  // behind the dashboard's current key on some projects.
   const auth = req.headers.get("Authorization") ?? "";
   const token = auth.replace(/^Bearer\s+/i, "");
-  if (token !== SUPABASE_SERVICE_ROLE_KEY) {
+  const matchesServiceRole =
+    !!SUPABASE_SERVICE_ROLE_KEY && token === SUPABASE_SERVICE_ROLE_KEY;
+  const matchesCronSecret = !!QBO_CRON_SECRET && token === QBO_CRON_SECRET;
+  if (!token || (!matchesServiceRole && !matchesCronSecret)) {
     return json({ error: "Forbidden" }, 403);
   }
 
@@ -206,6 +220,13 @@ async function syncOwner(
       const c = "Customer" in (data as Record<string, unknown>) ? (data as { Customer: { Id: string; SyncToken: string } }).Customer : (data as { Id: string; SyncToken: string });
       return { id: c.Id, syncToken: c.SyncToken };
     },
+    lookupExistingByName: async () => {
+      const r = await findCustomerByDisplayName(ctx, input.DisplayName);
+      if (!r.ok) return r;
+      return r.data
+        ? { ok: true as const, status: r.status, data: { Id: r.data.Id, SyncToken: r.data.SyncToken } }
+        : { ok: true as const, status: r.status, data: null };
+    },
   });
 }
 
@@ -240,6 +261,13 @@ async function syncService(
     extractIdSyncToken: (data) => {
       const i = "Item" in (data as Record<string, unknown>) ? (data as { Item: { Id: string; SyncToken: string } }).Item : (data as { Id: string; SyncToken: string });
       return { id: i.Id, syncToken: i.SyncToken };
+    },
+    lookupExistingByName: async () => {
+      const r = await findItemByName(ctx, input.Name);
+      if (!r.ok) return r;
+      return r.data
+        ? { ok: true as const, status: r.status, data: { Id: r.data.Id, SyncToken: r.data.SyncToken } }
+        : { ok: true as const, status: r.status, data: null };
     },
   });
 }

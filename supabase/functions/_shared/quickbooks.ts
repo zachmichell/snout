@@ -32,7 +32,11 @@ export type QboTokenResponse = {
 
 export type QboResult<T> =
   | { ok: true; status: number; data: T }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; code?: string };
+
+// Intuit error codes the integration handles specifically. Numeric
+// strings; we keep them as strings since Intuit returns them that way.
+export const QBO_ERROR_DUPLICATE_NAME = "6240";
 
 function basicAuth(clientId: string, clientSecret: string): string {
   return "Basic " + btoa(`${clientId}:${clientSecret}`);
@@ -380,7 +384,8 @@ export async function qboRequest<T = unknown>(args: {
       fault?.Detail ??
       parsed?.Fault?.type ??
       `QBO returned ${res.status}`;
-    return { ok: false, status: res.status, error: String(message) };
+    const code = fault?.code != null ? String(fault.code) : undefined;
+    return { ok: false, status: res.status, error: String(message), code };
   }
   return { ok: true, status: res.status, data: parsed as T };
 }
@@ -485,6 +490,50 @@ export type QboAccount = {
   Active: boolean;
 };
 
+// ----- Lookup-by-name (for duplicate adoption) -------------------------
+
+/**
+ * Find a Customer in QBO by exact DisplayName. Used when CREATE fails
+ * with code 6240 (Duplicate Name Exists Error) so the worker can
+ * adopt the existing QBO record into a Snout mapping rather than
+ * permanently failing the sync.
+ */
+export async function findCustomerByDisplayName(
+  ctx: QboTokenContext,
+  displayName: string,
+): Promise<QboResult<QboCustomer | null>> {
+  // QBO's query language uses single-quoted string literals; double
+  // any embedded apostrophes to escape. The query is run against the
+  // company file, so it scans active and inactive customers alike.
+  const escaped = displayName.replace(/'/g, "''");
+  const query = `select Id, SyncToken, DisplayName, GivenName, FamilyName from Customer where DisplayName = '${escaped}' MAXRESULTS 1`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Customer?: QboCustomer[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Customer?.[0] ?? null };
+}
+
+/** Find an Item by exact Name. Same purpose as findCustomerByDisplayName. */
+export async function findItemByName(
+  ctx: QboTokenContext,
+  name: string,
+): Promise<QboResult<QboItem | null>> {
+  const escaped = name.replace(/'/g, "''");
+  const query = `select Id, SyncToken, Name from Item where Name = '${escaped}' MAXRESULTS 1`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Item?: QboItem[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Item?.[0] ?? null };
+}
+
 export async function listIncomeAccounts(ctx: QboTokenContext): Promise<QboResult<QboAccount[]>> {
   const query = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Income' and Active = true MAXRESULTS 100`;
   const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
@@ -526,6 +575,13 @@ export async function syncOneEntity<T extends { Id: string; SyncToken: string }>
   create: () => Promise<QboResult<{ [key: string]: T } | T>>;
   update: (current: { Id: string; SyncToken: string }) => Promise<QboResult<{ [key: string]: T } | T>>;
   extractIdSyncToken: (data: { [key: string]: T } | T) => { id: string; syncToken: string };
+  // Optional: when CREATE fails with QBO_ERROR_DUPLICATE_NAME (6240),
+  // call this to find the existing QBO entity by name. If it returns
+  // a row, we adopt it (record the mapping, then UPDATE with our
+  // payload so QBO ends up with Snout's authoritative data). Returns
+  // null when no such entity exists, in which case the original
+  // duplicate-name failure is reported to the caller.
+  lookupExistingByName?: () => Promise<QboResult<{ Id: string; SyncToken: string } | null>>;
 }): Promise<EntitySyncOutcome> {
   const hash = await payloadHash(args.payload);
 
@@ -574,7 +630,104 @@ export async function syncOneEntity<T extends { Id: string; SyncToken: string }>
     return { ok: true, state: "updated", qboId: idTok.id };
   }
 
-  const result = await args.create();
+  let result = await args.create();
+
+  // Lookup-and-adopt: if QBO rejects the create as a duplicate name
+  // and the caller provided a lookup function, find the existing QBO
+  // entity by name, mark our mapping with that QBO id+SyncToken, and
+  // proceed to UPDATE with our payload. End state: Snout's data is
+  // authoritative on the existing QBO record.
+  if (!result.ok && result.code === QBO_ERROR_DUPLICATE_NAME && args.lookupExistingByName) {
+    const found = await args.lookupExistingByName();
+    if (found.ok && found.data) {
+      // Conflict guard: another Snout entity might already own this
+      // QBO id (two Snout entities with the same DisplayName both
+      // resolve to the same QBO customer). Adopting blindly would
+      // either silently fail on the partial unique index or, worse,
+      // overwrite the existing mapping. Detect and fail with a clear
+      // operator-facing message instead.
+      const { data: conflict } = await args.admin
+        .from("quickbooks_entity_mappings")
+        .select("id, snout_id")
+        .eq("organization_id", args.orgId)
+        .eq("qbo_entity_type", args.qboEntityType)
+        .eq("qbo_id", found.data.Id)
+        .is("deleted_at", null)
+        .neq("snout_id", args.snoutId)
+        .maybeSingle();
+
+      if (conflict) {
+        const conflictError = `Conflict: another Snout ${args.snoutTable} record (id=${conflict.snout_id}) is already linked to QBO ${args.qboEntityType} ${found.data.Id}. Rename or merge one of the Snout records before retrying.`;
+        if (existing) {
+          const { error: updErr } = await args.admin
+            .from("quickbooks_entity_mappings")
+            .update({ sync_state: "failed", last_error: conflictError, payload_hash: hash })
+            .eq("id", existing.id);
+          if (updErr) console.error("conflict-update mapping failed:", updErr);
+        } else {
+          const { error: insErr } = await args.admin.from("quickbooks_entity_mappings").insert({
+            organization_id: args.orgId,
+            snout_table: args.snoutTable,
+            snout_id: args.snoutId,
+            qbo_entity_type: args.qboEntityType,
+            qbo_id: "",
+            payload_hash: hash,
+            sync_state: "failed",
+            last_error: conflictError,
+          });
+          if (insErr) console.error("conflict-insert mapping failed:", insErr);
+        }
+        return { ok: false, error: conflictError };
+      }
+
+      const updateResult = await args.update({
+        Id: found.data.Id,
+        SyncToken: found.data.SyncToken,
+      });
+      if (updateResult.ok) {
+        const idTok = args.extractIdSyncToken(updateResult.data);
+        if (existing) {
+          const { error: mapErr } = await args.admin
+            .from("quickbooks_entity_mappings")
+            .update({
+              qbo_id: idTok.id,
+              sync_token: idTok.syncToken,
+              payload_hash: hash,
+              sync_state: "synced",
+              last_error: null,
+              last_synced_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+          if (mapErr) {
+            console.error("adopt-update mapping failed:", mapErr);
+            return { ok: false, error: `Mapping update failed: ${mapErr.message}` };
+          }
+        } else {
+          const { error: mapErr } = await args.admin.from("quickbooks_entity_mappings").insert({
+            organization_id: args.orgId,
+            snout_table: args.snoutTable,
+            snout_id: args.snoutId,
+            qbo_entity_type: args.qboEntityType,
+            qbo_id: idTok.id,
+            sync_token: idTok.syncToken,
+            payload_hash: hash,
+            sync_state: "synced",
+            last_synced_at: new Date().toISOString(),
+          });
+          if (mapErr) {
+            console.error("adopt-insert mapping failed:", mapErr);
+            return { ok: false, error: `Mapping insert failed: ${mapErr.message}` };
+          }
+        }
+        return { ok: true, state: "updated", qboId: idTok.id };
+      }
+      // Update after lookup also failed; fall through to record the
+      // most recent error (the update's, which is more actionable
+      // than the original duplicate-name).
+      result = updateResult;
+    }
+  }
+
   if (!result.ok) {
     if (existing) {
       await args.admin
@@ -597,7 +750,7 @@ export async function syncOneEntity<T extends { Id: string; SyncToken: string }>
   }
   const idTok = args.extractIdSyncToken(result.data);
   if (existing) {
-    await args.admin
+    const { error: mapErr } = await args.admin
       .from("quickbooks_entity_mappings")
       .update({
         qbo_id: idTok.id,
@@ -608,8 +761,12 @@ export async function syncOneEntity<T extends { Id: string; SyncToken: string }>
         last_synced_at: new Date().toISOString(),
       })
       .eq("id", existing.id);
+    if (mapErr) {
+      console.error("create-update mapping failed:", mapErr);
+      return { ok: false, error: `Mapping update failed: ${mapErr.message}` };
+    }
   } else {
-    await args.admin.from("quickbooks_entity_mappings").insert({
+    const { error: mapErr } = await args.admin.from("quickbooks_entity_mappings").insert({
       organization_id: args.orgId,
       snout_table: args.snoutTable,
       snout_id: args.snoutId,
@@ -620,6 +777,10 @@ export async function syncOneEntity<T extends { Id: string; SyncToken: string }>
       sync_state: "synced",
       last_synced_at: new Date().toISOString(),
     });
+    if (mapErr) {
+      console.error("create-insert mapping failed:", mapErr);
+      return { ok: false, error: `Mapping insert failed: ${mapErr.message}` };
+    }
   }
   return { ok: true, state: "created", qboId: idTok.id };
 }
