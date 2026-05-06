@@ -6221,6 +6221,10 @@ export type Database = {
         Returns: undefined
       }
       next_invoice_number: { Args: { _org_id: string }; Returns: string }
+      qbo_enqueue_unsynced_invoices: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: number
+      }
       qbo_mapping_counts: {
         Args: { _org_id: string }
         Returns: {
@@ -6261,6 +6265,12 @@ export type Database = {
           oldest_pending_at: string
           pending_count: number
           processing_count: number
+        }[]
+      }
+      qbo_unsynced_invoice_ids: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: {
+          invoice_id: string
         }[]
       }
       qbo_unsynced_owner_ids: {

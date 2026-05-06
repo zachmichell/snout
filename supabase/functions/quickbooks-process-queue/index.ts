@@ -17,15 +17,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
   createCustomer,
+  createInvoice,
   createItem,
   findCustomerByDisplayName,
+  findInvoiceByDocNumber,
   findItemByName,
   getTokenContext,
   listIncomeAccounts,
   syncOneEntity,
   updateCustomer,
+  updateInvoice,
   updateItem,
   type QboCustomerInput,
+  type QboInvoiceInput,
+  type QboInvoiceLine,
   type QboItemInput,
   type QboTokenContext,
 } from "../_shared/quickbooks.ts";
@@ -129,6 +134,15 @@ Deno.serve(async (req) => {
       // Dispatch by table.
       if (row.snout_table === "owners") {
         const result = await syncOwner(admin, ctx, row.organization_id, row.snout_id);
+        if (result.ok) {
+          await admin.rpc("qbo_mark_queue_processed", { _id: row.id });
+          succeeded += 1;
+        } else {
+          await admin.rpc("qbo_mark_queue_failed", { _id: row.id, _error: result.error });
+          failed += 1;
+        }
+      } else if (row.snout_table === "invoices") {
+        const result = await syncInvoice(admin, ctx, row.organization_id, row.snout_id);
         if (result.ok) {
           await admin.rpc("qbo_mark_queue_processed", { _id: row.id });
           succeeded += 1;
@@ -269,6 +283,193 @@ async function syncService(
         ? { ok: true as const, status: r.status, data: { Id: r.data.Id, SyncToken: r.data.SyncToken } }
         : { ok: true as const, status: r.status, data: null };
     },
+  });
+}
+
+// Sync one Snout invoice to QuickBooks. Pre-flight requirements:
+//   * The owner has a 'synced' mapping (we resolve CustomerRef from it).
+//   * Every invoice_line with service_id has a 'synced' mapping for
+//     that service (we resolve ItemRef from it). Lines without
+//     service_id become DescriptionOnly lines on the QBO invoice
+//     (handles surcharges, discounts, tips, ad-hoc additions).
+// If any prerequisite isn't met, we fail the invoice with a clear
+// "X not yet synced" message. The auto-sync queue's backoff retries
+// pick up the invoice once the dependent entities have synced.
+//
+// Tax handling: GlobalTaxCalculation = TaxExcluded means the lines
+// are pre-tax and we set the total tax explicitly on TxnTaxDetail.
+// Lines stay at their Snout pre-tax prices; QBO totals match Snout
+// because tax flows through the txn-level field. This is path (a)
+// from the cluster scope: Snout's authoritative number wins.
+//
+// Currency: QBO companies are single-currency unless Multicurrency
+// is enabled. Snout invoice currency must match the QBO company's
+// home currency; mismatch returns a clear error rather than a
+// silent type cast.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function syncInvoice(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any,
+  ctx: QboTokenContext,
+  orgId: string,
+  invoiceId: string,
+) {
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select(
+      "id, organization_id, owner_id, status, invoice_number, currency, subtotal_cents, tax_cents, total_cents, surcharge_cents, promotion_discount_cents, store_credit_applied_cents, issued_at, due_at, notes, deleted_at",
+    )
+    .eq("id", invoiceId)
+    .maybeSingle();
+  if (!invoice) return { ok: false as const, error: "Invoice not found" };
+  if (invoice.deleted_at) {
+    return { ok: true as const, state: "unchanged" as const, qboId: "" };
+  }
+  // Drafts and voided invoices are not pushed to QBO. The trigger
+  // already filters draft on enqueue; this is the void guard.
+  if (invoice.status === "draft" || invoice.status === "void") {
+    return { ok: true as const, state: "unchanged" as const, qboId: "" };
+  }
+  if (!invoice.owner_id) {
+    return { ok: false as const, error: "Invoice has no owner; cannot resolve QBO Customer" };
+  }
+
+  // Resolve customer via mapping. If not synced, fail with a message
+  // that names the entity type so the operator can find it.
+  const { data: ownerMapping } = await admin
+    .from("quickbooks_entity_mappings")
+    .select("qbo_id, sync_state")
+    .eq("organization_id", orgId)
+    .eq("snout_table", "owners")
+    .eq("snout_id", invoice.owner_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!ownerMapping || ownerMapping.sync_state !== "synced" || !ownerMapping.qbo_id) {
+    return {
+      ok: false as const,
+      error: `Invoice owner (${invoice.owner_id}) is not yet synced to QBO. Will retry once the owner sync completes.`,
+    };
+  }
+
+  // Pull lines and resolve any service refs.
+  const { data: lines, error: linesErr } = await admin
+    .from("invoice_lines")
+    .select("id, service_id, description, quantity, unit_price_cents, line_total_cents, line_type")
+    .eq("invoice_id", invoiceId)
+    .order("created_at");
+  if (linesErr) {
+    return { ok: false as const, error: `Could not load invoice lines: ${linesErr.message}` };
+  }
+
+  // Service id -> mapping lookup batch
+  const serviceIds = (lines ?? [])
+    .map((l: { service_id: string | null }) => l.service_id)
+    .filter((id: string | null): id is string => !!id);
+  const uniqueServiceIds = Array.from(new Set(serviceIds));
+  const serviceMappings: Record<string, { qbo_id: string; sync_state: string }> = {};
+  if (uniqueServiceIds.length > 0) {
+    const { data: svcMaps } = await admin
+      .from("quickbooks_entity_mappings")
+      .select("snout_id, qbo_id, sync_state")
+      .eq("organization_id", orgId)
+      .eq("snout_table", "services")
+      .in("snout_id", uniqueServiceIds)
+      .is("deleted_at", null);
+    for (const m of svcMaps ?? []) {
+      serviceMappings[m.snout_id] = { qbo_id: m.qbo_id, sync_state: m.sync_state };
+    }
+  }
+
+  // Bail early if any referenced service isn't synced.
+  for (const sid of uniqueServiceIds) {
+    const m = serviceMappings[sid];
+    if (!m || m.sync_state !== "synced" || !m.qbo_id) {
+      return {
+        ok: false as const,
+        error: `Service ${sid} on this invoice is not yet synced to QBO. Will retry once the service sync completes.`,
+      };
+    }
+  }
+
+  // Build line items. Cents -> dollars for QBO's decimal Amount.
+  const qboLines: QboInvoiceLine[] = (lines ?? []).map((l: {
+    service_id: string | null;
+    description: string;
+    quantity: number | string;
+    unit_price_cents: number;
+    line_total_cents: number;
+  }) => {
+    const lineTotal = Number((l.line_total_cents / 100).toFixed(2));
+    const unitPrice = Number((l.unit_price_cents / 100).toFixed(2));
+    const qty = typeof l.quantity === "string" ? parseFloat(l.quantity) : l.quantity;
+
+    if (l.service_id && serviceMappings[l.service_id]) {
+      const m = serviceMappings[l.service_id];
+      return {
+        DetailType: "SalesItemLineDetail" as const,
+        Amount: lineTotal,
+        Description: l.description,
+        SalesItemLineDetail: {
+          ItemRef: { value: m.qbo_id },
+          Qty: qty,
+          UnitPrice: unitPrice,
+        },
+      };
+    }
+    // Surcharges, discounts, tips, ad-hoc lines: description-only with
+    // an Amount. QBO permits negative amounts here for discounts.
+    return {
+      DetailType: "DescriptionOnly" as const,
+      Amount: lineTotal,
+      Description: l.description,
+    };
+  });
+
+  // Build invoice payload. Tax flows through TxnTaxDetail.TotalTax so
+  // QBO's invoice total ends up matching Snout's authoritative total.
+  const taxDollars = Number((invoice.tax_cents / 100).toFixed(2));
+  const input: QboInvoiceInput = {
+    CustomerRef: { value: ownerMapping.qbo_id },
+    Line: qboLines,
+    DocNumber: invoice.invoice_number ?? invoice.id.slice(0, 8),
+    PrivateNote: invoice.notes ?? undefined,
+    GlobalTaxCalculation: invoice.tax_cents > 0 ? "TaxExcluded" : "NotApplicable",
+    CurrencyRef: { value: invoice.currency as "CAD" | "USD" },
+  };
+  if (invoice.issued_at) {
+    input.TxnDate = invoice.issued_at.slice(0, 10);
+  }
+  if (invoice.due_at) {
+    input.DueDate = invoice.due_at.slice(0, 10);
+  }
+  if (invoice.tax_cents > 0) {
+    input.TxnTaxDetail = { TotalTax: taxDollars };
+  }
+
+  return syncOneEntity({
+    admin,
+    orgId,
+    snoutTable: "invoices",
+    snoutId: invoiceId,
+    qboEntityType: "Invoice",
+    payload: input,
+    create: () => createInvoice(ctx, input),
+    update: (current) => updateInvoice(ctx, current, input),
+    extractIdSyncToken: (data) => {
+      const i = "Invoice" in (data as Record<string, unknown>)
+        ? (data as { Invoice: { Id: string; SyncToken: string } }).Invoice
+        : (data as { Id: string; SyncToken: string });
+      return { id: i.Id, syncToken: i.SyncToken };
+    },
+    lookupExistingByName: input.DocNumber
+      ? async () => {
+          const r = await findInvoiceByDocNumber(ctx, input.DocNumber!);
+          if (!r.ok) return r;
+          return r.data
+            ? { ok: true as const, status: r.status, data: { Id: r.data.Id, SyncToken: r.data.SyncToken } }
+            : { ok: true as const, status: r.status, data: null };
+        }
+      : undefined,
   });
 }
 

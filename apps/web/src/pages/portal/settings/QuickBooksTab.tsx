@@ -48,6 +48,7 @@ import {
   useRetryFailedMapping,
   useResetFailedMappings,
   useQuickBooksSyncQueueStatus,
+  useEnqueueInvoiceBackfill,
   type SyncResult,
   type SyncCounts,
   type SyncAllProgress,
@@ -286,9 +287,11 @@ function SyncPanel() {
   const syncItems = useSyncQuickBooksItems();
   const allCustomers = useSyncAllQuickBooksCustomers();
   const allItems = useSyncAllQuickBooksItems();
+  const enqueueInvoices = useEnqueueInvoiceBackfill();
 
   const ownerCounts = counts.data?.find((c) => c.table === "owners");
   const serviceCounts = counts.data?.find((c) => c.table === "services");
+  const invoiceCounts = counts.data?.find((c) => c.table === "invoices");
 
   const handleSyncOne = async (
     label: string,
@@ -347,6 +350,90 @@ function SyncPanel() {
           onSyncAll={() => allItems.start()}
           onCancel={() => allItems.cancel()}
         />
+      </div>
+
+      <div className="mt-3">
+        <InvoiceSyncCard
+          counts={invoiceCounts}
+          loading={counts.isLoading}
+          isPending={enqueueInvoices.isPending}
+          onSyncAll={async () => {
+            try {
+              const n = await enqueueInvoices.mutateAsync(1000);
+              if (n === 0) {
+                toast.success("All invoices already up to date");
+              } else {
+                toast.success(`${n} invoice${n === 1 ? "" : "s"} queued. Auto-sync worker drains them at ~50/minute; watch the activity panel below.`);
+              }
+            } catch (e: any) {
+              toast.error(e?.message ?? "Could not enqueue invoices");
+            }
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Invoice sync card. Different shape from the customer/item cards
+// because invoices are processed exclusively through the auto-sync
+// worker. Pressing "Sync all" here just bulk-enqueues invoices into
+// the queue table; the existing cron-driven worker drains them.
+// Progress is visible in the AutoSyncPanel below.
+function InvoiceSyncCard({
+  counts,
+  loading,
+  isPending,
+  onSyncAll,
+}: {
+  counts: SyncCounts | undefined;
+  loading: boolean;
+  isPending: boolean;
+  onSyncAll: () => void;
+}) {
+  const synced = counts?.synced ?? 0;
+  const total = counts?.total ?? 0;
+  const failed = counts?.failed ?? 0;
+  const pending = total - synced - failed;
+
+  return (
+    <div className="rounded-md border border-border bg-background p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-medium text-foreground">Invoices</div>
+          <div className="mt-0.5 text-xs text-text-tertiary">
+            From non-draft Snout invoices. Synced through the auto-sync worker so
+            progress shows in the activity panel below. Customers and items must be
+            synced first; the worker retries invoices that depend on entities still
+            in flight.
+          </div>
+        </div>
+        <Button onClick={onSyncAll} disabled={isPending} size="sm">
+          {isPending ? "Queueing..." : "Sync all"}
+        </Button>
+      </div>
+      <div className="mt-3 flex items-center gap-3 text-xs">
+        {loading ? (
+          <span className="text-text-tertiary">Loading counts...</span>
+        ) : (
+          <>
+            <span className="text-foreground">
+              <span className="font-semibold">{synced}</span>
+              <span className="text-text-tertiary"> / {total}</span>
+              <span className="ml-1 text-text-tertiary">synced</span>
+            </span>
+            {pending > 0 && (
+              <span className="rounded-full border border-border bg-surface px-2 py-0.5 font-medium text-text-secondary">
+                {pending} pending
+              </span>
+            )}
+            {failed > 0 && (
+              <span className="rounded-full border border-destructive/30 bg-destructive-light px-2 py-0.5 font-medium text-destructive">
+                {failed} failed
+              </span>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -658,7 +745,11 @@ function FailedSyncsPanel() {
             {failures.slice(0, 50).map((f) => (
               <tr key={f.id} className="border-b border-border-subtle last:border-b-0">
                 <td className="px-3 py-2 align-top text-text-tertiary">
-                  {f.snout_table === "owners" ? "Owner" : "Service"}
+                  {f.snout_table === "owners"
+                    ? "Owner"
+                    : f.snout_table === "services"
+                      ? "Service"
+                      : "Invoice"}
                 </td>
                 <td className="px-3 py-2 align-top">
                   <div className="font-medium text-foreground">{f.entity_name}</div>

@@ -490,6 +490,106 @@ export type QboAccount = {
   Active: boolean;
 };
 
+// ----- Invoice ----------------------------------------------------------
+
+export type QboInvoiceLine =
+  | {
+      // Line that references a QBO Item (mapped from a Snout service).
+      // Amount is the line total in major-unit currency.
+      DetailType: "SalesItemLineDetail";
+      Amount: number;
+      Description?: string;
+      SalesItemLineDetail: {
+        ItemRef: { value: string; name?: string };
+        Qty?: number;
+        UnitPrice?: number;
+        TaxCodeRef?: { value: string };
+      };
+    }
+  | {
+      // Description-only line: used for surcharges, discounts, tips,
+      // and any other Snout invoice_lines that don't have a matching
+      // Snout service to map to a QBO Item. QBO accepts these without
+      // requiring an item ref. Negative Amount is allowed for
+      // discounts.
+      DetailType: "DescriptionOnly";
+      Amount?: number;
+      Description: string;
+    };
+
+export type QboInvoiceInput = {
+  CustomerRef: { value: string; name?: string };
+  Line: QboInvoiceLine[];
+  DocNumber?: string;
+  TxnDate?: string; // YYYY-MM-DD
+  DueDate?: string;
+  PrivateNote?: string;
+  CurrencyRef?: { value: "CAD" | "USD" };
+  // Tax handling: TaxExcluded means lines are pre-tax and we set the
+  // total tax explicitly via TxnTaxDetail. NotApplicable disables QBO's
+  // automated sales tax entirely (used when the company file hasn't
+  // configured AST).
+  GlobalTaxCalculation?: "TaxExcluded" | "TaxInclusive" | "NotApplicable";
+  TxnTaxDetail?: {
+    TotalTax?: number;
+    TxnTaxCodeRef?: { value: string };
+  };
+};
+
+export type QboInvoice = QboInvoiceInput & {
+  Id: string;
+  SyncToken: string;
+  TotalAmt?: number;
+};
+
+export function createInvoice(ctx: QboTokenContext, input: QboInvoiceInput) {
+  return qboRequest<{ Invoice: QboInvoice }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/invoice?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updateInvoice(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: QboInvoiceInput,
+) {
+  // Invoice updates with sparse=true preserve fields we don't include.
+  // We send the full Line[] every time because Intuit replaces lines
+  // wholesale on update (sparse semantics don't apply at the line level).
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ Invoice: QboInvoice }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/invoice?minorversion=70`,
+    body,
+  });
+}
+
+/**
+ * Find an Invoice by DocNumber. Used for duplicate-adoption when we
+ * detect a prior sync wrote an invoice with the same number. Less
+ * common than the customer/item duplicate case; included for
+ * symmetry and future-proofing.
+ */
+export async function findInvoiceByDocNumber(
+  ctx: QboTokenContext,
+  docNumber: string,
+): Promise<QboResult<QboInvoice | null>> {
+  const escaped = docNumber.replace(/'/g, "''");
+  const query = `select Id, SyncToken, DocNumber from Invoice where DocNumber = '${escaped}' MAXRESULTS 1`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Invoice?: QboInvoice[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Invoice?.[0] ?? null };
+}
+
 // ----- Lookup-by-name (for duplicate adoption) -------------------------
 
 /**

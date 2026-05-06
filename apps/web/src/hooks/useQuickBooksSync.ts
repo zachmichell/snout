@@ -49,6 +49,7 @@ export function useQuickBooksMappingCounts() {
       const buckets = new Map<string, SyncCounts>([
         ["owners", emptyCounts("owners")],
         ["services", emptyCounts("services")],
+        ["invoices", emptyCounts("invoices")],
       ]);
       for (const r of (rows ?? []) as Array<{
         snout_table: string;
@@ -242,6 +243,37 @@ export function useSyncAllQuickBooksItems() {
 }
 
 // =============================================================================
+// 6.3: invoice sync. Different shape from the customer/item batch flow:
+// invoices use the auto-sync queue end-to-end, so the "Sync now" button just
+// bulk-enqueues pending invoices via an RPC and the existing worker drains
+// them on cron ticks. Progress is visible in the AutoSyncPanel.
+// =============================================================================
+
+export function useEnqueueInvoiceBackfill() {
+  const qc = useQueryClient();
+  const { membership } = useAuth();
+  return useMutation({
+    mutationFn: async (limit: number = 1000): Promise<number> => {
+      if (!membership?.organization_id) throw new Error("No organization");
+      const { data, error } = await supabase.rpc("qbo_enqueue_unsynced_invoices", {
+        _org_id: membership.organization_id,
+        _limit: limit,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-sync-queue-status", membership?.organization_id],
+      });
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-mapping-counts", membership?.organization_id],
+      });
+    },
+  });
+}
+
+// =============================================================================
 // Failed-mapping resolution surface. Lists the failed rows with their entity
 // names + Intuit's failure reason, lets operators retry individuals or the
 // whole set after they've fixed the underlying cause in QBO.
@@ -249,10 +281,10 @@ export function useSyncAllQuickBooksItems() {
 
 export type FailedMapping = {
   id: string;
-  snout_table: "owners" | "services";
+  snout_table: "owners" | "services" | "invoices";
   snout_id: string;
   entity_name: string;
-  entity_secondary: string | null; // e.g. owner email, service description
+  entity_secondary: string | null; // e.g. owner email, service description, invoice owner
   last_error: string | null;
   last_synced_at: string | null;
   updated_at: string;
@@ -284,8 +316,11 @@ export function useQuickBooksFailedMappings() {
       const serviceIds = failures
         .filter((f) => f.snout_table === "services")
         .map((f) => f.snout_id);
+      const invoiceIds = failures
+        .filter((f) => f.snout_table === "invoices")
+        .map((f) => f.snout_id);
 
-      const [ownerLookup, serviceLookup] = await Promise.all([
+      const [ownerLookup, serviceLookup, invoiceLookup] = await Promise.all([
         ownerIds.length === 0
           ? Promise.resolve({ data: [] as Array<{ id: string; first_name: string | null; last_name: string | null; email: string | null }> })
           : supabase
@@ -298,6 +333,12 @@ export function useQuickBooksFailedMappings() {
               .from("services")
               .select("id, name, description")
               .in("id", serviceIds),
+        invoiceIds.length === 0
+          ? Promise.resolve({ data: [] as Array<{ id: string; invoice_number: string | null; total_cents: number; currency: string }> })
+          : supabase
+              .from("invoices")
+              .select("id, invoice_number, total_cents, currency")
+              .in("id", invoiceIds),
       ]);
 
       const ownerById = new Map<
@@ -318,15 +359,28 @@ export function useQuickBooksFailedMappings() {
       for (const s of serviceLookup.data ?? []) {
         serviceById.set(s.id, { name: s.name, secondary: s.description ?? null });
       }
+      const invoiceById = new Map<
+        string,
+        { name: string; secondary: string | null }
+      >();
+      for (const inv of invoiceLookup.data ?? []) {
+        const label = inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`;
+        invoiceById.set(inv.id, {
+          name: label,
+          secondary: `${(inv.total_cents / 100).toFixed(2)} ${inv.currency}`,
+        });
+      }
 
       return failures.map((f) => {
         const lookup =
           f.snout_table === "owners"
             ? ownerById.get(f.snout_id)
-            : serviceById.get(f.snout_id);
+            : f.snout_table === "services"
+              ? serviceById.get(f.snout_id)
+              : invoiceById.get(f.snout_id);
         return {
           id: f.id as string,
-          snout_table: f.snout_table as "owners" | "services",
+          snout_table: f.snout_table as "owners" | "services" | "invoices",
           snout_id: f.snout_id as string,
           entity_name: lookup?.name ?? `${f.snout_table} ${f.snout_id.slice(0, 8)}`,
           entity_secondary: lookup?.secondary ?? null,
