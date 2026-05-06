@@ -157,18 +157,15 @@ Deno.serve(async (req) => {
           failed += 1;
         }
       } else if (row.snout_table === "payments") {
+        // Deposit account is OPTIONAL on QBO Payment. QBO's default is
+        // "Undeposited Funds"; omitting the field sends payments there
+        // automatically. We still try to discover and persist a
+        // preferred account so future invocations don't re-query, but
+        // a discovery failure is no longer fatal.
         let depositAccount = depositAccountCache.get(row.organization_id);
         if (depositAccount === undefined) {
           depositAccount = await ensureDepositAccount(admin, row.organization_id, ctx);
           depositAccountCache.set(row.organization_id, depositAccount);
-        }
-        if (!depositAccount) {
-          await admin.rpc("qbo_mark_queue_failed", {
-            _id: row.id,
-            _error: "No active Bank or Undeposited Funds account in QBO",
-          });
-          failed += 1;
-          continue;
         }
         const result = await syncPayment(
           admin,
@@ -520,7 +517,7 @@ async function syncPayment(
   ctx: QboTokenContext,
   orgId: string,
   paymentId: string,
-  depositAccount: { value: string; name: string },
+  depositAccount: { value: string; name: string } | null,
 ) {
   const { data: payment } = await admin
     .from("payments")
@@ -602,9 +599,13 @@ async function syncPayment(
       },
     ],
     PaymentRefNum: truncatedRef,
-    DepositToAccountRef: depositAccount,
     CurrencyRef: { value: payment.currency as "CAD" | "USD" },
   };
+  // Only include DepositToAccountRef when we discovered one; QBO's
+  // own default ("Undeposited Funds") kicks in otherwise.
+  if (depositAccount) {
+    input.DepositToAccountRef = depositAccount;
+  }
   if (payment.processed_at) {
     input.TxnDate = payment.processed_at.slice(0, 10);
   }
