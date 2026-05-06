@@ -50,10 +50,13 @@ import {
   useQuickBooksSyncQueueStatus,
   useEnqueueInvoiceBackfill,
   useEnqueuePaymentBackfill,
+  useQuickBooksTaxCodes,
+  useRefreshQuickBooksTaxCodes,
   type SyncResult,
   type SyncCounts,
   type SyncAllProgress,
   type FailedMapping,
+  type QuickBooksTaxCode,
 } from "@/hooks/useQuickBooksSync";
 import { formatDateTime } from "@/lib/money";
 
@@ -390,6 +393,89 @@ function SyncPanel() {
             }
           }}
         />
+      </div>
+
+      <div className="mt-3">
+        <TaxCodesCard />
+      </div>
+    </div>
+  );
+}
+
+// 6.4.5a: Read-only display of the per-org QBO tax-code cache, plus a
+// manual refresh. Tax codes are auto-pulled at OAuth connect; the
+// refresh button is for cases where the operator changes their QBO
+// tax setup later (adds a new agency, edits a rate, etc.) and wants
+// Snout to pick up the new shape immediately.
+function TaxCodesCard() {
+  const taxCodes = useQuickBooksTaxCodes();
+  const refresh = useRefreshQuickBooksTaxCodes();
+
+  const sortedCodes: QuickBooksTaxCode[] = taxCodes.data ?? [];
+
+  return (
+    <div className="rounded-md border border-border bg-background p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-medium text-foreground">Tax codes</div>
+          <div className="mt-0.5 text-xs text-text-tertiary">
+            Imported from your QuickBooks Online tax setup. Attach a tax
+            code to each service or retail product so invoices sync with
+            the correct tax. QBO is the source of truth; refresh after
+            you add or edit tax codes there.
+          </div>
+        </div>
+        <Button
+          onClick={async () => {
+            try {
+              const r = await refresh.mutateAsync();
+              toast.success(
+                `Imported ${r.codes_imported} tax code${r.codes_imported === 1 ? "" : "s"} and ${r.rates_imported} rate${r.rates_imported === 1 ? "" : "s"}.`,
+              );
+            } catch (e: any) {
+              toast.error(e?.message ?? "Could not refresh tax codes");
+            }
+          }}
+          disabled={refresh.isPending}
+          size="sm"
+          variant="outline"
+        >
+          {refresh.isPending ? "Refreshing..." : "Refresh"}
+        </Button>
+      </div>
+
+      <div className="mt-3 text-xs">
+        {taxCodes.isLoading ? (
+          <span className="text-text-tertiary">Loading tax codes...</span>
+        ) : sortedCodes.length === 0 ? (
+          <span className="text-text-tertiary">
+            No tax codes cached yet. Click Refresh to import them from
+            QuickBooks.
+          </span>
+        ) : (
+          <ul className="divide-y divide-border rounded-md border border-border">
+            {sortedCodes.map((c) => (
+              <li
+                key={c.id}
+                className="flex items-center justify-between gap-3 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium text-foreground">{c.name}</div>
+                  <div className="text-text-tertiary">
+                    {c.taxable
+                      ? c.rate_summary ?? "No rates linked"
+                      : "Non-taxable"}
+                  </div>
+                </div>
+                {c.taxable && c.combined_rate_basis_points > 0 && (
+                  <span className="rounded-full border border-border bg-surface px-2 py-0.5 font-medium text-text-secondary">
+                    {(c.combined_rate_basis_points / 100).toFixed(2)}%
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

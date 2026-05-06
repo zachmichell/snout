@@ -526,3 +526,66 @@ export function useResetFailedMappings() {
     },
   });
 }
+
+// =============================================================================
+// 6.4.5a: QBO tax-code cache. Read-only list (used by service editors and
+// the settings tab) and a manual refresh that re-pulls from QBO.
+// =============================================================================
+
+export type QuickBooksTaxCode = {
+  id: string;
+  qbo_id: string;
+  name: string;
+  description: string | null;
+  taxable: boolean;
+  combined_rate_basis_points: number;
+  rate_summary: string | null;
+};
+
+export function useQuickBooksTaxCodes() {
+  const { membership } = useAuth();
+  return useQuery<QuickBooksTaxCode[]>({
+    queryKey: ["quickbooks-tax-codes", membership?.organization_id],
+    enabled: !!membership?.organization_id,
+    queryFn: async () => {
+      if (!membership?.organization_id) return [];
+      const { data, error } = await supabase.rpc("qbo_tax_codes_for_org", {
+        _org: membership.organization_id,
+      });
+      if (error) throw error;
+      return (data ?? []) as QuickBooksTaxCode[];
+    },
+  });
+}
+
+export function useRefreshQuickBooksTaxCodes() {
+  const qc = useQueryClient();
+  const { membership } = useAuth();
+  return useMutation<{
+    rates_imported: number;
+    codes_imported: number;
+    junction_rows: number;
+  }>({
+    mutationFn: async () => {
+      if (!membership?.organization_id) throw new Error("No organization");
+      const { data, error } = await supabase.functions.invoke(
+        "quickbooks-refresh-tax-codes",
+        { body: {} },
+      );
+      if (error) throw error;
+      if (!data?.ok) {
+        throw new Error(data?.error ?? "Refresh failed");
+      }
+      return {
+        rates_imported: Number(data.rates_imported ?? 0),
+        codes_imported: Number(data.codes_imported ?? 0),
+        junction_rows: Number(data.junction_rows ?? 0),
+      };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-tax-codes", membership?.organization_id],
+      });
+    },
+  });
+}

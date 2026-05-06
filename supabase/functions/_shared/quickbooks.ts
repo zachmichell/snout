@@ -743,6 +743,91 @@ export async function listIncomeAccounts(ctx: QboTokenContext): Promise<QboResul
   return { ok: true, status: res.status, data: res.data?.QueryResponse?.Account ?? [] };
 }
 
+// ----- TaxCode + TaxRate (6.4.5a) --------------------------------------
+//
+// QBO's tax model:
+//   - TaxRate is the atomic rate (e.g. "GST 5%", "QST 9.975%"). Each
+//     belongs to one tax agency.
+//   - TaxCode is what gets attached to invoice lines. A TaxCode points
+//     at one or more TaxRates via SalesTaxRateList / PurchaseTaxRateList.
+//     Combined codes (e.g. "GST/QST") reference multiple rates so a
+//     single per-line TaxCodeRef computes the full multi-tax total.
+//
+// We import both, then derive Snout's per-org cache from the join.
+
+export type QboTaxRate = {
+  Id: string;
+  Name: string;
+  Description?: string;
+  Active?: boolean;
+  RateValue: number; // Percentage as a decimal: 5 = 5%, 9.975 = 9.975%
+  AgencyRef?: { value: string; name?: string };
+  TaxReturnLineRef?: { value: string; name?: string };
+  EffectiveTaxRate?: Array<{
+    RateValue: number;
+    EffectiveDate: string;
+    EndDate?: string;
+  }>;
+};
+
+export type QboTaxCode = {
+  Id: string;
+  Name: string;
+  Description?: string;
+  Active?: boolean;
+  Taxable?: boolean;
+  TaxGroup?: boolean;
+  // Each list entry is a TaxRateDetail wrapping a TaxRateRef.
+  SalesTaxRateList?: {
+    TaxRateDetail?: Array<{
+      TaxRateRef: { value: string; name?: string };
+      TaxTypeApplicable?: string; // "TaxOnAmount" | "TaxOnTaxOnAmount" | etc.
+      TaxOrder?: number;
+    }>;
+  };
+  PurchaseTaxRateList?: {
+    TaxRateDetail?: Array<{
+      TaxRateRef: { value: string; name?: string };
+      TaxTypeApplicable?: string;
+      TaxOrder?: number;
+    }>;
+  };
+};
+
+/**
+ * List every TaxRate visible to the connected QBO realm. We pull both
+ * active and inactive (so existing invoices that reference an
+ * inactivated rate can still resolve) but mark inactive ones in our
+ * cache so the service-attribution UI can hide them.
+ */
+export async function listTaxRates(ctx: QboTokenContext): Promise<QboResult<QboTaxRate[]>> {
+  const query = `select * from TaxRate MAXRESULTS 1000`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { TaxRate?: QboTaxRate[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.TaxRate ?? [] };
+}
+
+/**
+ * List every TaxCode visible to the connected QBO realm. Same active
+ * inclusion logic as listTaxRates above.
+ */
+export async function listTaxCodes(ctx: QboTokenContext): Promise<QboResult<QboTaxCode[]>> {
+  const query = `select * from TaxCode MAXRESULTS 1000`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { TaxCode?: QboTaxCode[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.TaxCode ?? [] };
+}
+
 // =============================================================================
 // 6.2.2: per-entity sync helpers used by both the manual batch sync edge
 // functions and the auto-sync worker. Centralizes the

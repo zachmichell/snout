@@ -134,8 +134,28 @@ Deno.serve(async (req) => {
     );
   }
 
+  // 6.4.5a: Prime the per-org tax-code cache immediately after a
+  // successful connect. Fire-and-forget: failures are surfaced in the
+  // Failed Syncs panel and via the manual "Refresh tax codes" button;
+  // the connect flow itself doesn't block on it.
+  primeTaxCodeCache(orgId).catch((err) =>
+    console.warn("primeTaxCodeCache failed (non-fatal):", err),
+  );
+
   return redirect(`${APP_BASE_URL}${returnTo}&qbo_return=success`);
 });
+
+async function primeTaxCodeCache(orgId: string): Promise<void> {
+  const url = `${SUPABASE_URL}/functions/v1/quickbooks-refresh-tax-codes`;
+  await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ org_id: orgId }),
+  });
+}
 
 function redirect(location: string) {
   return new Response(null, { status: 302, headers: { Location: location } });

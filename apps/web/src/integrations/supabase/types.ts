@@ -4099,6 +4099,155 @@ export type Database = {
           },
         ]
       }
+      qbo_tax_code_rates: {
+        Row: {
+          applicable_on: string | null
+          created_at: string
+          id: string
+          organization_id: string
+          rate_type: string | null
+          tax_code_id: string
+          tax_rate_id: string
+        }
+        Insert: {
+          applicable_on?: string | null
+          created_at?: string
+          id?: string
+          organization_id: string
+          rate_type?: string | null
+          tax_code_id: string
+          tax_rate_id: string
+        }
+        Update: {
+          applicable_on?: string | null
+          created_at?: string
+          id?: string
+          organization_id?: string
+          rate_type?: string | null
+          tax_code_id?: string
+          tax_rate_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qbo_tax_code_rates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qbo_tax_code_rates_tax_code_id_fkey"
+            columns: ["tax_code_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_tax_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qbo_tax_code_rates_tax_rate_id_fkey"
+            columns: ["tax_rate_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_tax_rates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qbo_tax_codes: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          last_synced_at: string
+          name: string
+          organization_id: string
+          qbo_id: string
+          tax_group: string
+          taxable: boolean
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          last_synced_at?: string
+          name: string
+          organization_id: string
+          qbo_id: string
+          tax_group?: string
+          taxable?: boolean
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          last_synced_at?: string
+          name?: string
+          organization_id?: string
+          qbo_id?: string
+          tax_group?: string
+          taxable?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qbo_tax_codes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qbo_tax_rates: {
+        Row: {
+          active: boolean
+          agency_name: string | null
+          created_at: string
+          id: string
+          last_synced_at: string
+          name: string
+          organization_id: string
+          qbo_id: string
+          rate_basis_points: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          agency_name?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string
+          name: string
+          organization_id: string
+          qbo_id: string
+          rate_basis_points: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          agency_name?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string
+          name?: string
+          organization_id?: string
+          qbo_id?: string
+          rate_basis_points?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qbo_tax_rates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quickbooks_accounts: {
         Row: {
           access_token_expires_at: string | null
@@ -6277,6 +6426,18 @@ export type Database = {
           processing_count: number
         }[]
       }
+      qbo_tax_codes_for_org: {
+        Args: { _org: string }
+        Returns: {
+          combined_rate_basis_points: number
+          description: string
+          id: string
+          name: string
+          qbo_id: string
+          rate_summary: string
+          taxable: boolean
+        }[]
+      }
       qbo_unsynced_invoice_ids: {
         Args: { _limit?: number; _org_id: string }
         Returns: {
@@ -6626,3 +6787,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.98.2 (currently installed v2.90.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
