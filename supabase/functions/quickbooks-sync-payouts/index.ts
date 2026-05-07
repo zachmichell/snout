@@ -23,10 +23,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireOrgAdmin } from "../_shared/auth.ts";
 import {
-  createDeposit,
+  createJournalEntry,
   getTokenContext,
-  type QboDepositInput,
-  type QboDepositLine,
+  type QboJournalEntryInput,
+  type QboJournalEntryLine,
   type QboTokenContext,
 } from "../_shared/quickbooks.ts";
 
@@ -159,82 +159,105 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Build the Deposit lines. Two summary lines per payout:
-      //   1. Gross amount sourced from Undeposited Funds (the source
-      //      account where Payments posted). Positive amount.
-      //   2. Negative fee amount on the Fee Expense account.
-      // Net effect: Bank gets (gross - fee), Undeposited Funds drops
-      // by gross, Fee Expense rises by fee.
+      // Build the Journal Entry lines. The double-entry posting:
+      //   Debit Bank account by net (= gross - fee)
+      //   Debit Fee account by fee
+      //   Credit Source account (Undeposited Funds) by gross
+      // Total debits = total credits = gross. Net effect: Bank rises
+      // by net, Fee Expense rises by fee, Undeposited Funds drops by
+      // gross. Same accounting outcome as a Bank Deposit.
+      //
+      // We picked Journal Entry over Deposit because the QBO Deposit
+      // endpoint rejects valid payloads on Canadian-sandbox realms
+      // with multicurrency enabled (code 6000, empty element field).
+      // Journal Entries have no such constraint.
       const grossDollars = Number((p.gross_cents / 100).toFixed(2));
       const feeDollars = Number((p.fee_cents / 100).toFixed(2));
+      const netDollars = Number(((p.gross_cents - p.fee_cents) / 100).toFixed(2));
 
-      const lines: QboDepositLine[] = [];
-
-      if (grossDollars > 0) {
-        lines.push({
-          DetailType: "DepositLineDetail",
-          Amount: grossDollars,
-          Description: `${p.processor} payout ${p.processor_payout_id} — gross from Undeposited Funds`,
-          DepositLineDetail: {
-            AccountRef: {
-              value: account.default_deposit_account_id,
-              name: account.default_deposit_account_name ?? "Undeposited Funds",
-            },
-          },
-        });
-      }
-
-      if (feeDollars > 0) {
-        lines.push({
-          DetailType: "DepositLineDetail",
-          Amount: -feeDollars,
-          Description: `${p.processor} processor fees for payout ${p.processor_payout_id}`,
-          DepositLineDetail: {
-            AccountRef: {
-              value: account.default_fee_account_id,
-              name: account.default_fee_account_name ?? "Merchant Processing Fees",
-            },
-          },
-        });
-      }
-
-      if (lines.length === 0) {
-        const reason = "Payout has zero gross and zero fee — nothing to deposit.";
+      if (grossDollars <= 0) {
+        const reason = "Payout has zero gross — nothing to post.";
         await markFailed(admin, p.id, reason);
         failed += 1;
         failures.push({ payout_id: p.id, reason });
         continue;
       }
 
-      const input: QboDepositInput = {
-        DepositToAccountRef: {
-          value: account.default_bank_account_id,
-          name: account.default_bank_account_name ?? "Bank",
+      const lines: QboJournalEntryLine[] = [];
+      // Debit Bank by net amount
+      lines.push({
+        DetailType: "JournalEntryLineDetail",
+        Amount: netDollars,
+        Description: `${p.processor} payout ${p.processor_payout_id} (net deposit)`,
+        JournalEntryLineDetail: {
+          PostingType: "Debit",
+          AccountRef: { value: account.default_bank_account_id },
         },
+      });
+      // Debit Fee account by fee amount (only if fees > 0)
+      if (feeDollars > 0) {
+        lines.push({
+          DetailType: "JournalEntryLineDetail",
+          Amount: feeDollars,
+          Description: `${p.processor} processor fees for payout ${p.processor_payout_id}`,
+          JournalEntryLineDetail: {
+            PostingType: "Debit",
+            AccountRef: { value: account.default_fee_account_id },
+          },
+        });
+      }
+      // Credit Source (Undeposited Funds) by gross amount
+      lines.push({
+        DetailType: "JournalEntryLineDetail",
+        Amount: grossDollars,
+        Description: `${p.processor} payout ${p.processor_payout_id} (gross from undeposited funds)`,
+        JournalEntryLineDetail: {
+          PostingType: "Credit",
+          AccountRef: { value: account.default_deposit_account_id },
+        },
+      });
+
+      const input: QboJournalEntryInput = {
         Line: lines,
         TxnDate: p.payout_date,
         PrivateNote: p.description ?? `${p.processor} payout ${p.processor_payout_id}`,
         CurrencyRef: { value: p.currency },
+        DocNumber: p.processor_payout_id.slice(0, 21),
       };
 
-      const result = await createDeposit(ctx, input);
+      // 6.6a: persist request/response in the row for debug visibility.
+      await admin
+        .from("processor_payouts")
+        .update({ last_request_body: input as unknown as Record<string, unknown> })
+        .eq("id", p.id);
+      const result = await createJournalEntry(ctx, input);
       if (!result.ok) {
+        await admin
+          .from("processor_payouts")
+          .update({ last_response_body: JSON.stringify(result) })
+          .eq("id", p.id);
         const reason = result.error;
         await markFailed(admin, p.id, reason);
         failed += 1;
         failures.push({ payout_id: p.id, reason });
         continue;
       }
+      await admin
+        .from("processor_payouts")
+        .update({ last_response_body: JSON.stringify({ ok: true, qboId: result.data.JournalEntry.Id }) })
+        .eq("id", p.id);
 
-      const dep = result.data.Deposit;
-      // Persist mapping + flip state.
+      const je = result.data.JournalEntry;
+      // Persist mapping + flip state. qbo_entity_type='JournalEntry'
+      // so the reconciliation export and Failed Syncs panel surface
+      // these correctly.
       await admin.from("quickbooks_entity_mappings").insert({
         organization_id: p.organization_id,
         snout_table: "processor_payouts",
         snout_id: p.id,
-        qbo_entity_type: "Deposit",
-        qbo_id: dep.Id,
-        sync_token: dep.SyncToken,
+        qbo_entity_type: "JournalEntry",
+        qbo_id: je.Id,
+        sync_token: je.SyncToken,
         sync_state: "synced",
         last_synced_at: new Date().toISOString(),
       });

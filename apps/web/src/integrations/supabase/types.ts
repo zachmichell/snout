@@ -4044,6 +4044,8 @@ export type Database = {
           fee_cents: number
           gross_cents: number
           id: string
+          last_request_body: Json | null
+          last_response_body: string | null
           net_cents: number
           organization_id: string
           payout_date: string
@@ -4059,6 +4061,8 @@ export type Database = {
           fee_cents: number
           gross_cents: number
           id?: string
+          last_request_body?: Json | null
+          last_response_body?: string | null
           net_cents: number
           organization_id: string
           payout_date: string
@@ -4074,6 +4078,8 @@ export type Database = {
           fee_cents?: number
           gross_cents?: number
           id?: string
+          last_request_body?: Json | null
+          last_response_body?: string | null
           net_cents?: number
           organization_id?: string
           payout_date?: string
@@ -4378,6 +4384,8 @@ export type Database = {
           access_token_secret_id: string
           company_name: string | null
           created_at: string
+          default_bank_account_id: string | null
+          default_bank_account_name: string | null
           default_deposit_account_id: string | null
           default_deposit_account_name: string | null
           default_fee_account_id: string | null
@@ -4400,6 +4408,8 @@ export type Database = {
           access_token_secret_id: string
           company_name?: string | null
           created_at?: string
+          default_bank_account_id?: string | null
+          default_bank_account_name?: string | null
           default_deposit_account_id?: string | null
           default_deposit_account_name?: string | null
           default_fee_account_id?: string | null
@@ -4422,6 +4432,8 @@ export type Database = {
           access_token_secret_id?: string
           company_name?: string | null
           created_at?: string
+          default_bank_account_id?: string | null
+          default_bank_account_name?: string | null
           default_deposit_account_id?: string | null
           default_deposit_account_name?: string | null
           default_fee_account_id?: string | null
@@ -6527,6 +6539,7 @@ export type Database = {
           refresh_token: string
         }[]
       }
+      invoke_quickbooks_payouts_pipeline: { Args: never; Returns: string }
       invoke_quickbooks_process_queue: { Args: never; Returns: number }
       is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       is_org_member: { Args: { _org_id: string }; Returns: boolean }

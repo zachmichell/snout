@@ -57,6 +57,7 @@ import {
   useQuickBooksAccountSettings,
   useSetQuickBooksFeeAccount,
   useSyncQuickBooksPayouts,
+  useIngestStripePayouts,
   type SyncResult,
   type SyncCounts,
   type SyncAllProgress,
@@ -427,6 +428,7 @@ function PayoutsCard() {
   const { data: feeAccounts = [], isLoading: feeLoading } = useQuickBooksFeeAccounts();
   const setFee = useSetQuickBooksFeeAccount();
   const syncPayouts = useSyncQuickBooksPayouts();
+  const ingestPayouts = useIngestStripePayouts();
 
   const currentFeeId = settings?.default_fee_account_id ?? "";
   const currentFeeName = settings?.default_fee_account_name ?? null;
@@ -438,8 +440,9 @@ function PayoutsCard() {
         <div className="mt-0.5 text-xs text-text-tertiary">
           Stripe and Helcim batch your charges into daily/weekly payouts and
           deduct fees before depositing the net to your bank. Snout posts
-          one QBO Bank Deposit per payout: each charge as a Linked Payment,
-          plus a single negative line for the fees.
+          one QBO Journal Entry per payout: debit the bank for the net,
+          debit the fee account for the fees, credit Undeposited Funds for
+          the gross. Reconciles cleanly against your bank statement.
         </div>
       </div>
 
@@ -494,33 +497,61 @@ function PayoutsCard() {
             </p>
           )}
         </div>
-        <Button
-          onClick={async () => {
-            try {
-              const r = await syncPayouts.mutateAsync();
-              if (r.processed === 0) {
-                toast.success("No payouts ready to sync");
-              } else {
-                toast.success(
-                  `Synced ${r.succeeded} of ${r.processed} payout${r.processed === 1 ? "" : "s"} to QBO`,
-                );
+        <div className="flex items-end gap-2">
+          <Button
+            onClick={async () => {
+              try {
+                const r = await ingestPayouts.mutateAsync();
+                if (r.payouts_inserted === 0) {
+                  toast.success("No new Stripe payouts since last ingest");
+                } else {
+                  toast.success(
+                    `Ingested ${r.payouts_inserted} new payout${r.payouts_inserted === 1 ? "" : "s"} from Stripe`,
+                  );
+                }
+              } catch (e: any) {
+                toast.error(e?.message ?? "Could not ingest Stripe payouts");
               }
-            } catch (e: any) {
-              toast.error(e?.message ?? "Could not sync payouts");
-            }
-          }}
-          disabled={syncPayouts.isPending || !currentFeeId}
-          size="sm"
-        >
-          {syncPayouts.isPending ? "Syncing…" : "Sync payouts now"}
-        </Button>
+            }}
+            disabled={ingestPayouts.isPending}
+            size="sm"
+            variant="outline"
+          >
+            {ingestPayouts.isPending ? "Pulling…" : "Pull from Stripe"}
+          </Button>
+          <Button
+            onClick={async () => {
+              try {
+                const r = await syncPayouts.mutateAsync();
+                if (r.processed === 0) {
+                  toast.success("No payouts ready to sync");
+                } else {
+                  toast.success(
+                    `Synced ${r.succeeded} of ${r.processed} payout${r.processed === 1 ? "" : "s"} to QBO`,
+                  );
+                }
+              } catch (e: any) {
+                toast.error(e?.message ?? "Could not sync payouts");
+              }
+            }}
+            disabled={syncPayouts.isPending || !currentFeeId}
+            size="sm"
+          >
+            {syncPayouts.isPending ? "Syncing…" : "Sync payouts now"}
+          </Button>
+        </div>
       </div>
       {!currentFeeId && (
         <p className="mt-3 text-xs text-text-tertiary">
-          Pick a fee account before syncing — the QBO Bank Deposit needs an
-          expense account for the negative fee line.
+          Pick a fee account before syncing — the journal entry needs an
+          expense account to debit for the processor fees.
         </p>
       )}
+      <p className="mt-3 text-xs text-text-tertiary">
+        Pull from Stripe ingests payouts since the last run. A daily cron
+        job (03:15 UTC) does this automatically; the manual button is for
+        catching up after Stripe Connect setup or backfilling.
+      </p>
     </div>
   );
 }
