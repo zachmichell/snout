@@ -61,6 +61,10 @@ import {
   useQuickBooksLiabilityAccounts,
   useSetQuickBooksTipsPayableAccount,
   useSyncQuickBooksTips,
+  useQuickBooksIncomeAccounts,
+  useSetQuickBooksCreditAccount,
+  useSyncQuickBooksCreditLedger,
+  type CreditAccountSlot,
   type SyncResult,
   type SyncCounts,
   type SyncAllProgress,
@@ -423,6 +427,10 @@ function SyncPanel() {
       <div className="mt-3">
         <TipsCard />
       </div>
+
+      <div className="mt-3">
+        <CreditAccountsCard />
+      </div>
     </div>
   );
 }
@@ -530,6 +538,202 @@ function TipsCard() {
         <p className="mt-3 text-xs text-text-tertiary">
           Pick a Tips Payable account before syncing — Snout needs a
           liability account to credit when tips post.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// 6.6c: Credit ledger. Operator picks four GL accounts (three deferred-revenue
+// liabilities + one expired-credits income), then runs the sync to post a
+// Journal Entry per credit_ledger row. Per-credit-type liability split keeps
+// daycare half-day, daycare full-day, and boarding-night balances visible
+// separately on the balance sheet.
+//
+// Snout posts these JE shapes per ledger row:
+//   purchase     -> Debit Undeposited Funds, Credit each Deferred [type]
+//   consumption  -> Debit Deferred [type],   Credit Service Income
+//   expiration   -> Debit Deferred [type],   Credit Expired Credits Income
+//   refund       -> Debit Deferred [type],   Credit Undeposited Funds
+function CreditAccountsCard() {
+  const { data: settings } = useQuickBooksAccountSettings();
+  const { data: liabilityAccounts = [], isLoading: liabLoading } =
+    useQuickBooksLiabilityAccounts();
+  const { data: incomeAccounts = [], isLoading: incomeLoading } =
+    useQuickBooksIncomeAccounts();
+  const setCredit = useSetQuickBooksCreditAccount();
+  const syncCredits = useSyncQuickBooksCreditLedger();
+
+  const fullId = settings?.default_deferred_daycare_full_account_id ?? "";
+  const fullName = settings?.default_deferred_daycare_full_account_name ?? null;
+  const halfId = settings?.default_deferred_daycare_half_account_id ?? "";
+  const halfName = settings?.default_deferred_daycare_half_account_name ?? null;
+  const boardingId = settings?.default_deferred_boarding_account_id ?? "";
+  const boardingName = settings?.default_deferred_boarding_account_name ?? null;
+  const expiredId = settings?.default_expired_credits_income_account_id ?? "";
+  const expiredName =
+    settings?.default_expired_credits_income_account_name ?? null;
+
+  const allLiabilityPicked = !!fullId && !!halfId && !!boardingId;
+  const ready = allLiabilityPicked && !!expiredId;
+
+  return (
+    <div className="rounded-md border border-border bg-background p-4">
+      <div className="mb-3">
+        <div className="font-medium text-foreground">Credit packages</div>
+        <div className="mt-0.5 text-xs text-text-tertiary">
+          Customers pay up front for daycare and boarding credits, so the
+          revenue is deferred until each credit is redeemed. Pick a separate
+          QBO Liability account for each credit type so the balance sheet
+          shows half-day, full-day, and boarding-night liability separately.
+          Snout posts a Journal Entry per ledger row — purchases debit
+          Undeposited Funds and credit the matching liability; consumption
+          debits the liability and credits Service Income; expirations debit
+          the liability and credit the Expired Credits income account you
+          choose below.
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <CreditAccountPicker
+          label="Daycare half day"
+          slot="deferred_daycare_half"
+          accounts={liabilityAccounts}
+          loading={liabLoading}
+          currentId={halfId}
+          currentName={halfName}
+          setCredit={setCredit}
+          kind="liability"
+        />
+        <CreditAccountPicker
+          label="Daycare full day"
+          slot="deferred_daycare_full"
+          accounts={liabilityAccounts}
+          loading={liabLoading}
+          currentId={fullId}
+          currentName={fullName}
+          setCredit={setCredit}
+          kind="liability"
+        />
+        <CreditAccountPicker
+          label="Boarding nights"
+          slot="deferred_boarding"
+          accounts={liabilityAccounts}
+          loading={liabLoading}
+          currentId={boardingId}
+          currentName={boardingName}
+          setCredit={setCredit}
+          kind="liability"
+        />
+        <CreditAccountPicker
+          label="Expired credits income"
+          slot="expired_credits_income"
+          accounts={incomeAccounts}
+          loading={incomeLoading}
+          currentId={expiredId}
+          currentName={expiredName}
+          setCredit={setCredit}
+          kind="income"
+        />
+      </div>
+
+      <div className="mt-4 flex items-center justify-end gap-3">
+        {!ready && (
+          <p className="text-xs text-text-tertiary">
+            Pick all four accounts before syncing.
+          </p>
+        )}
+        <Button
+          onClick={async () => {
+            try {
+              const r = await syncCredits.mutateAsync();
+              if (r.processed === 0) {
+                toast.success("No credit-ledger rows ready to sync");
+              } else {
+                toast.success(
+                  `Synced ${r.succeeded} of ${r.processed} ledger row${r.processed === 1 ? "" : "s"} to QBO`,
+                );
+              }
+            } catch (e: any) {
+              toast.error(e?.message ?? "Could not sync credit ledger");
+            }
+          }}
+          disabled={syncCredits.isPending || !ready}
+          size="sm"
+        >
+          {syncCredits.isPending ? "Syncing…" : "Sync credit ledger now"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CreditAccountPicker({
+  label,
+  slot,
+  accounts,
+  loading,
+  currentId,
+  currentName,
+  setCredit,
+  kind,
+}: {
+  label: string;
+  slot: CreditAccountSlot;
+  accounts: Array<{ id: string; name: string; type: string }>;
+  loading: boolean;
+  currentId: string;
+  currentName: string | null;
+  setCredit: ReturnType<typeof useSetQuickBooksCreditAccount>;
+  kind: "liability" | "income";
+}) {
+  const placeholder = loading
+    ? "Loading…"
+    : accounts.length === 0
+      ? kind === "liability"
+        ? "No liability accounts in QBO"
+        : "No income accounts in QBO"
+      : kind === "liability"
+        ? "Pick a liability account"
+        : "Pick an income account";
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-semibold text-text-secondary">
+        {label}
+      </label>
+      <Sel
+        value={currentId || "__none__"}
+        onValueChange={(v) => {
+          if (v === "__none__") return;
+          const acct = accounts.find((a) => a.id === v);
+          if (!acct) return;
+          setCredit.mutate(
+            { slot, account: { id: acct.id, name: acct.name } },
+            {
+              onSuccess: () => toast.success(`${label} set to ${acct.name}`),
+              onError: (e: any) => toast.error(e?.message ?? "Could not save"),
+            },
+          );
+        }}
+        disabled={loading || accounts.length === 0}
+      >
+        <SelTrigger>
+          <SelValue placeholder={placeholder} />
+        </SelTrigger>
+        <SelContent>
+          <SelItem value="__none__" disabled>
+            <span className="text-text-tertiary">{placeholder}</span>
+          </SelItem>
+          {accounts.map((a) => (
+            <SelItem key={a.id} value={a.id}>
+              {a.name} <span className="text-text-tertiary">({a.type})</span>
+            </SelItem>
+          ))}
+        </SelContent>
+      </Sel>
+      {currentName && (
+        <p className="mt-1 text-xs text-text-tertiary">
+          Currently <strong>{currentName}</strong>.
         </p>
       )}
     </div>

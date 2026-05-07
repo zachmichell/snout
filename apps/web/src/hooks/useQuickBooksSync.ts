@@ -565,7 +565,7 @@ export function useQuickBooksAccountSettings() {
       const { data, error } = await supabase
         .from("quickbooks_accounts")
         .select(
-          "default_fee_account_id, default_fee_account_name, default_deposit_account_id, default_deposit_account_name, default_income_account_id, default_income_account_name, default_tips_payable_account_id, default_tips_payable_account_name",
+          "default_fee_account_id, default_fee_account_name, default_deposit_account_id, default_deposit_account_name, default_income_account_id, default_income_account_name, default_tips_payable_account_id, default_tips_payable_account_name, default_deferred_daycare_full_account_id, default_deferred_daycare_full_account_name, default_deferred_daycare_half_account_id, default_deferred_daycare_half_account_name, default_deferred_boarding_account_id, default_deferred_boarding_account_name, default_expired_credits_income_account_id, default_expired_credits_income_account_name",
         )
         .eq("organization_id", membership.organization_id)
         .is("deleted_at", null)
@@ -580,6 +580,14 @@ export function useQuickBooksAccountSettings() {
         default_income_account_name: string | null;
         default_tips_payable_account_id: string | null;
         default_tips_payable_account_name: string | null;
+        default_deferred_daycare_full_account_id: string | null;
+        default_deferred_daycare_full_account_name: string | null;
+        default_deferred_daycare_half_account_id: string | null;
+        default_deferred_daycare_half_account_name: string | null;
+        default_deferred_boarding_account_id: string | null;
+        default_deferred_boarding_account_name: string | null;
+        default_expired_credits_income_account_id: string | null;
+        default_expired_credits_income_account_name: string | null;
       } | null;
     },
   });
@@ -869,6 +877,90 @@ export function useRefreshQuickBooksTaxCodes() {
     onSuccess: () => {
       qc.invalidateQueries({
         queryKey: ["quickbooks-tax-codes", membership?.organization_id],
+      });
+    },
+  });
+}
+
+// =============================================================================
+// 6.6c: Credit ledger. Operator picks four GL accounts (three deferred-revenue
+// liabilities, one expired-credits income), then runs the sync to post a
+// Journal Entry per credit_ledger row. Per-credit-type liability split keeps
+// daycare half-day, daycare full-day, and boarding-night balances visible
+// separately on the balance sheet.
+// =============================================================================
+
+export type CreditAccountSlot =
+  | "deferred_daycare_full"
+  | "deferred_daycare_half"
+  | "deferred_boarding"
+  | "expired_credits_income";
+
+export type QuickBooksIncomeAccount = {
+  id: string;
+  name: string;
+  type: string;
+  subType: string | null;
+};
+
+export function useQuickBooksIncomeAccounts() {
+  const { membership } = useAuth();
+  return useQuery<QuickBooksIncomeAccount[]>({
+    queryKey: ["quickbooks-income-accounts", membership?.organization_id],
+    enabled: !!membership?.organization_id,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke(
+        "quickbooks-list-income-accounts",
+        { body: {} },
+      );
+      if (error) throw error;
+      return (data?.accounts ?? []) as QuickBooksIncomeAccount[];
+    },
+  });
+}
+
+export function useSetQuickBooksCreditAccount() {
+  const qc = useQueryClient();
+  const { membership } = useAuth();
+  return useMutation({
+    mutationFn: async (args: {
+      slot: CreditAccountSlot;
+      account: { id: string; name: string };
+    }) => {
+      const { error } = await supabase.rpc("qbo_set_credit_account", {
+        _slot: args.slot,
+        _qbo_id: args.account.id,
+        _name: args.account.name,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-account-settings", membership?.organization_id],
+      });
+    },
+  });
+}
+
+export function useSyncQuickBooksCreditLedger() {
+  const qc = useQueryClient();
+  const { membership } = useAuth();
+  return useMutation<{ processed: number; succeeded: number; failed: number }>({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke(
+        "quickbooks-sync-credit-ledger",
+        { body: {} },
+      );
+      if (error) throw error;
+      return {
+        processed: Number(data?.processed ?? 0),
+        succeeded: Number(data?.succeeded ?? 0),
+        failed: Number(data?.failed ?? 0),
+      };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-mapping-counts", membership?.organization_id],
       });
     },
   });

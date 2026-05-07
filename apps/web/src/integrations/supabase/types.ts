@@ -4380,8 +4380,16 @@ export type Database = {
           created_at: string
           default_bank_account_id: string | null
           default_bank_account_name: string | null
+          default_deferred_boarding_account_id: string | null
+          default_deferred_boarding_account_name: string | null
+          default_deferred_daycare_full_account_id: string | null
+          default_deferred_daycare_full_account_name: string | null
+          default_deferred_daycare_half_account_id: string | null
+          default_deferred_daycare_half_account_name: string | null
           default_deposit_account_id: string | null
           default_deposit_account_name: string | null
+          default_expired_credits_income_account_id: string | null
+          default_expired_credits_income_account_name: string | null
           default_fee_account_id: string | null
           default_fee_account_name: string | null
           default_income_account_id: string | null
@@ -4406,8 +4414,16 @@ export type Database = {
           created_at?: string
           default_bank_account_id?: string | null
           default_bank_account_name?: string | null
+          default_deferred_boarding_account_id?: string | null
+          default_deferred_boarding_account_name?: string | null
+          default_deferred_daycare_full_account_id?: string | null
+          default_deferred_daycare_full_account_name?: string | null
+          default_deferred_daycare_half_account_id?: string | null
+          default_deferred_daycare_half_account_name?: string | null
           default_deposit_account_id?: string | null
           default_deposit_account_name?: string | null
+          default_expired_credits_income_account_id?: string | null
+          default_expired_credits_income_account_name?: string | null
           default_fee_account_id?: string | null
           default_fee_account_name?: string | null
           default_income_account_id?: string | null
@@ -4432,8 +4448,16 @@ export type Database = {
           created_at?: string
           default_bank_account_id?: string | null
           default_bank_account_name?: string | null
+          default_deferred_boarding_account_id?: string | null
+          default_deferred_boarding_account_name?: string | null
+          default_deferred_daycare_full_account_id?: string | null
+          default_deferred_daycare_full_account_name?: string | null
+          default_deferred_daycare_half_account_id?: string | null
+          default_deferred_daycare_half_account_name?: string | null
           default_deposit_account_id?: string | null
           default_deposit_account_name?: string | null
+          default_expired_credits_income_account_id?: string | null
+          default_expired_credits_income_account_name?: string | null
           default_fee_account_id?: string | null
           default_fee_account_name?: string | null
           default_income_account_id?: string | null
@@ -6605,6 +6629,10 @@ export type Database = {
       }
       qbo_retry_failed_mapping: {
         Args: { _mapping_id: string }
+        Returns: undefined
+      }
+      qbo_set_credit_account: {
+        Args: { _name: string; _qbo_id: string; _slot: string }
         Returns: undefined
       }
       qbo_set_fee_account: {
