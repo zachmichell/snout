@@ -379,11 +379,14 @@ export async function qboRequest<T = unknown>(args: {
   }
   if (!res.ok) {
     const fault = parsed?.Fault?.Error?.[0];
-    const message =
-      fault?.Message ??
-      fault?.Detail ??
-      parsed?.Fault?.type ??
-      `QBO returned ${res.status}`;
+    // Combine Message + Detail when both are present so the operator
+    // sees what QBO actually rejected (Detail typically includes the
+    // specific field name like "Property Name:DepositToAccountRef").
+    const message = fault?.Message
+      ? fault?.Detail
+        ? `${fault.Message}: ${fault.Detail}`
+        : fault.Message
+      : fault?.Detail ?? parsed?.Fault?.type ?? `QBO returned ${res.status}`;
     const code = fault?.code != null ? String(fault.code) : undefined;
     return { ok: false, status: res.status, error: String(message), code };
   }
@@ -665,6 +668,215 @@ export async function findPaymentByRefNum(
   return { ok: true, status: res.status, data: res.data?.QueryResponse?.Payment?.[0] ?? null };
 }
 
+// ----- Deposit (6.6a) ----------------------------------------------------
+//
+// QBO's Deposit entity records money landing in a bank account from
+// one or more sources. For processor-fee accounting we use it like:
+//   - Cash In: the gross processor payout (linked to the Payment(s)
+//     that fed it via DepositLineDetail.LinkedTxn[]) OR a single
+//     summary line referencing Undeposited Funds for that amount.
+//   - Cash Out: a NEGATIVE line on the operator's chosen Fee
+//     expense account, sized to the processor fees for that payout.
+// Net effect: bank account credited by (gross - fee), Undeposited
+// Funds debited by gross, Fee Expense debited by fee.
+
+export type QboDepositLine =
+  | {
+      // Summary line backed by an account (used for the fee line —
+      // negative Amount on an Expense / COGS account).
+      DetailType: "DepositLineDetail";
+      Amount: number;
+      Description?: string;
+      DepositLineDetail: {
+        AccountRef: { value: string; name?: string };
+        Entity?: { value: string; type: string };
+      };
+    }
+  | {
+      // Linked-transaction line: a payment that previously hit
+      // Undeposited Funds gets pulled into the Deposit.
+      DetailType: "DepositLineDetail";
+      Amount: number;
+      Description?: string;
+      LinkedTxn: Array<{ TxnId: string; TxnType: "Payment" }>;
+      DepositLineDetail: { Entity?: { value: string; type: string } };
+    };
+
+export type QboDepositInput = {
+  // The bank / current-asset account the money lands in.
+  DepositToAccountRef: { value: string; name?: string };
+  Line: QboDepositLine[];
+  TxnDate?: string;
+  PrivateNote?: string;
+  CurrencyRef?: { value: "CAD" | "USD" };
+};
+
+export type QboDeposit = QboDepositInput & {
+  Id: string;
+  SyncToken: string;
+  TotalAmt?: number;
+};
+
+export function createDeposit(ctx: QboTokenContext, input: QboDepositInput) {
+  return qboRequest<{ Deposit: QboDeposit }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/deposit?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updateDeposit(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: QboDepositInput,
+) {
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ Deposit: QboDeposit }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/deposit?minorversion=70`,
+    body,
+  });
+}
+
+/**
+ * List the operator's expense accounts so the QBO settings UI can
+ * show a dropdown for the fee account choice.
+ */
+export async function listExpenseAccounts(ctx: QboTokenContext): Promise<QboResult<QboAccount[]>> {
+  // Two queries because QBO doesn't accept parenthesized OR.
+  const expenseQuery = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Expense' and Active = true MAXRESULTS 200`;
+  const cogsQuery = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Cost of Goods Sold' and Active = true MAXRESULTS 200`;
+  const [expRes, cogsRes] = await Promise.all([
+    qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+      ctx,
+      method: "GET",
+      path: `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(expenseQuery)}&minorversion=70`,
+    }),
+    qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+      ctx,
+      method: "GET",
+      path: `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(cogsQuery)}&minorversion=70`,
+    }),
+  ]);
+  if (!expRes.ok) return expRes;
+  if (!cogsRes.ok) return cogsRes;
+  return {
+    ok: true,
+    status: 200,
+    data: [
+      ...(expRes.data?.QueryResponse?.Account ?? []),
+      ...(cogsRes.data?.QueryResponse?.Account ?? []),
+    ].sort((a, b) => a.Name.localeCompare(b.Name)),
+  };
+}
+
+// ----- RefundReceipt (6.4b) ----------------------------------------------
+//
+// QBO's RefundReceipt records money returned to a customer. Unlike
+// Payment, it does NOT link back to the original Invoice with LinkedTxn
+// — the original Payment stays untouched and the Invoice stays "Paid".
+// The RefundReceipt is its own transaction that posts a contra-revenue
+// line and a deposit account credit.
+//
+// Two shapes:
+//   - Full refund (refund_amount == original payment amount): mirror
+//     the original invoice's lines so each line reverses against the
+//     same income account it credited.
+//   - Partial refund (refund_amount < original payment amount): a
+//     single description-only line for refund_amount. Per-line
+//     proration would require operator-side categorization beyond
+//     what we currently have on file.
+
+export type QboRefundReceiptLine =
+  | {
+      DetailType: "SalesItemLineDetail";
+      Amount: number;
+      Description?: string;
+      SalesItemLineDetail: {
+        ItemRef: { value: string; name?: string };
+        Qty?: number;
+        UnitPrice?: number;
+        TaxCodeRef?: { value: string };
+      };
+    }
+  | {
+      DetailType: "DescriptionOnly";
+      Amount?: number;
+      Description: string;
+    };
+
+export type QboRefundReceiptInput = {
+  CustomerRef: { value: string; name?: string };
+  TotalAmt?: number; // QBO computes from lines but we send for clarity
+  Line: QboRefundReceiptLine[];
+  TxnDate?: string;
+  PrivateNote?: string;
+  PaymentRefNum?: string; // processor's refund txn id, for dedup
+  CurrencyRef?: { value: "CAD" | "USD" };
+  // Where the refund money comes FROM. Default: same account that
+  // received the original Payment, typically Undeposited Funds.
+  DepositToAccountRef?: { value: string; name?: string };
+  // Tax handling mirrors invoices: TaxExcluded keeps line totals
+  // pre-tax and lets QBO compute from per-line TaxCodeRef. NotApplicable
+  // disables AST.
+  GlobalTaxCalculation?: "TaxExcluded" | "TaxInclusive" | "NotApplicable";
+  TxnTaxDetail?: {
+    TotalTax?: number;
+    TxnTaxCodeRef?: { value: string };
+  };
+};
+
+export type QboRefundReceipt = QboRefundReceiptInput & {
+  Id: string;
+  SyncToken: string;
+};
+
+export function createRefundReceipt(ctx: QboTokenContext, input: QboRefundReceiptInput) {
+  return qboRequest<{ RefundReceipt: QboRefundReceipt }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/refundreceipt?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updateRefundReceipt(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: QboRefundReceiptInput,
+) {
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ RefundReceipt: QboRefundReceipt }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/refundreceipt?minorversion=70`,
+    body,
+  });
+}
+
+/**
+ * Find a RefundReceipt by PaymentRefNum. Adopt-on-duplicate path —
+ * if the operator has manually entered a refund with the same
+ * processor txn id, we adopt rather than fail.
+ */
+export async function findRefundReceiptByRefNum(
+  ctx: QboTokenContext,
+  refNum: string,
+): Promise<QboResult<QboRefundReceipt | null>> {
+  const escaped = refNum.replace(/'/g, "''");
+  const query = `select Id, SyncToken, PaymentRefNum from RefundReceipt where PaymentRefNum = '${escaped}' MAXRESULTS 1`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { RefundReceipt?: QboRefundReceipt[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.RefundReceipt?.[0] ?? null };
+}
+
 /**
  * List candidate deposit accounts. Preference order, in callers:
  *   1. Other Current Asset > Undeposited Funds (the "holding" account
@@ -676,15 +888,40 @@ export async function findPaymentByRefNum(
  * quickbooks_accounts.default_deposit_account_id.
  */
 export async function listDepositAccounts(ctx: QboTokenContext): Promise<QboResult<QboAccount[]>> {
-  const query = `select Id, Name, AccountType, AccountSubType, Active from Account where (AccountType = 'Bank' or AccountSubType = 'UndepositedFunds') and Active = true MAXRESULTS 100`;
-  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
-  const res = await qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
-    ctx,
-    method: "GET",
-    path,
+  // QBO's query language does NOT support parenthesized OR clauses
+  // in WHERE — anything fancier than `field = 'x' AND field = 'y'` is
+  // a parse error. Split into two queries and merge in JS so we can
+  // still cover both Bank and Undeposited Funds candidates.
+  const bankQuery = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Bank' and Active = true MAXRESULTS 100`;
+  const undepositedQuery = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountSubType = 'UndepositedFunds' and Active = true MAXRESULTS 100`;
+
+  const [bankRes, undepRes] = await Promise.all([
+    qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+      ctx,
+      method: "GET",
+      path: `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(bankQuery)}&minorversion=70`,
+    }),
+    qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+      ctx,
+      method: "GET",
+      path: `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(undepositedQuery)}&minorversion=70`,
+    }),
+  ]);
+  if (!bankRes.ok) return bankRes;
+  if (!undepRes.ok) return undepRes;
+
+  const merged: QboAccount[] = [
+    ...(bankRes.data?.QueryResponse?.Account ?? []),
+    ...(undepRes.data?.QueryResponse?.Account ?? []),
+  ];
+  // Dedupe by id in case a single account matches both filters somehow.
+  const seen = new Set<string>();
+  const unique = merged.filter((a) => {
+    if (seen.has(a.Id)) return false;
+    seen.add(a.Id);
+    return true;
   });
-  if (!res.ok) return res;
-  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Account ?? [] };
+  return { ok: true, status: 200, data: unique };
 }
 
 // ----- Lookup-by-name (for duplicate adoption) -------------------------
@@ -867,12 +1104,17 @@ export async function syncOneEntity<T extends { Id: string; SyncToken: string }>
 }): Promise<EntitySyncOutcome> {
   const hash = await payloadHash(args.payload);
 
+  // 6.4b: scope mapping lookup by qbo_entity_type so a Snout payment
+  // with both a Payment mapping AND a RefundReceipt mapping doesn't
+  // collide. The unique index is on
+  // (org, snout_table, snout_id, qbo_entity_type).
   const { data: existingRows } = await args.admin
     .from("quickbooks_entity_mappings")
     .select("id, qbo_id, sync_token, payload_hash, sync_state")
     .eq("organization_id", args.orgId)
     .eq("snout_table", args.snoutTable)
     .eq("snout_id", args.snoutId)
+    .eq("qbo_entity_type", args.qboEntityType)
     .is("deleted_at", null)
     .maybeSingle();
   const existing = existingRows as
