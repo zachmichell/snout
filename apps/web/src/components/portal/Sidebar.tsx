@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Receipt,
   Package,
+  Wrench,
   GraduationCap,
   BarChart3,
 } from "lucide-react";
@@ -56,6 +57,7 @@ const sections: Array<{
       { to: "/pos/cart", icon: ShoppingCart, label: "POS" },
       { to: "/invoices", icon: Receipt, label: "Invoices", permission: "invoices.view" as Permission },
       { to: "/products", icon: Package, label: "Products" },
+      { to: "/services", icon: Wrench, label: "Services", permission: "services.manage" as Permission },
     ],
   },
   {
