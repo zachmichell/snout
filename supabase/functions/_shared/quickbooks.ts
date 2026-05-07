@@ -801,6 +801,40 @@ export function updateDeposit(
 }
 
 /**
+ * List the operator's liability accounts (Other Current Liability +
+ * Long Term Liability) so the QBO settings UI can show a dropdown
+ * for Tips Payable / Deferred Revenue choices.
+ */
+export async function listLiabilityAccounts(ctx: QboTokenContext): Promise<QboResult<QboAccount[]>> {
+  // Two queries because QBO query language doesn't accept parenthesized
+  // OR. Same pattern as listDepositAccounts / listExpenseAccounts.
+  const ocl = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Other Current Liability' and Active = true MAXRESULTS 200`;
+  const ltl = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Long Term Liability' and Active = true MAXRESULTS 200`;
+  const [oclRes, ltlRes] = await Promise.all([
+    qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+      ctx,
+      method: "GET",
+      path: `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(ocl)}&minorversion=70`,
+    }),
+    qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+      ctx,
+      method: "GET",
+      path: `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(ltl)}&minorversion=70`,
+    }),
+  ]);
+  if (!oclRes.ok) return oclRes;
+  if (!ltlRes.ok) return ltlRes;
+  return {
+    ok: true,
+    status: 200,
+    data: [
+      ...(oclRes.data?.QueryResponse?.Account ?? []),
+      ...(ltlRes.data?.QueryResponse?.Account ?? []),
+    ].sort((a, b) => a.Name.localeCompare(b.Name)),
+  };
+}
+
+/**
  * List the operator's expense accounts so the QBO settings UI can
  * show a dropdown for the fee account choice.
  */
