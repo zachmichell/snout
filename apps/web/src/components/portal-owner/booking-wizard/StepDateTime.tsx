@@ -91,6 +91,60 @@ export default function StepDateTime({
     },
   });
 
+  // 7.1 follow-up #2: when a specific groomer is picked, fetch the
+  // dates they actually have availability windows for (next 60 days)
+  // so the date picker only offers viable days. We also fetch the
+  // available slots for the selected date so the time picker shows
+  // exactly what's bookable, given service duration.
+  //
+  // For "Any available", we fall back to the facility-hours-based
+  // generic time slot generator since we don't know who'd take the
+  // booking.
+  const groomerEndDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 60);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const { data: groomerDatesPayload } = useQuery({
+    queryKey: ["wizard-groomer-dates", state.groomerId, minDate, groomerEndDate],
+    enabled: isGrooming && !!state.groomerId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_groomer_available_dates", {
+        p_groomer_id: state.groomerId!,
+        p_start_date: minDate,
+        p_end_date: groomerEndDate,
+      });
+      if (error) throw error;
+      return data as { dates?: string[] } | null;
+    },
+  });
+  const groomerAvailableDates = groomerDatesPayload?.dates ?? [];
+
+  const { data: groomerSlotsPayload, isLoading: slotsLoading } = useQuery({
+    queryKey: [
+      "wizard-groomer-slots",
+      state.groomerId,
+      state.datetime?.date,
+      state.service?.estimated_minutes,
+    ],
+    enabled:
+      isGrooming &&
+      !!state.groomerId &&
+      !!state.datetime?.date &&
+      !!state.service?.estimated_minutes,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_groomer_available_slots", {
+        p_groomer_id: state.groomerId!,
+        p_date: state.datetime!.date,
+        p_duration_minutes: state.service!.estimated_minutes!,
+      });
+      if (error) throw error;
+      return data as { slots?: string[] } | null;
+    },
+  });
+  const groomerSlots = groomerSlotsPayload?.slots ?? [];
+
   // Initialize sensible defaults once we know whether we have facility hours.
   // If the location is set we wait for the query so the visible default is
   // never the legacy 07:00/18:00 flashing into the real open/close.
@@ -289,18 +343,21 @@ export default function StepDateTime({
 
       {dur === "flat" && (
         <>
-          <Field label={`Date (${dayOfWeek})`}>
-            <Input type="date" min={minDate} value={dt.date} onChange={(e) => update({ date: e.target.value })} />
-          </Field>
-          <Field label="Appointment time">
-            <TimeSelect value={dt.startTime} onChange={(v) => update({ startTime: v })} />
-          </Field>
+          {/* 7.1 follow-up: groomer first so a customer who prefers a
+              specific person sees only their availability. */}
           {isGrooming && groomers.length > 0 && (
             <Field label="Groomer">
               <Select
                 value={state.groomerId ?? "__any__"}
                 onValueChange={(v) =>
-                  setState((s) => ({ ...s, groomerId: v === "__any__" ? null : v }))
+                  setState((s) => ({
+                    ...s,
+                    groomerId: v === "__any__" ? null : v,
+                    // Reset the time when the groomer changes — the
+                    // previously-picked slot may not be valid for the
+                    // new groomer's availability.
+                    datetime: s.datetime ? { ...s.datetime, startTime: "" } : s.datetime,
+                  }))
                 }
               >
                 <SelectTrigger>
@@ -317,8 +374,8 @@ export default function StepDateTime({
               </Select>
               <p className="mt-1 text-xs text-muted-foreground">
                 {groomers.length} groomer{groomers.length === 1 ? "" : "s"} on
-                staff. Pick one or leave on "Any available" and the facility
-                will assign someone when they confirm.
+                staff. Pick one to see only their available dates and times,
+                or leave on "Any available" to see facility-wide options.
               </p>
             </Field>
           )}
@@ -327,6 +384,98 @@ export default function StepDateTime({
               The facility will assign a groomer when they confirm your booking.
             </p>
           )}
+
+          {/* When a specific groomer is picked, show only the dates
+              their groomer_availability table actually has windows
+              for. Otherwise fall back to a free-form date input. */}
+          {isGrooming && state.groomerId && groomerAvailableDates.length > 0 ? (
+            <Field label={`Date (${dayOfWeek})`}>
+              <Select
+                value={dt.date}
+                onValueChange={(v) => update({ date: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an available date" />
+                </SelectTrigger>
+                <SelectContent>
+                  {groomerAvailableDates.map((d) => {
+                    const dayName = new Date(d + "T00:00:00").toLocaleDateString(
+                      undefined,
+                      { weekday: "short", month: "short", day: "numeric" },
+                    );
+                    return (
+                      <SelectItem key={d} value={d}>
+                        {dayName}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Showing the next {groomerAvailableDates.length} day
+                {groomerAvailableDates.length === 1 ? "" : "s"} this groomer
+                has availability.
+              </p>
+            </Field>
+          ) : isGrooming && state.groomerId && groomerAvailableDates.length === 0 ? (
+            <p className="rounded-lg border border-warning/30 bg-warning-light p-3 text-xs">
+              This groomer has no availability in the next 60 days. Pick "Any
+              available" or a different groomer.
+            </p>
+          ) : (
+            <Field label={`Date (${dayOfWeek})`}>
+              <Input
+                type="date"
+                min={minDate}
+                value={dt.date}
+                onChange={(e) => update({ date: e.target.value })}
+              />
+            </Field>
+          )}
+
+          {/* When a specific groomer is picked AND a date is set,
+              show only their available slots for the requested
+              service duration. Otherwise the generic facility-hours
+              picker. */}
+          {isGrooming && state.groomerId && groomerAvailableDates.length > 0 ? (
+            slotsLoading ? (
+              <p className="text-xs text-muted-foreground">Loading slots…</p>
+            ) : groomerSlots.length === 0 ? (
+              <p className="rounded-lg border border-warning/30 bg-warning-light p-3 text-xs">
+                No open slots on the selected day for a{" "}
+                {state.service?.estimated_minutes ?? 60}-minute appointment.
+                Pick another date.
+              </p>
+            ) : (
+              <Field label="Appointment time">
+                <Select
+                  value={dt.startTime}
+                  onValueChange={(v) => update({ startTime: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groomerSlots.map((t) => {
+                      const [h, m] = t.split(":").map(Number);
+                      const period = h < 12 ? "AM" : "PM";
+                      const display = h % 12 === 0 ? 12 : h % 12;
+                      return (
+                        <SelectItem key={t} value={t}>
+                          {display}:{String(m).padStart(2, "0")} {period}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )
+          ) : (
+            <Field label="Appointment time">
+              <TimeSelect value={dt.startTime} onChange={(v) => update({ startTime: v })} />
+            </Field>
+          )}
+
           {state.service?.estimated_minutes ? (
             <p className="text-xs text-muted-foreground">
               Approximate duration: {state.service.estimated_minutes} minute
