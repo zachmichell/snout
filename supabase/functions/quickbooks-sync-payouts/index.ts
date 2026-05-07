@@ -170,16 +170,16 @@ Deno.serve(async (req) => {
 
       const lines: QboDepositLine[] = [];
 
+      // Drop `name` fields from AccountRefs — when QBO sees a name
+      // that doesn't exactly match its stored display name it sometimes
+      // ignores the value entirely. value alone always works.
       if (grossDollars > 0) {
         lines.push({
           DetailType: "DepositLineDetail",
           Amount: grossDollars,
-          Description: `${p.processor} payout ${p.processor_payout_id} — gross from Undeposited Funds`,
+          Description: `${p.processor} payout ${p.processor_payout_id} — gross from ${account.default_deposit_account_name ?? "source"}`,
           DepositLineDetail: {
-            AccountRef: {
-              value: account.default_deposit_account_id,
-              name: account.default_deposit_account_name ?? "Undeposited Funds",
-            },
+            AccountRef: { value: account.default_deposit_account_id },
           },
         });
       }
@@ -190,10 +190,7 @@ Deno.serve(async (req) => {
           Amount: -feeDollars,
           Description: `${p.processor} processor fees for payout ${p.processor_payout_id}`,
           DepositLineDetail: {
-            AccountRef: {
-              value: account.default_fee_account_id,
-              name: account.default_fee_account_name ?? "Merchant Processing Fees",
-            },
+            AccountRef: { value: account.default_fee_account_id },
           },
         });
       }
@@ -207,24 +204,36 @@ Deno.serve(async (req) => {
       }
 
       const input: QboDepositInput = {
-        DepositToAccountRef: {
-          value: account.default_bank_account_id,
-          name: account.default_bank_account_name ?? "Bank",
-        },
+        DepositToAccountRef: { value: account.default_bank_account_id },
         Line: lines,
         TxnDate: p.payout_date,
         PrivateNote: p.description ?? `${p.processor} payout ${p.processor_payout_id}`,
         CurrencyRef: { value: p.currency },
       };
 
+      // 6.6a debug: persist the request body so we can inspect it
+      // via SQL without relying on edge-function logs. Cleaned up
+      // once the Deposit shape stabilizes.
+      await admin
+        .from("processor_payouts")
+        .update({ last_request_body: input as unknown as Record<string, unknown> })
+        .eq("id", p.id);
       const result = await createDeposit(ctx, input);
       if (!result.ok) {
+        await admin
+          .from("processor_payouts")
+          .update({ last_response_body: JSON.stringify(result) })
+          .eq("id", p.id);
         const reason = result.error;
         await markFailed(admin, p.id, reason);
         failed += 1;
         failures.push({ payout_id: p.id, reason });
         continue;
       }
+      await admin
+        .from("processor_payouts")
+        .update({ last_response_body: JSON.stringify({ ok: true, qboId: result.data.Deposit.Id }) })
+        .eq("id", p.id);
 
       const dep = result.data.Deposit;
       // Persist mapping + flip state.

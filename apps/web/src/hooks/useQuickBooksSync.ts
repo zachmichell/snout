@@ -626,6 +626,29 @@ export function useSyncQuickBooksPayouts() {
   });
 }
 
+export function useIngestStripePayouts() {
+  const qc = useQueryClient();
+  const { membership } = useAuth();
+  return useMutation<{ orgs: number; payouts_inserted: number }>({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke(
+        "quickbooks-ingest-stripe-payouts",
+        { body: {} },
+      );
+      if (error) throw error;
+      return {
+        orgs: Number(data?.orgs ?? 0),
+        payouts_inserted: Number(data?.payouts_inserted ?? 0),
+      };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-mapping-counts", membership?.organization_id],
+      });
+    },
+  });
+}
+
 // =============================================================================
 // 6.5: Reconciliation export. Per-org CSV of every QBO entity mapping with
 // the Snout-side display name and amount. Operators download this at month

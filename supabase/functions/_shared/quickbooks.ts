@@ -379,9 +379,6 @@ export async function qboRequest<T = unknown>(args: {
   }
   if (!res.ok) {
     const fault = parsed?.Fault?.Error?.[0];
-    // Combine Message + Detail when both are present so the operator
-    // sees what QBO actually rejected (Detail typically includes the
-    // specific field name like "Property Name:DepositToAccountRef").
     const message = fault?.Message
       ? fault?.Detail
         ? `${fault.Message}: ${fault.Detail}`
