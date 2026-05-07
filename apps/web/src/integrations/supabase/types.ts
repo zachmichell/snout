@@ -1477,7 +1477,7 @@ export type Database = {
           completed_time: string | null
           created_at: string
           estimated_duration_minutes: number
-          groomer_id: string
+          groomer_id: string | null
           id: string
           notes: string | null
           organization_id: string
@@ -1497,7 +1497,7 @@ export type Database = {
           completed_time?: string | null
           created_at?: string
           estimated_duration_minutes?: number
-          groomer_id: string
+          groomer_id?: string | null
           id?: string
           notes?: string | null
           organization_id: string
@@ -1517,7 +1517,7 @@ export type Database = {
           completed_time?: string | null
           created_at?: string
           estimated_duration_minutes?: number
-          groomer_id?: string
+          groomer_id?: string | null
           id?: string
           notes?: string | null
           organization_id?: string
@@ -3048,6 +3048,7 @@ export type Database = {
           method: Database["public"]["Enums"]["payment_method_enum"]
           organization_id: string
           processed_at: string | null
+          refund_amount_cents: number | null
           refund_notes: string | null
           refund_reason_id: string | null
           status: Database["public"]["Enums"]["payment_status"]
@@ -3068,6 +3069,7 @@ export type Database = {
           method: Database["public"]["Enums"]["payment_method_enum"]
           organization_id: string
           processed_at?: string | null
+          refund_amount_cents?: number | null
           refund_notes?: string | null
           refund_reason_id?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
@@ -3088,6 +3090,7 @@ export type Database = {
           method?: Database["public"]["Enums"]["payment_method_enum"]
           organization_id?: string
           processed_at?: string | null
+          refund_amount_cents?: number | null
           refund_notes?: string | null
           refund_reason_id?: string | null
           status?: Database["public"]["Enums"]["payment_status"]

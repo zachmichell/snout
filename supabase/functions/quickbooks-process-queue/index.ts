@@ -20,10 +20,12 @@ import {
   createInvoice,
   createItem,
   createPayment,
+  createRefundReceipt,
   findCustomerByDisplayName,
   findInvoiceByDocNumber,
   findItemByName,
   findPaymentByRefNum,
+  findRefundReceiptByRefNum,
   getTokenContext,
   listDepositAccounts,
   listIncomeAccounts,
@@ -32,11 +34,13 @@ import {
   updateInvoice,
   updateItem,
   updatePayment,
+  updateRefundReceipt,
   type QboCustomerInput,
   type QboInvoiceInput,
   type QboInvoiceLine,
   type QboItemInput,
   type QboPaymentInput,
+  type QboRefundReceiptInput,
   type QboTokenContext,
 } from "../_shared/quickbooks.ts";
 
@@ -167,20 +171,41 @@ Deno.serve(async (req) => {
           depositAccount = await ensureDepositAccount(admin, row.organization_id, ctx);
           depositAccountCache.set(row.organization_id, depositAccount);
         }
-        const result = await syncPayment(
+        // First leg: ensure the QBO Payment exists (idempotent).
+        // Refunded payments still need their original Payment in QBO
+        // so the original Invoice stays paid; only after that succeeds
+        // do we add the RefundReceipt.
+        const paymentResult = await syncPayment(
           admin,
           ctx,
           row.organization_id,
           row.snout_id,
           depositAccount,
         );
-        if (result.ok) {
-          await admin.rpc("qbo_mark_queue_processed", { _id: row.id });
-          succeeded += 1;
-        } else {
-          await admin.rpc("qbo_mark_queue_failed", { _id: row.id, _error: result.error });
+        if (!paymentResult.ok) {
+          await admin.rpc("qbo_mark_queue_failed", { _id: row.id, _error: paymentResult.error });
           failed += 1;
+          continue;
         }
+
+        // Second leg: when the Snout payment is refunded, also create a
+        // QBO RefundReceipt. syncRefundReceipt is a no-op for non-
+        // refunded payments so the call is safe to make every time.
+        const refundResult = await syncRefundReceipt(
+          admin,
+          ctx,
+          row.organization_id,
+          row.snout_id,
+          depositAccount,
+        );
+        if (!refundResult.ok) {
+          await admin.rpc("qbo_mark_queue_failed", { _id: row.id, _error: refundResult.error });
+          failed += 1;
+          continue;
+        }
+
+        await admin.rpc("qbo_mark_queue_processed", { _id: row.id });
+        succeeded += 1;
       } else if (row.snout_table === "services") {
         // Items also need an income account; resolve once per org.
         let incomeAccount = incomeAccountCache.get(row.organization_id);
@@ -585,13 +610,11 @@ async function syncPayment(
   if (payment.status === "pending" || payment.status === "failed") {
     return { ok: true as const, state: "unchanged" as const, qboId: "" };
   }
-  if (payment.status === "refunded") {
-    // 6.4b will create a RefundReceipt for this. For now we don't
-    // overwrite the original Payment on QBO; we just leave the queue
-    // row marked processed so we don't burn rate limit retrying it.
-    return { ok: true as const, state: "unchanged" as const, qboId: "" };
-  }
-  if (payment.status !== "succeeded") {
+  // 6.4b: refunded payments still need their original Payment in QBO
+  // so the original Invoice stays paid; the syncRefundReceipt second
+  // leg adds the RefundReceipt entity for the refund itself. Both
+  // 'succeeded' and 'refunded' fall through here unchanged.
+  if (payment.status !== "succeeded" && payment.status !== "refunded") {
     return { ok: false as const, error: `Unexpected payment status: ${payment.status}` };
   }
 
@@ -686,6 +709,243 @@ async function syncPayment(
             : { ok: true as const, status: r.status, data: null };
         }
       : undefined,
+  });
+}
+
+// 6.4b: For refunded payments, create the QBO RefundReceipt that
+// records the money returned to the customer. The original Payment
+// stays untouched on QBO so the original Invoice continues to show
+// "Paid". Per operator decision:
+//   - Full refund (refund_amount == original payment): mirror the
+//     original invoice's lines exactly, so each line reverses against
+//     the same income account it credited.
+//   - Partial refund: a single description-only line ("Partial refund
+//     of payment <ref>") for the refund amount, without per-line
+//     proration.
+// No-op for non-refunded payments so the worker can call this
+// unconditionally on the payments branch.
+//
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function syncRefundReceipt(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any,
+  ctx: QboTokenContext,
+  orgId: string,
+  paymentId: string,
+  depositAccount: { value: string; name: string } | null,
+) {
+  const { data: payment } = await admin
+    .from("payments")
+    .select(
+      "id, invoice_id, amount_cents, currency, status, stripe_payment_intent_id, helcim_transaction_id, processed_at, deleted_at, refund_amount_cents",
+    )
+    .eq("id", paymentId)
+    .maybeSingle();
+  if (!payment || payment.deleted_at || payment.status !== "refunded") {
+    return { ok: true as const, state: "unchanged" as const, qboId: "" };
+  }
+
+  // Resolve invoice + owner mappings (needed for CustomerRef + line
+  // ItemRefs on full-refund mirror).
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("id, owner_id, total_cents")
+    .eq("id", payment.invoice_id)
+    .maybeSingle();
+  if (!invoice) {
+    return { ok: false as const, error: "Refund's invoice not found" };
+  }
+
+  const { data: ownerMapping } = await admin
+    .from("quickbooks_entity_mappings")
+    .select("qbo_id, sync_state")
+    .eq("organization_id", orgId)
+    .eq("snout_table", "owners")
+    .eq("snout_id", invoice.owner_id)
+    .eq("qbo_entity_type", "Customer")
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!ownerMapping || ownerMapping.sync_state !== "synced" || !ownerMapping.qbo_id) {
+    return {
+      ok: false as const,
+      error: `Refund's owner (${invoice.owner_id}) is not yet synced to QBO. Will retry once the owner sync completes.`,
+    };
+  }
+
+  // refund_amount_cents is the actual refunded amount; if absent we
+  // assume the operator refunded the full payment.
+  const refundAmountCents = payment.refund_amount_cents ?? payment.amount_cents;
+  const isFullRefund = refundAmountCents >= payment.amount_cents;
+  const refundAmountDollars = Number((refundAmountCents / 100).toFixed(2));
+
+  // Build the line items.
+  let lines: Array<
+    | {
+        DetailType: "SalesItemLineDetail";
+        Amount: number;
+        Description?: string;
+        SalesItemLineDetail: {
+          ItemRef: { value: string; name?: string };
+          Qty?: number;
+          UnitPrice?: number;
+          TaxCodeRef?: { value: string };
+        };
+      }
+    | { DetailType: "DescriptionOnly"; Amount?: number; Description: string }
+  > = [];
+
+  if (isFullRefund) {
+    // Mirror the original invoice's lines so each one reverses the
+    // exact income / tax routing that booked the original revenue.
+    const { data: invLines } = await admin
+      .from("invoice_lines")
+      .select(
+        "id, service_id, description, quantity, unit_price_cents, line_total_cents, qbo_tax_code_id",
+      )
+      .eq("invoice_id", payment.invoice_id)
+      .order("created_at");
+
+    // Resolve service mappings (Item refs) and tax-code refs (TaxCodeRef).
+    const serviceIds = (invLines ?? [])
+      .map((l: { service_id: string | null }) => l.service_id)
+      .filter((id: string | null): id is string => !!id);
+    const uniqueServiceIds = Array.from(new Set(serviceIds));
+    const serviceMap: Record<string, string> = {};
+    if (uniqueServiceIds.length > 0) {
+      const { data: svcMaps } = await admin
+        .from("quickbooks_entity_mappings")
+        .select("snout_id, qbo_id")
+        .eq("organization_id", orgId)
+        .eq("snout_table", "services")
+        .eq("qbo_entity_type", "Item")
+        .in("snout_id", uniqueServiceIds)
+        .is("deleted_at", null);
+      for (const m of svcMaps ?? []) serviceMap[m.snout_id] = m.qbo_id;
+    }
+    const serviceTaxCodes: Record<string, string | null> = {};
+    if (uniqueServiceIds.length > 0) {
+      const { data: svcRows } = await admin
+        .from("services")
+        .select("id, qbo_tax_code_id")
+        .in("id", uniqueServiceIds);
+      for (const s of svcRows ?? []) serviceTaxCodes[s.id] = s.qbo_tax_code_id ?? null;
+    }
+    const taxCodeUuids = new Set<string>();
+    for (const l of invLines ?? []) {
+      if (l.qbo_tax_code_id) taxCodeUuids.add(l.qbo_tax_code_id);
+      else if (l.service_id && serviceTaxCodes[l.service_id])
+        taxCodeUuids.add(serviceTaxCodes[l.service_id] as string);
+    }
+    const taxCodeQboIds: Record<string, string> = {};
+    if (taxCodeUuids.size > 0) {
+      const { data: codes } = await admin
+        .from("qbo_tax_codes")
+        .select("id, qbo_id")
+        .in("id", Array.from(taxCodeUuids));
+      for (const c of codes ?? []) taxCodeQboIds[c.id] = c.qbo_id;
+    }
+
+    for (const l of invLines ?? []) {
+      const lineTotal = Number((l.line_total_cents / 100).toFixed(2));
+      const unitPrice = Number((l.unit_price_cents / 100).toFixed(2));
+      const qty = typeof l.quantity === "string" ? parseFloat(l.quantity) : l.quantity;
+      const effectiveTaxCodeUuid =
+        l.qbo_tax_code_id ?? (l.service_id ? serviceTaxCodes[l.service_id] : null);
+      const taxCodeRef = effectiveTaxCodeUuid && taxCodeQboIds[effectiveTaxCodeUuid]
+        ? { value: taxCodeQboIds[effectiveTaxCodeUuid] }
+        : undefined;
+
+      if (l.service_id && serviceMap[l.service_id]) {
+        lines.push({
+          DetailType: "SalesItemLineDetail" as const,
+          Amount: lineTotal,
+          Description: l.description,
+          SalesItemLineDetail: {
+            ItemRef: { value: serviceMap[l.service_id] },
+            Qty: qty,
+            UnitPrice: unitPrice,
+            ...(taxCodeRef ? { TaxCodeRef: taxCodeRef } : {}),
+          },
+        });
+      } else {
+        lines.push({
+          DetailType: "DescriptionOnly" as const,
+          Amount: lineTotal,
+          Description: l.description,
+        });
+      }
+    }
+  } else {
+    // Partial refund: single description-only line. Operator decision
+    // — keeps the GL clean without requiring per-line proration.
+    const refNum =
+      payment.stripe_payment_intent_id ?? payment.helcim_transaction_id ?? payment.id.slice(0, 21);
+    lines = [
+      {
+        DetailType: "DescriptionOnly" as const,
+        Amount: refundAmountDollars,
+        Description: `Partial refund of payment ${refNum}`,
+      },
+    ];
+  }
+
+  // QBO RefundReceipt REQUIRES DepositToAccountRef (unlike Payment
+  // where it's optional and QBO defaults to Undeposited Funds). If
+  // discovery returned no candidate, fail with a clear operator-
+  // facing message rather than letting QBO error with a cryptic
+  // "Required param missing" — the operator needs to add a Bank or
+  // Undeposited Funds account in QBO before refunds can sync.
+  if (!depositAccount) {
+    return {
+      ok: false as const,
+      error:
+        "Refund needs a Deposit-To account in QBO (Bank or Undeposited Funds). " +
+        "Add one in your QBO Chart of Accounts and refresh this sync.",
+    };
+  }
+
+  // Refund ref-num distinguishes this from the original Payment's
+  // PaymentRefNum so QBO doesn't collapse them in the audit trail. The
+  // "R-" prefix is convention; truncate to QBO's 21-char limit.
+  const baseRefNum =
+    payment.stripe_payment_intent_id ?? payment.helcim_transaction_id ?? payment.id.slice(0, 18);
+  const refundRefNum = `R-${baseRefNum}`.slice(0, 21);
+
+  const input: QboRefundReceiptInput = {
+    CustomerRef: { value: ownerMapping.qbo_id },
+    TotalAmt: refundAmountDollars,
+    Line: lines,
+    PaymentRefNum: refundRefNum,
+    CurrencyRef: { value: payment.currency as "CAD" | "USD" },
+    GlobalTaxCalculation: isFullRefund ? "TaxExcluded" : "NotApplicable",
+    DepositToAccountRef: depositAccount,
+  };
+  if (payment.processed_at) {
+    input.TxnDate = payment.processed_at.slice(0, 10);
+  }
+
+  return syncOneEntity({
+    admin,
+    orgId,
+    snoutTable: "payments",
+    snoutId: paymentId,
+    qboEntityType: "RefundReceipt",
+    payload: input,
+    create: () => createRefundReceipt(ctx, input),
+    update: (current) => updateRefundReceipt(ctx, current, input),
+    extractIdSyncToken: (data) => {
+      const r = "RefundReceipt" in (data as Record<string, unknown>)
+        ? (data as { RefundReceipt: { Id: string; SyncToken: string } }).RefundReceipt
+        : (data as { Id: string; SyncToken: string });
+      return { id: r.Id, syncToken: r.SyncToken };
+    },
+    lookupExistingByName: async () => {
+      const r = await findRefundReceiptByRefNum(ctx, refundRefNum);
+      if (!r.ok) return r;
+      return r.data
+        ? { ok: true as const, status: r.status, data: { Id: r.data.Id, SyncToken: r.data.SyncToken } }
+        : { ok: true as const, status: r.status, data: null };
+    },
   });
 }
 
