@@ -43,10 +43,19 @@ export default function StepReview({
       end.setHours(end.getHours() + hours);
       return { startISO: start.toISOString(), endISO: end.toISOString() };
     }
+    if (svc.duration_type === "flat") {
+      // 7.1: end = start + service.estimated_minutes. Falls back to
+      // 60 minutes if the operator hasn't set a duration; the wizard's
+      // earlier validation prevents reaching this fallback in practice.
+      const start = combineDateTime(dt.date, dt.startTime);
+      const minutes = svc.estimated_minutes ?? 60;
+      const end = new Date(start.getTime() + minutes * 60_000);
+      return { startISO: start.toISOString(), endISO: end.toISOString() };
+    }
     const start = combineDateTime(dt.date, dt.startTime);
     const end = combineDateTime(dt.date, dt.endTime ?? dt.startTime);
     return { startISO: start.toISOString(), endISO: end.toISOString() };
-  }, [dt, svc.duration_type, hours]);
+  }, [dt, svc.duration_type, svc.estimated_minutes, hours]);
 
   const estimate = estimatePriceCents({
     basePriceCents: svc.base_price_cents,
@@ -67,6 +76,12 @@ export default function StepReview({
     if (svc.duration_type === "overnight" || svc.duration_type === "multi_night") {
       return `${fmt(startISO)} → ${fmt(endISO)} (${nights} night${nights === 1 ? "" : "s"})`;
     }
+    if (svc.duration_type === "flat") {
+      // 7.1: appointment-style line reads "May 8, 10:00 AM (90 min)"
+      // — no end time; the duration is the more useful detail.
+      const minutes = svc.estimated_minutes ?? 60;
+      return `${fmt(startISO)} (${minutes} min)`;
+    }
     return `${fmt(startISO)} – ${new Date(endISO).toLocaleTimeString(undefined, {
       hour: "numeric",
       minute: "2-digit",
@@ -77,6 +92,27 @@ export default function StepReview({
     mutationFn: async () => {
       if (!owner || !membership) throw new Error("Missing account info");
       setSubmitting(true);
+
+      // 7.3: Pre-flight conflict check. Catches the common case
+      // of a customer picking a slot that's already taken before we
+      // hit the DB exclusion constraint with a less-friendly error.
+      // The RPC is privacy-preserving — only returns true/false.
+      const { data: hasConflict, error: conflictErr } = await supabase.rpc(
+        "check_booking_conflict",
+        {
+          _organization_id: membership.organization_id,
+          _service_id: svc.id,
+          _start_at: startISO,
+          _end_at: endISO,
+        },
+      );
+      if (conflictErr) throw conflictErr;
+      if (hasConflict) {
+        throw new Error(
+          "That time slot is already taken. Please pick a different time and try again.",
+        );
+      }
+
       const { data: res, error: resErr } = await supabase
         .from("reservations")
         .insert({
@@ -103,6 +139,39 @@ export default function StepReview({
       }));
       const { error: rpErr } = await supabase.from("reservation_pets").insert(rows);
       if (rpErr) throw rpErr;
+
+      // 7.1 follow-up: grooming services need a parallel
+      // grooming_appointments row per pet so the staff Grooming page
+      // surfaces the request. groomer_id is the customer's pick (or
+      // null for "any available", in which case staff assigns on
+      // confirmation). estimated_duration_minutes comes from the
+      // service so the staff calendar shows the right block size.
+      if (svc.module === "grooming") {
+        const startDate = startISO.slice(0, 10); // yyyy-mm-dd
+        const startTimeOfDay = new Date(startISO).toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const apptRows = state.pets.map((p) => ({
+          organization_id: membership.organization_id,
+          reservation_id: res.id,
+          pet_id: p.id,
+          owner_id: owner.id,
+          groomer_id: state.groomerId, // null = "any available"
+          appointment_date: startDate,
+          start_time: startTimeOfDay,
+          estimated_duration_minutes: svc.estimated_minutes ?? 60,
+          services_requested: [svc.name],
+          price_cents: svc.base_price_cents,
+          status: "requested",
+          notes: state.notes || null,
+        }));
+        const { error: apptErr } = await supabase
+          .from("grooming_appointments")
+          .insert(apptRows);
+        if (apptErr) throw apptErr;
+      }
       return res.id;
     },
     onSuccess: () => {

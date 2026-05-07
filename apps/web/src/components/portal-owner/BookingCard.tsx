@@ -45,8 +45,19 @@ export default function BookingCard({
   const qc = useQueryClient();
 
   const cancelable = booking.status === "requested" || booking.status === "confirmed";
-  const pets = (booking.reservation_pets ?? [])
-    .map((rp) => rp.pets?.name)
+  // Defensive coercion: PostgREST sometimes returns 1:N relations as
+  // an object instead of a 1-element array. Same shape problem we
+  // hit on ServiceDetail; same fix here.
+  const reservationPets = Array.isArray(booking.reservation_pets)
+    ? booking.reservation_pets
+    : booking.reservation_pets
+      ? [booking.reservation_pets]
+      : [];
+  const pets = reservationPets
+    .map((rp: any) => {
+      const pet = Array.isArray(rp?.pets) ? rp.pets[0] : rp?.pets;
+      return pet?.name;
+    })
     .filter(Boolean)
     .join(", ");
 

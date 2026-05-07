@@ -194,8 +194,16 @@ export default function OwnerDashboard() {
           {upcoming && upcoming.length > 0 ? (
             <ul className="divide-y divide-border-subtle">
               {upcoming.map((r: any) => (
-                <li key={r.id} className="py-3 first:pt-0 last:pb-0">
-                  <div className="flex items-center justify-between gap-3">
+                <li key={r.id}>
+                  {/* Wrap each row in a Link to /portal/bookings so the
+                      customer can act on the booking (cancel a request,
+                      view notes, etc.). The Bookings page renders a full
+                      BookingCard with the Cancel button when the status
+                      is requested/confirmed. */}
+                  <Link
+                    to="/portal/bookings"
+                    className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-3 hover:bg-muted/40 first:mt-0 transition-colors"
+                  >
                     <div className="min-w-0">
                       <p className="font-medium text-foreground truncate">
                         {r.services?.name ?? "Service"}
@@ -211,8 +219,11 @@ export default function OwnerDashboard() {
                           ` · ${r.reservation_pets.map((rp: any) => rp.pets?.name).filter(Boolean).join(", ")}`}
                       </p>
                     </div>
-                    <ReservationStatusBadge status={r.status} />
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <ReservationStatusBadge status={r.status} />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>

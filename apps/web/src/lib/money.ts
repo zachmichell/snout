@@ -29,6 +29,7 @@ export function formatDurationType(t: string): string {
     full_day: "Full Day",
     overnight: "Overnight",
     multi_night: "Multi-Night",
+    flat: "Appointment",
   };
   return map[t] ?? t;
 }

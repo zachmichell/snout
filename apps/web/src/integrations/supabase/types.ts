@@ -5130,6 +5130,7 @@ export type Database = {
           description: string | null
           duration_minutes: number | null
           duration_type: Database["public"]["Enums"]["duration_type_enum"]
+          estimated_minutes: number | null
           id: string
           is_addon: boolean
           location_id: string | null
@@ -5150,6 +5151,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number | null
           duration_type: Database["public"]["Enums"]["duration_type_enum"]
+          estimated_minutes?: number | null
           id?: string
           is_addon?: boolean
           location_id?: string | null
@@ -5170,6 +5172,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number | null
           duration_type?: Database["public"]["Enums"]["duration_type_enum"]
+          estimated_minutes?: number | null
           id?: string
           is_addon?: boolean
           location_id?: string | null
@@ -6299,6 +6302,15 @@ export type Database = {
             }
             Returns: undefined
           }
+      check_booking_conflict: {
+        Args: {
+          _end_at: string
+          _organization_id: string
+          _service_id: string
+          _start_at: string
+        }
+        Returns: boolean
+      }
       client_retention_stats: {
         Args: { _org_id: string; _range_from: string }
         Returns: {

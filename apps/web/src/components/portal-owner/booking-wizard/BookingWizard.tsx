@@ -11,11 +11,15 @@ export type WizardService = {
   id: string;
   name: string;
   description: string | null;
-  duration_type: "hourly" | "half_day" | "full_day" | "overnight" | "multi_night";
+  duration_type: "hourly" | "half_day" | "full_day" | "overnight" | "multi_night" | "flat";
   base_price_cents: number;
   max_pets_per_booking: number | null;
   location_id: string | null;
   module: string;
+  // 7.2: estimated duration in minutes. Required for flat services
+  // (the wizard uses it to compute end_at on submission). Optional
+  // metadata for time-window services.
+  estimated_minutes: number | null;
 };
 
 export type WizardPet = {
@@ -41,6 +45,9 @@ export type WizardState = {
   pets: WizardPet[];
   datetime: WizardDateTime | null;
   notes: string;
+  // 7.1 follow-up: customer-selected groomer for grooming services.
+  // Null means "any available groomer"; staff assigns on confirmation.
+  groomerId: string | null;
 };
 
 const STEPS = ["Service", "Pets", "Date & Time", "Review"];
@@ -59,12 +66,20 @@ export default function BookingWizard({
     pets: [],
     datetime: null,
     notes: "",
+    groomerId: null,
   });
   const qc = useQueryClient();
 
   const reset = () => {
     setStep(0);
-    setState({ locationId: null, service: null, pets: [], datetime: null, notes: "" });
+    setState({
+      locationId: null,
+      service: null,
+      pets: [],
+      datetime: null,
+      notes: "",
+      groomerId: null,
+    });
   };
 
   const handleClose = (v: boolean) => {
@@ -78,6 +93,12 @@ export default function BookingWizard({
   const onComplete = () => {
     qc.invalidateQueries({ queryKey: ["owner-bookings"] });
     qc.invalidateQueries({ queryKey: ["owner-upcoming"] });
+    // Staff side: refresh grooming requests + week calendar so the
+    // new appointment shows up immediately for any open staff session
+    // viewing the same browser. Realtime subscriptions would be ideal
+    // here; this keyed invalidation is the lightweight fix.
+    qc.invalidateQueries({ queryKey: ["grooming-requests"] });
+    qc.invalidateQueries({ queryKey: ["grooming-week"] });
     handleClose(false);
   };
 

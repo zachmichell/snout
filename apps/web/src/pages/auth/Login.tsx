@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,13 +6,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import Logo from "@/components/portal/Logo";
+import { useAuth } from "@/hooks/useAuth";
+
+const STAFF_ROLES = ["owner", "admin", "manager", "staff"];
 
 export default function Login() {
   const navigate = useNavigate();
+  const { user, membership, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [magicLoading, setMagicLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  // Role-based redirect: customer -> /portal/dashboard, staff -> /dashboard.
+  // Driven by the auth context so we wait for membership to load instead
+  // of guessing /dashboard and getting "Not authorized" when the user is
+  // a customer. Fires either after a fresh sign-in (submitted=true) or
+  // when the user is already authenticated and lands on /login (e.g.,
+  // returning from a magic link).
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+    if (!membership) return;
+    if (!submitted && !user) return; // belt-and-suspenders
+    const target = STAFF_ROLES.includes(membership.role)
+      ? "/dashboard"
+      : "/portal/dashboard";
+    navigate(target, { replace: true });
+  }, [authLoading, user, membership, submitted, navigate]);
 
   const handlePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,15 +42,18 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) return toast.error(error.message);
-    navigate("/dashboard");
+    setSubmitted(true);
+    // Navigation handled by the effect above once membership resolves.
   };
 
   const handleMagic = async () => {
     if (!email) return toast.error("Enter your email first");
     setMagicLoading(true);
+    // Magic link sends users back to /login; the effect above will then
+    // route them to the right portal based on their role.
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+      options: { emailRedirectTo: `${window.location.origin}/login` },
     });
     setMagicLoading(false);
     if (error) return toast.error(error.message);

@@ -51,16 +51,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Set up listener FIRST
+    // Set up listener FIRST.
+    //
+    // Race fix: on a fresh sign-in, user becomes truthy synchronously
+    // here while membership fetch is async. Without flipping loading
+    // back to true, route guards (RoleRoute, RequirePermission)
+    // would briefly observe `loading=false, user=set, membership=null`
+    // and redirect to /onboarding or render "Not authorized" before
+    // membership has had a chance to resolve. Keep loading=true while
+    // the post-auth membership load is in flight so guards block on
+    // the spinner instead.
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
-        // Defer Supabase calls
-        setTimeout(() => loadUserData(sess.user.id), 0);
+        setLoading(true);
+        // Defer Supabase calls (Supabase auth docs warn about calling
+        // supabase.from() inside the listener synchronously — schedule
+        // it as its own task to avoid the deadlock).
+        setTimeout(() => {
+          loadUserData(sess.user!.id).finally(() => setLoading(false));
+        }, 0);
       } else {
         setProfile(null);
         setMembership(null);
+        setLoading(false);
       }
     });
 
