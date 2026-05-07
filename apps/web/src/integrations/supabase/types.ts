@@ -3033,6 +3033,55 @@ export type Database = {
           },
         ]
       }
+      payment_payouts: {
+        Row: {
+          created_at: string
+          fee_cents: number
+          id: string
+          organization_id: string
+          payment_id: string
+          payout_id: string
+        }
+        Insert: {
+          created_at?: string
+          fee_cents?: number
+          id?: string
+          organization_id: string
+          payment_id: string
+          payout_id: string
+        }
+        Update: {
+          created_at?: string
+          fee_cents?: number
+          id?: string
+          organization_id?: string
+          payment_id?: string
+          payout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_payouts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_payouts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_payouts_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "processor_payouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount_cents: number
@@ -3987,6 +4036,62 @@ export type Database = {
           },
         ]
       }
+      processor_payouts: {
+        Row: {
+          created_at: string
+          currency: string
+          description: string | null
+          fee_cents: number
+          gross_cents: number
+          id: string
+          net_cents: number
+          organization_id: string
+          payout_date: string
+          processor: string
+          processor_payout_id: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency: string
+          description?: string | null
+          fee_cents: number
+          gross_cents: number
+          id?: string
+          net_cents: number
+          organization_id: string
+          payout_date: string
+          processor: string
+          processor_payout_id: string
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          description?: string | null
+          fee_cents?: number
+          gross_cents?: number
+          id?: string
+          net_cents?: number
+          organization_id?: string
+          payout_date?: string
+          processor?: string
+          processor_payout_id?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processor_payouts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -4275,6 +4380,8 @@ export type Database = {
           created_at: string
           default_deposit_account_id: string | null
           default_deposit_account_name: string | null
+          default_fee_account_id: string | null
+          default_fee_account_name: string | null
           default_income_account_id: string | null
           default_income_account_name: string | null
           deleted_at: string | null
@@ -4295,6 +4402,8 @@ export type Database = {
           created_at?: string
           default_deposit_account_id?: string | null
           default_deposit_account_name?: string | null
+          default_fee_account_id?: string | null
+          default_fee_account_name?: string | null
           default_income_account_id?: string | null
           default_income_account_name?: string | null
           deleted_at?: string | null
@@ -4315,6 +4424,8 @@ export type Database = {
           created_at?: string
           default_deposit_account_id?: string | null
           default_deposit_account_name?: string | null
+          default_fee_account_id?: string | null
+          default_fee_account_name?: string | null
           default_income_account_id?: string | null
           default_income_account_name?: string | null
           deleted_at?: string | null
@@ -6481,6 +6592,10 @@ export type Database = {
       }
       qbo_retry_failed_mapping: {
         Args: { _mapping_id: string }
+        Returns: undefined
+      }
+      qbo_set_fee_account: {
+        Args: { _name: string; _qbo_id: string }
         Returns: undefined
       }
       qbo_sync_queue_status: {

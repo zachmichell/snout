@@ -668,6 +668,110 @@ export async function findPaymentByRefNum(
   return { ok: true, status: res.status, data: res.data?.QueryResponse?.Payment?.[0] ?? null };
 }
 
+// ----- Deposit (6.6a) ----------------------------------------------------
+//
+// QBO's Deposit entity records money landing in a bank account from
+// one or more sources. For processor-fee accounting we use it like:
+//   - Cash In: the gross processor payout (linked to the Payment(s)
+//     that fed it via DepositLineDetail.LinkedTxn[]) OR a single
+//     summary line referencing Undeposited Funds for that amount.
+//   - Cash Out: a NEGATIVE line on the operator's chosen Fee
+//     expense account, sized to the processor fees for that payout.
+// Net effect: bank account credited by (gross - fee), Undeposited
+// Funds debited by gross, Fee Expense debited by fee.
+
+export type QboDepositLine =
+  | {
+      // Summary line backed by an account (used for the fee line —
+      // negative Amount on an Expense / COGS account).
+      DetailType: "DepositLineDetail";
+      Amount: number;
+      Description?: string;
+      DepositLineDetail: {
+        AccountRef: { value: string; name?: string };
+        Entity?: { value: string; type: string };
+      };
+    }
+  | {
+      // Linked-transaction line: a payment that previously hit
+      // Undeposited Funds gets pulled into the Deposit.
+      DetailType: "DepositLineDetail";
+      Amount: number;
+      Description?: string;
+      LinkedTxn: Array<{ TxnId: string; TxnType: "Payment" }>;
+      DepositLineDetail: { Entity?: { value: string; type: string } };
+    };
+
+export type QboDepositInput = {
+  // The bank / current-asset account the money lands in.
+  DepositToAccountRef: { value: string; name?: string };
+  Line: QboDepositLine[];
+  TxnDate?: string;
+  PrivateNote?: string;
+  CurrencyRef?: { value: "CAD" | "USD" };
+};
+
+export type QboDeposit = QboDepositInput & {
+  Id: string;
+  SyncToken: string;
+  TotalAmt?: number;
+};
+
+export function createDeposit(ctx: QboTokenContext, input: QboDepositInput) {
+  return qboRequest<{ Deposit: QboDeposit }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/deposit?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updateDeposit(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: QboDepositInput,
+) {
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ Deposit: QboDeposit }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/deposit?minorversion=70`,
+    body,
+  });
+}
+
+/**
+ * List the operator's expense accounts so the QBO settings UI can
+ * show a dropdown for the fee account choice.
+ */
+export async function listExpenseAccounts(ctx: QboTokenContext): Promise<QboResult<QboAccount[]>> {
+  // Two queries because QBO doesn't accept parenthesized OR.
+  const expenseQuery = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Expense' and Active = true MAXRESULTS 200`;
+  const cogsQuery = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Cost of Goods Sold' and Active = true MAXRESULTS 200`;
+  const [expRes, cogsRes] = await Promise.all([
+    qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+      ctx,
+      method: "GET",
+      path: `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(expenseQuery)}&minorversion=70`,
+    }),
+    qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+      ctx,
+      method: "GET",
+      path: `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(cogsQuery)}&minorversion=70`,
+    }),
+  ]);
+  if (!expRes.ok) return expRes;
+  if (!cogsRes.ok) return cogsRes;
+  return {
+    ok: true,
+    status: 200,
+    data: [
+      ...(expRes.data?.QueryResponse?.Account ?? []),
+      ...(cogsRes.data?.QueryResponse?.Account ?? []),
+    ].sort((a, b) => a.Name.localeCompare(b.Name)),
+  };
+}
+
 // ----- RefundReceipt (6.4b) ----------------------------------------------
 //
 // QBO's RefundReceipt records money returned to a customer. Unlike

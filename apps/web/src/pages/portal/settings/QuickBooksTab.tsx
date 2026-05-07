@@ -53,12 +53,23 @@ import {
   useQuickBooksTaxCodes,
   useRefreshQuickBooksTaxCodes,
   useDownloadQuickBooksMappingReport,
+  useQuickBooksFeeAccounts,
+  useQuickBooksAccountSettings,
+  useSetQuickBooksFeeAccount,
+  useSyncQuickBooksPayouts,
   type SyncResult,
   type SyncCounts,
   type SyncAllProgress,
   type FailedMapping,
   type QuickBooksTaxCode,
 } from "@/hooks/useQuickBooksSync";
+import {
+  Select as Sel,
+  SelectContent as SelContent,
+  SelectItem as SelItem,
+  SelectTrigger as SelTrigger,
+  SelectValue as SelValue,
+} from "@/components/ui/select";
 import { formatDateTime } from "@/lib/money";
 
 export default function QuickBooksTab() {
@@ -400,6 +411,116 @@ function SyncPanel() {
         <TaxCodesCard />
         <ReconciliationCard />
       </div>
+
+      <div className="mt-3">
+        <PayoutsCard />
+      </div>
+    </div>
+  );
+}
+
+// 6.6a: Processor payouts. Two halves:
+//   1. Pick the QBO Expense account where merchant fees post.
+//   2. Sync any payouts that are 'ready' to QBO Bank Deposits.
+function PayoutsCard() {
+  const { data: settings } = useQuickBooksAccountSettings();
+  const { data: feeAccounts = [], isLoading: feeLoading } = useQuickBooksFeeAccounts();
+  const setFee = useSetQuickBooksFeeAccount();
+  const syncPayouts = useSyncQuickBooksPayouts();
+
+  const currentFeeId = settings?.default_fee_account_id ?? "";
+  const currentFeeName = settings?.default_fee_account_name ?? null;
+
+  return (
+    <div className="rounded-md border border-border bg-background p-4">
+      <div className="mb-3">
+        <div className="font-medium text-foreground">Processor payouts</div>
+        <div className="mt-0.5 text-xs text-text-tertiary">
+          Stripe and Helcim batch your charges into daily/weekly payouts and
+          deduct fees before depositing the net to your bank. Snout posts
+          one QBO Bank Deposit per payout: each charge as a Linked Payment,
+          plus a single negative line for the fees.
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-end">
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-text-secondary">
+            Fee account
+          </label>
+          <Sel
+            value={currentFeeId || "__none__"}
+            onValueChange={(v) => {
+              if (v === "__none__") return;
+              const acct = feeAccounts.find((a) => a.id === v);
+              if (!acct) return;
+              setFee.mutate(
+                { id: acct.id, name: acct.name },
+                {
+                  onSuccess: () =>
+                    toast.success(`Fee account set to ${acct.name}`),
+                  onError: (e: any) => toast.error(e?.message ?? "Could not save"),
+                },
+              );
+            }}
+            disabled={feeLoading || feeAccounts.length === 0}
+          >
+            <SelTrigger>
+              <SelValue
+                placeholder={
+                  feeLoading
+                    ? "Loading…"
+                    : feeAccounts.length === 0
+                    ? "No expense accounts in QBO"
+                    : "Pick an expense account"
+                }
+              />
+            </SelTrigger>
+            <SelContent>
+              <SelItem value="__none__" disabled>
+                <span className="text-text-tertiary">Pick an expense account</span>
+              </SelItem>
+              {feeAccounts.map((a) => (
+                <SelItem key={a.id} value={a.id}>
+                  {a.name}{" "}
+                  <span className="text-text-tertiary">({a.type})</span>
+                </SelItem>
+              ))}
+            </SelContent>
+          </Sel>
+          {currentFeeName && (
+            <p className="mt-1 text-xs text-text-tertiary">
+              Currently routing fees to <strong>{currentFeeName}</strong>.
+            </p>
+          )}
+        </div>
+        <Button
+          onClick={async () => {
+            try {
+              const r = await syncPayouts.mutateAsync();
+              if (r.processed === 0) {
+                toast.success("No payouts ready to sync");
+              } else {
+                toast.success(
+                  `Synced ${r.succeeded} of ${r.processed} payout${r.processed === 1 ? "" : "s"} to QBO`,
+                );
+              }
+            } catch (e: any) {
+              toast.error(e?.message ?? "Could not sync payouts");
+            }
+          }}
+          disabled={syncPayouts.isPending || !currentFeeId}
+          size="sm"
+        >
+          {syncPayouts.isPending ? "Syncing…" : "Sync payouts now"}
+        </Button>
+      </div>
+      {!currentFeeId && (
+        <p className="mt-3 text-xs text-text-tertiary">
+          Pick a fee account before syncing — the QBO Bank Deposit needs an
+          expense account for the negative fee line.
+        </p>
+      )}
     </div>
   );
 }
