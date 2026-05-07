@@ -123,6 +123,33 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Mark-stale: any cached rate that wasn't returned by this refresh
+    // is dropped (or marked inactive if it has been referenced). After
+    // a connection swap (e.g. US sandbox -> Canadian sandbox) the prior
+    // realm's codes/rates would otherwise stay in the cache forever
+    // and pollute the operator's tax-code dropdown.
+    const seenRateIds = new Set(
+      (ratesRes.data ?? []).map((r: QboTaxRate) => r.Id),
+    );
+    if (seenRateIds.size > 0) {
+      const { data: existingRates } = await admin
+        .from("qbo_tax_rates")
+        .select("id, qbo_id")
+        .eq("organization_id", orgId);
+      const stale = (existingRates ?? []).filter(
+        (r: { qbo_id: string }) => !seenRateIds.has(r.qbo_id),
+      );
+      if (stale.length > 0) {
+        await admin
+          .from("qbo_tax_rates")
+          .delete()
+          .in(
+            "id",
+            stale.map((r: { id: string }) => r.id),
+          );
+      }
+    }
+
     // Reload to get Snout UUIDs for the qbo_id values we just upserted.
     const { data: ratesAfter, error: ratesAfterErr } = await admin
       .from("qbo_tax_rates")
@@ -156,6 +183,32 @@ Deno.serve(async (req) => {
         .upsert(codeRows, { onConflict: "organization_id,qbo_id" });
       if (codeErr) {
         return json({ error: "Could not upsert tax codes", details: codeErr.message }, 500);
+      }
+    }
+
+    // Mark-stale on tax codes too. Same reason as rates above. Any
+    // service or product that had a stale code attached gets its FK
+    // auto-cleared by the ON DELETE SET NULL on services.qbo_tax_code_id
+    // and retail_products.qbo_tax_code_id.
+    const seenCodeIds = new Set(
+      (codesRes.data ?? []).map((c: QboTaxCode) => c.Id),
+    );
+    if (seenCodeIds.size > 0) {
+      const { data: existingCodes } = await admin
+        .from("qbo_tax_codes")
+        .select("id, qbo_id")
+        .eq("organization_id", orgId);
+      const stale = (existingCodes ?? []).filter(
+        (c: { qbo_id: string }) => !seenCodeIds.has(c.qbo_id),
+      );
+      if (stale.length > 0) {
+        await admin
+          .from("qbo_tax_codes")
+          .delete()
+          .in(
+            "id",
+            stale.map((c: { id: string }) => c.id),
+          );
       }
     }
 
