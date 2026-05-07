@@ -15,6 +15,13 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
+      # The root `npm test` script delegates to `bun run --cwd apps/web
+      # test`. Install Bun so the delegate finds its runtime. setup-bun
+      # is the official action and pins via package.json's "packageManager"
+      # field if present; otherwise uses the latest stable.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - run: npm ci
       - run: npm test
       # Lint is intentionally not gated yet. The repo carries pre-existing
@@ -30,6 +37,9 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - uses: supabase/setup-cli@v1
         with:
           version: latest
