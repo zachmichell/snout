@@ -6302,6 +6302,15 @@ export type Database = {
             }
             Returns: undefined
           }
+      check_booking_conflict: {
+        Args: {
+          _end_at: string
+          _organization_id: string
+          _service_id: string
+          _start_at: string
+        }
+        Returns: boolean
+      }
       client_retention_stats: {
         Args: { _org_id: string; _range_from: string }
         Returns: {

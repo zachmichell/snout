@@ -92,6 +92,27 @@ export default function StepReview({
     mutationFn: async () => {
       if (!owner || !membership) throw new Error("Missing account info");
       setSubmitting(true);
+
+      // 7.3: Pre-flight conflict check. Catches the common case
+      // of a customer picking a slot that's already taken before we
+      // hit the DB exclusion constraint with a less-friendly error.
+      // The RPC is privacy-preserving — only returns true/false.
+      const { data: hasConflict, error: conflictErr } = await supabase.rpc(
+        "check_booking_conflict",
+        {
+          _organization_id: membership.organization_id,
+          _service_id: svc.id,
+          _start_at: startISO,
+          _end_at: endISO,
+        },
+      );
+      if (conflictErr) throw conflictErr;
+      if (hasConflict) {
+        throw new Error(
+          "That time slot is already taken. Please pick a different time and try again.",
+        );
+      }
+
       const { data: res, error: resErr } = await supabase
         .from("reservations")
         .insert({
