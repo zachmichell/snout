@@ -1331,6 +1331,82 @@ export type Database = {
           },
         ]
       }
+      groomer_availability: {
+        Row: {
+          created_at: string
+          date: string
+          end_time: string
+          groomer_id: string
+          id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          end_time: string
+          groomer_id: string
+          id?: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          end_time?: string
+          groomer_id?: string
+          id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groomer_availability_groomer_id_fkey"
+            columns: ["groomer_id"]
+            isOneToOne: false
+            referencedRelation: "groomers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groomer_working_hours: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          groomer_id: string
+          id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          groomer_id: string
+          id?: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          groomer_id?: string
+          id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groomer_working_hours_groomer_id_fkey"
+            columns: ["groomer_id"]
+            isOneToOne: false
+            referencedRelation: "groomers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       groomers: {
         Row: {
           bio: string | null
@@ -1763,8 +1839,11 @@ export type Database = {
           line_total_cents: number
           line_type: string
           organization_id: string
+          qbo_tax_code_id: string | null
           quantity: number
           service_id: string | null
+          tax_breakdown: Json | null
+          tax_cents: number
           unit_price_cents: number
         }
         Insert: {
@@ -1775,8 +1854,11 @@ export type Database = {
           line_total_cents: number
           line_type?: string
           organization_id: string
+          qbo_tax_code_id?: string | null
           quantity?: number
           service_id?: string | null
+          tax_breakdown?: Json | null
+          tax_cents?: number
           unit_price_cents: number
         }
         Update: {
@@ -1787,8 +1869,11 @@ export type Database = {
           line_total_cents?: number
           line_type?: string
           organization_id?: string
+          qbo_tax_code_id?: string | null
           quantity?: number
           service_id?: string | null
+          tax_breakdown?: Json | null
+          tax_cents?: number
           unit_price_cents?: number
         }
         Relationships: [
@@ -1804,6 +1889,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_qbo_tax_code_id_fkey"
+            columns: ["qbo_tax_code_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_tax_codes"
             referencedColumns: ["id"]
           },
           {
@@ -2552,6 +2644,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          attachments: Json
           body: string
           conversation_id: string
           created_at: string
@@ -2561,6 +2654,7 @@ export type Database = {
           sender_type: Database["public"]["Enums"]["message_sender_type"]
         }
         Insert: {
+          attachments?: Json
           body: string
           conversation_id: string
           created_at?: string
@@ -2570,6 +2664,7 @@ export type Database = {
           sender_type: Database["public"]["Enums"]["message_sender_type"]
         }
         Update: {
+          attachments?: Json
           body?: string
           conversation_id?: string
           created_at?: string
@@ -2623,11 +2718,13 @@ export type Database = {
       }
       organizations: {
         Row: {
+          cancellation_policy_hours: number
           country: Database["public"]["Enums"]["country_enum"]
           created_at: string
           credit_expiration_days: number | null
           currency: Database["public"]["Enums"]["currency_enum"]
           deleted_at: string | null
+          grooming_cancellation_policy_hours: number
           id: string
           invoice_counter: number
           name: string
@@ -2639,11 +2736,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancellation_policy_hours?: number
           country: Database["public"]["Enums"]["country_enum"]
           created_at?: string
           credit_expiration_days?: number | null
           currency: Database["public"]["Enums"]["currency_enum"]
           deleted_at?: string | null
+          grooming_cancellation_policy_hours?: number
           id?: string
           invoice_counter?: number
           name: string
@@ -2655,11 +2754,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancellation_policy_hours?: number
           country?: Database["public"]["Enums"]["country_enum"]
           created_at?: string
           credit_expiration_days?: number | null
           currency?: Database["public"]["Enums"]["currency_enum"]
           deleted_at?: string | null
+          grooming_cancellation_policy_hours?: number
           id?: string
           invoice_counter?: number
           name?: string
@@ -2683,6 +2784,7 @@ export type Database = {
           purchased_at: string
           remaining_credits: Json
           status: string
+          stripe_checkout_session_id: string | null
           updated_at: string
         }
         Insert: {
@@ -2695,6 +2797,7 @@ export type Database = {
           purchased_at?: string
           remaining_credits?: Json
           status?: string
+          stripe_checkout_session_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -2707,6 +2810,7 @@ export type Database = {
           purchased_at?: string
           remaining_credits?: Json
           status?: string
+          stripe_checkout_session_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -4011,12 +4115,165 @@ export type Database = {
           },
         ]
       }
+      qbo_tax_code_rates: {
+        Row: {
+          applicable_on: string | null
+          created_at: string
+          id: string
+          organization_id: string
+          rate_type: string | null
+          tax_code_id: string
+          tax_rate_id: string
+        }
+        Insert: {
+          applicable_on?: string | null
+          created_at?: string
+          id?: string
+          organization_id: string
+          rate_type?: string | null
+          tax_code_id: string
+          tax_rate_id: string
+        }
+        Update: {
+          applicable_on?: string | null
+          created_at?: string
+          id?: string
+          organization_id?: string
+          rate_type?: string | null
+          tax_code_id?: string
+          tax_rate_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qbo_tax_code_rates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qbo_tax_code_rates_tax_code_id_fkey"
+            columns: ["tax_code_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_tax_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qbo_tax_code_rates_tax_rate_id_fkey"
+            columns: ["tax_rate_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_tax_rates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qbo_tax_codes: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          last_synced_at: string
+          name: string
+          organization_id: string
+          qbo_id: string
+          tax_group: string
+          taxable: boolean
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          last_synced_at?: string
+          name: string
+          organization_id: string
+          qbo_id: string
+          tax_group?: string
+          taxable?: boolean
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          last_synced_at?: string
+          name?: string
+          organization_id?: string
+          qbo_id?: string
+          tax_group?: string
+          taxable?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qbo_tax_codes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qbo_tax_rates: {
+        Row: {
+          active: boolean
+          agency_name: string | null
+          created_at: string
+          id: string
+          last_synced_at: string
+          name: string
+          organization_id: string
+          qbo_id: string
+          rate_basis_points: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          agency_name?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string
+          name: string
+          organization_id: string
+          qbo_id: string
+          rate_basis_points: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          agency_name?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string
+          name?: string
+          organization_id?: string
+          qbo_id?: string
+          rate_basis_points?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qbo_tax_rates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quickbooks_accounts: {
         Row: {
           access_token_expires_at: string | null
           access_token_secret_id: string
           company_name: string | null
           created_at: string
+          default_deposit_account_id: string | null
+          default_deposit_account_name: string | null
+          default_income_account_id: string | null
+          default_income_account_name: string | null
           deleted_at: string | null
           environment: string
           id: string
@@ -4033,6 +4290,10 @@ export type Database = {
           access_token_secret_id: string
           company_name?: string | null
           created_at?: string
+          default_deposit_account_id?: string | null
+          default_deposit_account_name?: string | null
+          default_income_account_id?: string | null
+          default_income_account_name?: string | null
           deleted_at?: string | null
           environment?: string
           id?: string
@@ -4049,6 +4310,10 @@ export type Database = {
           access_token_secret_id?: string
           company_name?: string | null
           created_at?: string
+          default_deposit_account_id?: string | null
+          default_deposit_account_name?: string | null
+          default_income_account_id?: string | null
+          default_income_account_name?: string | null
           deleted_at?: string | null
           environment?: string
           id?: string
@@ -4063,6 +4328,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "quickbooks_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quickbooks_entity_mappings: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          organization_id: string
+          payload_hash: string | null
+          qbo_entity_type: string
+          qbo_id: string
+          snout_id: string
+          snout_table: string
+          sync_state: string
+          sync_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          organization_id: string
+          payload_hash?: string | null
+          qbo_entity_type: string
+          qbo_id: string
+          snout_id: string
+          snout_table: string
+          sync_state?: string
+          sync_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          organization_id?: string
+          payload_hash?: string | null
+          qbo_entity_type?: string
+          qbo_id?: string
+          snout_id?: string
+          snout_table?: string
+          sync_state?: string
+          sync_token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_entity_mappings_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -4105,6 +4429,56 @@ export type Database = {
           },
           {
             foreignKeyName: "quickbooks_oauth_pending_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quickbooks_sync_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          enqueued_at: string
+          id: string
+          last_error: string | null
+          next_attempt_at: string
+          op: string
+          organization_id: string
+          processed_at: string | null
+          snout_id: string
+          snout_table: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          enqueued_at?: string
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          op?: string
+          organization_id: string
+          processed_at?: string | null
+          snout_id: string
+          snout_table: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          enqueued_at?: string
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          op?: string
+          organization_id?: string
+          processed_at?: string | null
+          snout_id?: string
+          snout_table?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_sync_queue_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -4653,6 +5027,7 @@ export type Database = {
           organization_id: string
           photo_url: string | null
           price_cents: number
+          qbo_tax_code_id: string | null
           reorder_point: number
           sku: string | null
           stock_quantity: number
@@ -4672,6 +5047,7 @@ export type Database = {
           organization_id: string
           photo_url?: string | null
           price_cents?: number
+          qbo_tax_code_id?: string | null
           reorder_point?: number
           sku?: string | null
           stock_quantity?: number
@@ -4691,13 +5067,22 @@ export type Database = {
           organization_id?: string
           photo_url?: string | null
           price_cents?: number
+          qbo_tax_code_id?: string | null
           reorder_point?: number
           sku?: string | null
           stock_quantity?: number
           updated_at?: string
           vendor?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "retail_products_qbo_tax_code_id_fkey"
+            columns: ["qbo_tax_code_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_tax_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       service_deposit_overrides: {
         Row: {
@@ -4740,6 +5125,7 @@ export type Database = {
           active: boolean
           base_price_cents: number
           created_at: string
+          default_duration_minutes: number | null
           deleted_at: string | null
           description: string | null
           duration_minutes: number | null
@@ -4751,6 +5137,7 @@ export type Database = {
           module: Database["public"]["Enums"]["module_enum"]
           name: string
           organization_id: string
+          qbo_tax_code_id: string | null
           time_windows: Json
           updated_at: string
         }
@@ -4758,6 +5145,7 @@ export type Database = {
           active?: boolean
           base_price_cents?: number
           created_at?: string
+          default_duration_minutes?: number | null
           deleted_at?: string | null
           description?: string | null
           duration_minutes?: number | null
@@ -4769,6 +5157,7 @@ export type Database = {
           module: Database["public"]["Enums"]["module_enum"]
           name: string
           organization_id: string
+          qbo_tax_code_id?: string | null
           time_windows?: Json
           updated_at?: string
         }
@@ -4776,6 +5165,7 @@ export type Database = {
           active?: boolean
           base_price_cents?: number
           created_at?: string
+          default_duration_minutes?: number | null
           deleted_at?: string | null
           description?: string | null
           duration_minutes?: number | null
@@ -4787,6 +5177,7 @@ export type Database = {
           module?: Database["public"]["Enums"]["module_enum"]
           name?: string
           organization_id?: string
+          qbo_tax_code_id?: string | null
           time_windows?: Json
           updated_at?: string
         }
@@ -4803,6 +5194,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_qbo_tax_code_id_fkey"
+            columns: ["qbo_tax_code_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_tax_codes"
             referencedColumns: ["id"]
           },
         ]
@@ -5975,6 +6373,19 @@ export type Database = {
         Returns: undefined
       }
       expire_credits: { Args: { p_organization_id: string }; Returns: Json }
+      get_groomer_available_dates: {
+        Args: { p_end_date: string; p_groomer_id: string; p_start_date: string }
+        Returns: Json
+      }
+      get_groomer_available_slots: {
+        Args: {
+          p_date: string
+          p_duration_minutes?: number
+          p_groomer_id: string
+          p_slot_step_minutes?: number
+        }
+        Returns: Json
+      }
       get_helcim_api_token: { Args: { _org_id: string }; Returns: string }
       get_helcim_webhook_verifier: {
         Args: { _org_id: string }
@@ -5990,17 +6401,128 @@ export type Database = {
           refresh_token: string
         }[]
       }
+      invoke_quickbooks_process_queue: { Args: never; Returns: number }
       is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       is_org_member: { Args: { _org_id: string }; Returns: boolean }
+      mark_conversation_read_by_owner: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
       mark_invoice_paid_offline: {
         Args: { invoice_id: string; method?: string }
         Returns: undefined
       }
       next_invoice_number: { Args: { _org_id: string }; Returns: string }
+      qbo_enqueue_unsynced_invoices: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: number
+      }
+      qbo_enqueue_unsynced_payments: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: number
+      }
+      qbo_mapping_counts: {
+        Args: { _org_id: string }
+        Returns: {
+          n: number
+          snout_table: string
+          sync_state: string
+        }[]
+      }
+      qbo_mapping_report: {
+        Args: { _org: string }
+        Returns: {
+          amount_cents: number
+          currency: string
+          display_name: string
+          last_error: string
+          last_synced_at: string
+          qbo_entity_type: string
+          qbo_id: string
+          snout_id: string
+          snout_table: string
+          sync_state: string
+        }[]
+      }
+      qbo_mark_queue_failed: {
+        Args: { _error: string; _id: string }
+        Returns: undefined
+      }
+      qbo_mark_queue_processed: { Args: { _id: string }; Returns: undefined }
+      qbo_pickup_queue_batch: {
+        Args: { _limit?: number }
+        Returns: {
+          attempts: number
+          id: string
+          op: string
+          organization_id: string
+          snout_id: string
+          snout_table: string
+        }[]
+      }
+      qbo_reset_failed_mappings: {
+        Args: { _org_id: string; _snout_table?: string }
+        Returns: number
+      }
+      qbo_retry_failed_mapping: {
+        Args: { _mapping_id: string }
+        Returns: undefined
+      }
+      qbo_sync_queue_status: {
+        Args: { _org_id: string }
+        Returns: {
+          failed_in_queue_count: number
+          last_processed_at: string
+          oldest_pending_at: string
+          pending_count: number
+          processing_count: number
+        }[]
+      }
+      qbo_tax_codes_for_org: {
+        Args: { _org: string }
+        Returns: {
+          combined_rate_basis_points: number
+          description: string
+          id: string
+          name: string
+          qbo_id: string
+          rate_summary: string
+          taxable: boolean
+        }[]
+      }
+      qbo_unsynced_invoice_ids: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: {
+          invoice_id: string
+        }[]
+      }
+      qbo_unsynced_owner_ids: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: {
+          owner_id: string
+        }[]
+      }
+      qbo_unsynced_payment_ids: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: {
+          payment_id: string
+        }[]
+      }
+      qbo_unsynced_service_ids: {
+        Args: { _limit?: number; _org_id: string }
+        Returns: {
+          service_id: string
+        }[]
+      }
+      recalculate_invoice_taxes: {
+        Args: { _invoice_id: string }
+        Returns: undefined
+      }
       refresh_owner_credit_cache: {
         Args: { p_owner_id: string }
         Returns: undefined
       }
+      resolve_line_tax_code: { Args: { _line_id: string }; Returns: string }
       set_helcim_api_token: {
         Args: { _api_token: string; _org_id: string }
         Returns: string
@@ -6079,6 +6601,7 @@ export type Database = {
         | "full_day"
         | "overnight"
         | "multi_night"
+        | "flat"
       intake_status_enum:
         | "pending_review"
         | "approved"
@@ -6268,6 +6791,7 @@ export const Constants = {
         "full_day",
         "overnight",
         "multi_night",
+        "flat",
       ],
       intake_status_enum: [
         "pending_review",
@@ -6320,3 +6844,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.98.2 (currently installed v2.90.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

@@ -32,7 +32,11 @@ export type QboTokenResponse = {
 
 export type QboResult<T> =
   | { ok: true; status: number; data: T }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; code?: string };
+
+// Intuit error codes the integration handles specifically. Numeric
+// strings; we keep them as strings since Intuit returns them that way.
+export const QBO_ERROR_DUPLICATE_NAME = "6240";
 
 function basicAuth(clientId: string, clientSecret: string): string {
   return "Basic " + btoa(`${clientId}:${clientSecret}`);
@@ -246,4 +250,845 @@ export function generateOAuthState(): string {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+// =============================================================================
+// 6.2: Sync helpers used by the customer and item sync edge functions.
+// =============================================================================
+
+export type QboTokenContext = {
+  accessToken: string;
+  realmId: string;
+  environment: QboEnvironment;
+};
+
+/**
+ * Resolve a usable access token for the org, refreshing through Intuit
+ * if the stored access token is at or near expiry. Persists the new
+ * tokens via update_quickbooks_tokens before returning.
+ *
+ * Returns null if the org has no live QBO connection.
+ */
+export async function getTokenContext(args: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any; // SupabaseClient typed loosely so this file has no SDK dep
+  orgId: string;
+  clientId: string;
+  clientSecret: string;
+  refreshLeewaySeconds?: number;
+}): Promise<QboTokenContext | null> {
+  const { data, error } = await args.admin.rpc("get_quickbooks_tokens", {
+    _org_id: args.orgId,
+  });
+  if (error) {
+    console.error("get_quickbooks_tokens failed:", error);
+    return null;
+  }
+  if (!Array.isArray(data) || data.length === 0) return null;
+  const row = data[0] as {
+    access_token: string;
+    refresh_token: string;
+    realm_id: string;
+    environment: string;
+    access_token_expires_at: string | null;
+  };
+
+  const leeway = (args.refreshLeewaySeconds ?? 120) * 1000;
+  const expiresAt = row.access_token_expires_at
+    ? new Date(row.access_token_expires_at).getTime()
+    : 0;
+  const env = row.environment as QboEnvironment;
+
+  if (Date.now() < expiresAt - leeway) {
+    return {
+      accessToken: row.access_token,
+      realmId: row.realm_id,
+      environment: env,
+    };
+  }
+
+  const refreshed = await refreshAccessToken({
+    clientId: args.clientId,
+    clientSecret: args.clientSecret,
+    refreshToken: row.refresh_token,
+  });
+  if (!refreshed.ok) {
+    await args.admin
+      .from("quickbooks_accounts")
+      .update({
+        status: "restricted",
+        last_verification_error: refreshed.error,
+      })
+      .eq("organization_id", args.orgId);
+    return null;
+  }
+  const newExpiresAt = new Date(
+    Date.now() + refreshed.data.expires_in * 1000,
+  ).toISOString();
+  await args.admin.rpc("update_quickbooks_tokens", {
+    _org_id: args.orgId,
+    _access_token: refreshed.data.access_token,
+    _refresh_token: refreshed.data.refresh_token,
+    _access_expires_at: newExpiresAt,
+  });
+  return {
+    accessToken: refreshed.data.access_token,
+    realmId: row.realm_id,
+    environment: env,
+  };
+}
+
+/**
+ * Generic authenticated request to a QBO data API endpoint. Returns
+ * a structured QboResult so callers can branch on ok without
+ * try/catching network errors.
+ */
+export async function qboRequest<T = unknown>(args: {
+  ctx: QboTokenContext;
+  method: "GET" | "POST";
+  path: string; // e.g. "/v3/company/<realmId>/customer?minorversion=70"
+  body?: unknown;
+}): Promise<QboResult<T>> {
+  const url = `${dataBase(args.ctx.environment)}${args.path}`;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${args.ctx.accessToken}`,
+    Accept: "application/json",
+  };
+  if (args.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: args.method,
+      headers,
+      body: args.body !== undefined ? JSON.stringify(args.body) : undefined,
+    });
+  } catch (err) {
+    return { ok: false, status: 0, error: (err as Error).message };
+  }
+  const text = await res.text();
+  let parsed: any = null;
+  if (text) {
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = { Fault: { Error: [{ Message: text }] } };
+    }
+  }
+  if (!res.ok) {
+    const fault = parsed?.Fault?.Error?.[0];
+    const message =
+      fault?.Message ??
+      fault?.Detail ??
+      parsed?.Fault?.type ??
+      `QBO returned ${res.status}`;
+    const code = fault?.code != null ? String(fault.code) : undefined;
+    return { ok: false, status: res.status, error: String(message), code };
+  }
+  return { ok: true, status: res.status, data: parsed as T };
+}
+
+// ----- Customer ----------------------------------------------------------
+
+export type QboCustomerInput = {
+  DisplayName: string;
+  GivenName?: string;
+  FamilyName?: string;
+  PrimaryEmailAddr?: { Address: string };
+  PrimaryPhone?: { FreeFormNumber: string };
+  BillAddr?: {
+    Line1?: string;
+    City?: string;
+    CountrySubDivisionCode?: string;
+    PostalCode?: string;
+    Country?: string;
+  };
+  Notes?: string;
+};
+
+export type QboCustomer = QboCustomerInput & {
+  Id: string;
+  SyncToken: string;
+  Active?: boolean;
+};
+
+export function createCustomer(ctx: QboTokenContext, input: QboCustomerInput) {
+  return qboRequest<{ Customer: QboCustomer }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/customer?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updateCustomer(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: QboCustomerInput,
+) {
+  // Intuit expects a sparse update with explicit "sparse: true" plus
+  // Id and SyncToken. Without sparse, omitting a field deletes it.
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ Customer: QboCustomer }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/customer?minorversion=70`,
+    body,
+  });
+}
+
+// ----- Item -------------------------------------------------------------
+
+export type QboItemType = "Service" | "NonInventory" | "Inventory";
+
+export type QboItemInput = {
+  Name: string;
+  Type: QboItemType;
+  IncomeAccountRef: { value: string; name?: string };
+  Description?: string;
+  UnitPrice?: number; // QBO accepts decimal; cents-to-dollars conversion is the caller's job
+  Active?: boolean;
+};
+
+export type QboItem = QboItemInput & {
+  Id: string;
+  SyncToken: string;
+};
+
+export function createItem(ctx: QboTokenContext, input: QboItemInput) {
+  return qboRequest<{ Item: QboItem }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/item?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updateItem(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: Partial<QboItemInput>,
+) {
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ Item: QboItem }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/item?minorversion=70`,
+    body,
+  });
+}
+
+// ----- Account (read-only for picking IncomeAccountRef on items) --------
+
+export type QboAccount = {
+  Id: string;
+  Name: string;
+  AccountType: string; // "Income", "Expense", "Bank", etc.
+  AccountSubType?: string;
+  Active: boolean;
+};
+
+// ----- Invoice ----------------------------------------------------------
+
+export type QboInvoiceLine =
+  | {
+      // Line that references a QBO Item (mapped from a Snout service).
+      // Amount is the line total in major-unit currency.
+      DetailType: "SalesItemLineDetail";
+      Amount: number;
+      Description?: string;
+      SalesItemLineDetail: {
+        ItemRef: { value: string; name?: string };
+        Qty?: number;
+        UnitPrice?: number;
+        TaxCodeRef?: { value: string };
+      };
+    }
+  | {
+      // Description-only line: used for surcharges, discounts, tips,
+      // and any other Snout invoice_lines that don't have a matching
+      // Snout service to map to a QBO Item. QBO accepts these without
+      // requiring an item ref. Negative Amount is allowed for
+      // discounts.
+      DetailType: "DescriptionOnly";
+      Amount?: number;
+      Description: string;
+    };
+
+export type QboInvoiceInput = {
+  CustomerRef: { value: string; name?: string };
+  Line: QboInvoiceLine[];
+  DocNumber?: string;
+  TxnDate?: string; // YYYY-MM-DD
+  DueDate?: string;
+  PrivateNote?: string;
+  CurrencyRef?: { value: "CAD" | "USD" };
+  // Tax handling: TaxExcluded means lines are pre-tax and we set the
+  // total tax explicitly via TxnTaxDetail. NotApplicable disables QBO's
+  // automated sales tax entirely (used when the company file hasn't
+  // configured AST).
+  GlobalTaxCalculation?: "TaxExcluded" | "TaxInclusive" | "NotApplicable";
+  TxnTaxDetail?: {
+    TotalTax?: number;
+    TxnTaxCodeRef?: { value: string };
+  };
+};
+
+export type QboInvoice = QboInvoiceInput & {
+  Id: string;
+  SyncToken: string;
+  TotalAmt?: number;
+};
+
+export function createInvoice(ctx: QboTokenContext, input: QboInvoiceInput) {
+  return qboRequest<{ Invoice: QboInvoice }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/invoice?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updateInvoice(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: QboInvoiceInput,
+) {
+  // Invoice updates with sparse=true preserve fields we don't include.
+  // We send the full Line[] every time because Intuit replaces lines
+  // wholesale on update (sparse semantics don't apply at the line level).
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ Invoice: QboInvoice }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/invoice?minorversion=70`,
+    body,
+  });
+}
+
+/**
+ * Find an Invoice by DocNumber. Used for duplicate-adoption when we
+ * detect a prior sync wrote an invoice with the same number. Less
+ * common than the customer/item duplicate case; included for
+ * symmetry and future-proofing.
+ */
+export async function findInvoiceByDocNumber(
+  ctx: QboTokenContext,
+  docNumber: string,
+): Promise<QboResult<QboInvoice | null>> {
+  const escaped = docNumber.replace(/'/g, "''");
+  const query = `select Id, SyncToken, DocNumber from Invoice where DocNumber = '${escaped}' MAXRESULTS 1`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Invoice?: QboInvoice[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Invoice?.[0] ?? null };
+}
+
+// ----- Payment ----------------------------------------------------------
+
+export type QboPaymentLine = {
+  // Each line links the payment to one or more invoices. For Snout
+  // we always have a 1:1 invoice<->payment relationship.
+  Amount: number;
+  LinkedTxn: Array<{
+    TxnId: string; // QBO Invoice Id
+    TxnType: "Invoice";
+  }>;
+};
+
+export type QboPaymentInput = {
+  CustomerRef: { value: string; name?: string };
+  TotalAmt: number; // major units
+  Line?: QboPaymentLine[];
+  TxnDate?: string; // YYYY-MM-DD
+  PrivateNote?: string;
+  PaymentRefNum?: string; // e.g. Stripe payment_intent id, Helcim transaction id
+  CurrencyRef?: { value: "CAD" | "USD" };
+  // Where the money lands. Required when QBO has multiple bank /
+  // undeposited-funds accounts; we auto-pick on first sync.
+  DepositToAccountRef?: { value: string; name?: string };
+};
+
+export type QboPayment = QboPaymentInput & {
+  Id: string;
+  SyncToken: string;
+};
+
+export function createPayment(ctx: QboTokenContext, input: QboPaymentInput) {
+  return qboRequest<{ Payment: QboPayment }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/payment?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updatePayment(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: QboPaymentInput,
+) {
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ Payment: QboPayment }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/payment?minorversion=70`,
+    body,
+  });
+}
+
+/**
+ * Find a Payment by PaymentRefNum (the processor's transaction id).
+ * Used for adopt-on-duplicate when the operator has previously
+ * imported payments by hand. Less common than customer/item dups but
+ * the path costs nothing to provide.
+ */
+export async function findPaymentByRefNum(
+  ctx: QboTokenContext,
+  refNum: string,
+): Promise<QboResult<QboPayment | null>> {
+  const escaped = refNum.replace(/'/g, "''");
+  const query = `select Id, SyncToken, PaymentRefNum from Payment where PaymentRefNum = '${escaped}' MAXRESULTS 1`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Payment?: QboPayment[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Payment?.[0] ?? null };
+}
+
+/**
+ * List candidate deposit accounts. Preference order, in callers:
+ *   1. Other Current Asset > Undeposited Funds (the "holding" account
+ *      QBO uses by default for payments before deposit)
+ *   2. Any active Bank account
+ *
+ * QBO requires DepositToAccountRef when the company has more than
+ * one viable account; we pick once and persist on
+ * quickbooks_accounts.default_deposit_account_id.
+ */
+export async function listDepositAccounts(ctx: QboTokenContext): Promise<QboResult<QboAccount[]>> {
+  const query = `select Id, Name, AccountType, AccountSubType, Active from Account where (AccountType = 'Bank' or AccountSubType = 'UndepositedFunds') and Active = true MAXRESULTS 100`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Account ?? [] };
+}
+
+// ----- Lookup-by-name (for duplicate adoption) -------------------------
+
+/**
+ * Find a Customer in QBO by exact DisplayName. Used when CREATE fails
+ * with code 6240 (Duplicate Name Exists Error) so the worker can
+ * adopt the existing QBO record into a Snout mapping rather than
+ * permanently failing the sync.
+ */
+export async function findCustomerByDisplayName(
+  ctx: QboTokenContext,
+  displayName: string,
+): Promise<QboResult<QboCustomer | null>> {
+  // QBO's query language uses single-quoted string literals; double
+  // any embedded apostrophes to escape. The query is run against the
+  // company file, so it scans active and inactive customers alike.
+  const escaped = displayName.replace(/'/g, "''");
+  const query = `select Id, SyncToken, DisplayName, GivenName, FamilyName from Customer where DisplayName = '${escaped}' MAXRESULTS 1`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Customer?: QboCustomer[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Customer?.[0] ?? null };
+}
+
+/** Find an Item by exact Name. Same purpose as findCustomerByDisplayName. */
+export async function findItemByName(
+  ctx: QboTokenContext,
+  name: string,
+): Promise<QboResult<QboItem | null>> {
+  const escaped = name.replace(/'/g, "''");
+  const query = `select Id, SyncToken, Name from Item where Name = '${escaped}' MAXRESULTS 1`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Item?: QboItem[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Item?.[0] ?? null };
+}
+
+export async function listIncomeAccounts(ctx: QboTokenContext): Promise<QboResult<QboAccount[]>> {
+  const query = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Income' and Active = true MAXRESULTS 100`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.Account ?? [] };
+}
+
+// ----- TaxCode + TaxRate (6.4.5a) --------------------------------------
+//
+// QBO's tax model:
+//   - TaxRate is the atomic rate (e.g. "GST 5%", "QST 9.975%"). Each
+//     belongs to one tax agency.
+//   - TaxCode is what gets attached to invoice lines. A TaxCode points
+//     at one or more TaxRates via SalesTaxRateList / PurchaseTaxRateList.
+//     Combined codes (e.g. "GST/QST") reference multiple rates so a
+//     single per-line TaxCodeRef computes the full multi-tax total.
+//
+// We import both, then derive Snout's per-org cache from the join.
+
+export type QboTaxRate = {
+  Id: string;
+  Name: string;
+  Description?: string;
+  Active?: boolean;
+  RateValue: number; // Percentage as a decimal: 5 = 5%, 9.975 = 9.975%
+  AgencyRef?: { value: string; name?: string };
+  TaxReturnLineRef?: { value: string; name?: string };
+  EffectiveTaxRate?: Array<{
+    RateValue: number;
+    EffectiveDate: string;
+    EndDate?: string;
+  }>;
+};
+
+export type QboTaxCode = {
+  Id: string;
+  Name: string;
+  Description?: string;
+  Active?: boolean;
+  Taxable?: boolean;
+  TaxGroup?: boolean;
+  // Each list entry is a TaxRateDetail wrapping a TaxRateRef.
+  SalesTaxRateList?: {
+    TaxRateDetail?: Array<{
+      TaxRateRef: { value: string; name?: string };
+      TaxTypeApplicable?: string; // "TaxOnAmount" | "TaxOnTaxOnAmount" | etc.
+      TaxOrder?: number;
+    }>;
+  };
+  PurchaseTaxRateList?: {
+    TaxRateDetail?: Array<{
+      TaxRateRef: { value: string; name?: string };
+      TaxTypeApplicable?: string;
+      TaxOrder?: number;
+    }>;
+  };
+};
+
+/**
+ * List every TaxRate visible to the connected QBO realm. We pull both
+ * active and inactive (so existing invoices that reference an
+ * inactivated rate can still resolve) but mark inactive ones in our
+ * cache so the service-attribution UI can hide them.
+ */
+export async function listTaxRates(ctx: QboTokenContext): Promise<QboResult<QboTaxRate[]>> {
+  const query = `select * from TaxRate MAXRESULTS 1000`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { TaxRate?: QboTaxRate[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.TaxRate ?? [] };
+}
+
+/**
+ * List every TaxCode visible to the connected QBO realm. Same active
+ * inclusion logic as listTaxRates above.
+ */
+export async function listTaxCodes(ctx: QboTokenContext): Promise<QboResult<QboTaxCode[]>> {
+  const query = `select * from TaxCode MAXRESULTS 1000`;
+  const path = `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(query)}&minorversion=70`;
+  const res = await qboRequest<{ QueryResponse: { TaxCode?: QboTaxCode[] } }>({
+    ctx,
+    method: "GET",
+    path,
+  });
+  if (!res.ok) return res;
+  return { ok: true, status: res.status, data: res.data?.QueryResponse?.TaxCode ?? [] };
+}
+
+// =============================================================================
+// 6.2.2: per-entity sync helpers used by both the manual batch sync edge
+// functions and the auto-sync worker. Centralizes the
+// create-vs-update-vs-skip decision, payload-hash check, mapping write, and
+// QBO call so adding a new sync type (invoices in 6.3, payments in 6.4) is
+// a matter of writing the input mapper and reusing this same control flow.
+// =============================================================================
+
+export type EntitySyncOutcome =
+  | { ok: true; state: "created" | "updated" | "unchanged"; qboId: string }
+  | { ok: false; error: string };
+
+/**
+ * Sync one Snout entity to QuickBooks. Idempotent: looks up the
+ * existing mapping, computes a hash of the new payload, and decides
+ * to create / update / skip based on what changed. Writes the mapping
+ * row regardless of outcome so the Failed Syncs panel surfaces failures.
+ */
+export async function syncOneEntity<T extends { Id: string; SyncToken: string }>(args: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any;
+  orgId: string;
+  snoutTable: string;
+  snoutId: string;
+  qboEntityType: string;
+  payload: unknown;
+  create: () => Promise<QboResult<{ [key: string]: T } | T>>;
+  update: (current: { Id: string; SyncToken: string }) => Promise<QboResult<{ [key: string]: T } | T>>;
+  extractIdSyncToken: (data: { [key: string]: T } | T) => { id: string; syncToken: string };
+  // Optional: when CREATE fails with QBO_ERROR_DUPLICATE_NAME (6240),
+  // call this to find the existing QBO entity by name. If it returns
+  // a row, we adopt it (record the mapping, then UPDATE with our
+  // payload so QBO ends up with Snout's authoritative data). Returns
+  // null when no such entity exists, in which case the original
+  // duplicate-name failure is reported to the caller.
+  lookupExistingByName?: () => Promise<QboResult<{ Id: string; SyncToken: string } | null>>;
+}): Promise<EntitySyncOutcome> {
+  const hash = await payloadHash(args.payload);
+
+  const { data: existingRows } = await args.admin
+    .from("quickbooks_entity_mappings")
+    .select("id, qbo_id, sync_token, payload_hash, sync_state")
+    .eq("organization_id", args.orgId)
+    .eq("snout_table", args.snoutTable)
+    .eq("snout_id", args.snoutId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const existing = existingRows as
+    | {
+        id: string;
+        qbo_id: string;
+        sync_token: string | null;
+        payload_hash: string | null;
+        sync_state: string;
+      }
+    | null;
+
+  if (existing && existing.sync_state === "synced" && existing.payload_hash === hash) {
+    return { ok: true, state: "unchanged", qboId: existing.qbo_id };
+  }
+
+  if (existing && existing.qbo_id && existing.sync_token) {
+    const result = await args.update({ Id: existing.qbo_id, SyncToken: existing.sync_token });
+    if (!result.ok) {
+      await args.admin
+        .from("quickbooks_entity_mappings")
+        .update({ sync_state: "failed", last_error: result.error })
+        .eq("id", existing.id);
+      return { ok: false, error: result.error };
+    }
+    const idTok = args.extractIdSyncToken(result.data);
+    await args.admin
+      .from("quickbooks_entity_mappings")
+      .update({
+        sync_token: idTok.syncToken,
+        payload_hash: hash,
+        sync_state: "synced",
+        last_error: null,
+        last_synced_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+    return { ok: true, state: "updated", qboId: idTok.id };
+  }
+
+  let result = await args.create();
+
+  // Lookup-and-adopt: if QBO rejects the create as a duplicate name
+  // and the caller provided a lookup function, find the existing QBO
+  // entity by name, mark our mapping with that QBO id+SyncToken, and
+  // proceed to UPDATE with our payload. End state: Snout's data is
+  // authoritative on the existing QBO record.
+  if (!result.ok && result.code === QBO_ERROR_DUPLICATE_NAME && args.lookupExistingByName) {
+    const found = await args.lookupExistingByName();
+    if (found.ok && found.data) {
+      // Conflict guard: another Snout entity might already own this
+      // QBO id (two Snout entities with the same DisplayName both
+      // resolve to the same QBO customer). Adopting blindly would
+      // either silently fail on the partial unique index or, worse,
+      // overwrite the existing mapping. Detect and fail with a clear
+      // operator-facing message instead.
+      const { data: conflict } = await args.admin
+        .from("quickbooks_entity_mappings")
+        .select("id, snout_id")
+        .eq("organization_id", args.orgId)
+        .eq("qbo_entity_type", args.qboEntityType)
+        .eq("qbo_id", found.data.Id)
+        .is("deleted_at", null)
+        .neq("snout_id", args.snoutId)
+        .maybeSingle();
+
+      if (conflict) {
+        const conflictError = `Conflict: another Snout ${args.snoutTable} record (id=${conflict.snout_id}) is already linked to QBO ${args.qboEntityType} ${found.data.Id}. Rename or merge one of the Snout records before retrying.`;
+        if (existing) {
+          const { error: updErr } = await args.admin
+            .from("quickbooks_entity_mappings")
+            .update({ sync_state: "failed", last_error: conflictError, payload_hash: hash })
+            .eq("id", existing.id);
+          if (updErr) console.error("conflict-update mapping failed:", updErr);
+        } else {
+          const { error: insErr } = await args.admin.from("quickbooks_entity_mappings").insert({
+            organization_id: args.orgId,
+            snout_table: args.snoutTable,
+            snout_id: args.snoutId,
+            qbo_entity_type: args.qboEntityType,
+            qbo_id: "",
+            payload_hash: hash,
+            sync_state: "failed",
+            last_error: conflictError,
+          });
+          if (insErr) console.error("conflict-insert mapping failed:", insErr);
+        }
+        return { ok: false, error: conflictError };
+      }
+
+      const updateResult = await args.update({
+        Id: found.data.Id,
+        SyncToken: found.data.SyncToken,
+      });
+      if (updateResult.ok) {
+        const idTok = args.extractIdSyncToken(updateResult.data);
+        if (existing) {
+          const { error: mapErr } = await args.admin
+            .from("quickbooks_entity_mappings")
+            .update({
+              qbo_id: idTok.id,
+              sync_token: idTok.syncToken,
+              payload_hash: hash,
+              sync_state: "synced",
+              last_error: null,
+              last_synced_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id);
+          if (mapErr) {
+            console.error("adopt-update mapping failed:", mapErr);
+            return { ok: false, error: `Mapping update failed: ${mapErr.message}` };
+          }
+        } else {
+          const { error: mapErr } = await args.admin.from("quickbooks_entity_mappings").insert({
+            organization_id: args.orgId,
+            snout_table: args.snoutTable,
+            snout_id: args.snoutId,
+            qbo_entity_type: args.qboEntityType,
+            qbo_id: idTok.id,
+            sync_token: idTok.syncToken,
+            payload_hash: hash,
+            sync_state: "synced",
+            last_synced_at: new Date().toISOString(),
+          });
+          if (mapErr) {
+            console.error("adopt-insert mapping failed:", mapErr);
+            return { ok: false, error: `Mapping insert failed: ${mapErr.message}` };
+          }
+        }
+        return { ok: true, state: "updated", qboId: idTok.id };
+      }
+      // Update after lookup also failed; fall through to record the
+      // most recent error (the update's, which is more actionable
+      // than the original duplicate-name).
+      result = updateResult;
+    }
+  }
+
+  if (!result.ok) {
+    if (existing) {
+      await args.admin
+        .from("quickbooks_entity_mappings")
+        .update({ sync_state: "failed", last_error: result.error, payload_hash: hash })
+        .eq("id", existing.id);
+    } else {
+      await args.admin.from("quickbooks_entity_mappings").insert({
+        organization_id: args.orgId,
+        snout_table: args.snoutTable,
+        snout_id: args.snoutId,
+        qbo_entity_type: args.qboEntityType,
+        qbo_id: "",
+        payload_hash: hash,
+        sync_state: "failed",
+        last_error: result.error,
+      });
+    }
+    return { ok: false, error: result.error };
+  }
+  const idTok = args.extractIdSyncToken(result.data);
+  if (existing) {
+    const { error: mapErr } = await args.admin
+      .from("quickbooks_entity_mappings")
+      .update({
+        qbo_id: idTok.id,
+        sync_token: idTok.syncToken,
+        payload_hash: hash,
+        sync_state: "synced",
+        last_error: null,
+        last_synced_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+    if (mapErr) {
+      console.error("create-update mapping failed:", mapErr);
+      return { ok: false, error: `Mapping update failed: ${mapErr.message}` };
+    }
+  } else {
+    const { error: mapErr } = await args.admin.from("quickbooks_entity_mappings").insert({
+      organization_id: args.orgId,
+      snout_table: args.snoutTable,
+      snout_id: args.snoutId,
+      qbo_entity_type: args.qboEntityType,
+      qbo_id: idTok.id,
+      sync_token: idTok.syncToken,
+      payload_hash: hash,
+      sync_state: "synced",
+      last_synced_at: new Date().toISOString(),
+    });
+    if (mapErr) {
+      console.error("create-insert mapping failed:", mapErr);
+      return { ok: false, error: `Mapping insert failed: ${mapErr.message}` };
+    }
+  }
+  return { ok: true, state: "created", qboId: idTok.id };
+}
+
+// ----- Hashing ----------------------------------------------------------
+
+/**
+ * Stable hash of a payload object so we can skip re-pushing entities
+ * whose Snout-side data has not changed since the last successful
+ * sync. Order-insensitive at the top level via sorted-key serialization.
+ */
+export async function payloadHash(payload: unknown): Promise<string> {
+  const canonical = canonicalize(payload);
+  const buf = new TextEncoder().encode(canonical);
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  const bytes = new Uint8Array(digest);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function canonicalize(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalize).join(",")}]`;
+  }
+  const keys = Object.keys(value as Record<string, unknown>).sort();
+  return `{${keys
+    .map((k) => `${JSON.stringify(k)}:${canonicalize((value as Record<string, unknown>)[k])}`)
+    .join(",")}}`;
 }
