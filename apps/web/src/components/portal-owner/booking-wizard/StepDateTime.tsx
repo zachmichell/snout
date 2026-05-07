@@ -1,10 +1,14 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCentsShort } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import {
   combineDateTime,
   diffNights,
@@ -385,36 +389,22 @@ export default function StepDateTime({
             </p>
           )}
 
-          {/* When a specific groomer is picked, show only the dates
-              their groomer_availability table actually has windows
-              for. Otherwise fall back to a free-form date input. */}
+          {/* When a specific groomer is picked, show a month calendar
+              with non-available days disabled. Otherwise fall back to
+              a free-form date input. The calendar UX makes it obvious
+              which days the groomer is open vs not, and lets the
+              customer skim weeks rather than scroll a long dropdown. */}
           {isGrooming && state.groomerId && groomerAvailableDates.length > 0 ? (
-            <Field label={`Date (${dayOfWeek})`}>
-              <Select
+            <Field label="Date">
+              <GroomerDatePicker
                 value={dt.date}
-                onValueChange={(v) => update({ date: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an available date" />
-                </SelectTrigger>
-                <SelectContent>
-                  {groomerAvailableDates.map((d) => {
-                    const dayName = new Date(d + "T00:00:00").toLocaleDateString(
-                      undefined,
-                      { weekday: "short", month: "short", day: "numeric" },
-                    );
-                    return (
-                      <SelectItem key={d} value={d}>
-                        {dayName}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+                onChange={(v) => update({ date: v })}
+                availableDates={groomerAvailableDates}
+              />
               <p className="mt-1 text-xs text-muted-foreground">
-                Showing the next {groomerAvailableDates.length} day
-                {groomerAvailableDates.length === 1 ? "" : "s"} this groomer
-                has availability.
+                {groomerAvailableDates.length} day
+                {groomerAvailableDates.length === 1 ? "" : "s"} available in
+                the next 60 days. Greyed-out days are blocked off.
               </p>
             </Field>
           ) : isGrooming && state.groomerId && groomerAvailableDates.length === 0 ? (
@@ -537,5 +527,79 @@ function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) 
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+// Month calendar picker. Disables every day NOT in availableDates so
+// the customer can only land on a day the groomer is open. Renders
+// inside a Popover so it stays compact in the wizard.
+function GroomerDatePicker({
+  value,
+  onChange,
+  availableDates,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  availableDates: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const availableSet = useMemo(() => new Set(availableDates), [availableDates]);
+
+  // The first available date is a useful default and the lower bound
+  // for the calendar's view. Without it the calendar opens on today
+  // and the user has to scan ahead to find the first open day.
+  const firstAvailable = availableDates[0];
+  const lastAvailable = availableDates[availableDates.length - 1];
+
+  const selected = value ? new Date(value + "T00:00:00") : undefined;
+  const buttonLabel = selected
+    ? selected.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "Pick a date";
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-normal",
+            !selected && "text-muted-foreground",
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {buttonLabel}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selected}
+          defaultMonth={selected ?? (firstAvailable ? new Date(firstAvailable + "T00:00:00") : undefined)}
+          fromDate={firstAvailable ? new Date(firstAvailable + "T00:00:00") : undefined}
+          toDate={lastAvailable ? new Date(lastAvailable + "T00:00:00") : undefined}
+          // Disable any day not in the available set so the customer
+          // can't pick a closed day. react-day-picker calls this for
+          // each rendered cell.
+          disabled={(date) => {
+            const ymd = date.toISOString().slice(0, 10);
+            return !availableSet.has(ymd);
+          }}
+          onSelect={(d) => {
+            if (!d) return;
+            // Normalize to local yyyy-mm-dd to match the rest of the
+            // wizard's string-based date plumbing.
+            const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            onChange(ymd);
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
