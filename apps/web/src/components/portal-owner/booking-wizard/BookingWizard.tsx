@@ -11,11 +11,15 @@ export type WizardService = {
   id: string;
   name: string;
   description: string | null;
-  duration_type: "hourly" | "half_day" | "full_day" | "overnight" | "multi_night";
+  duration_type: "hourly" | "half_day" | "full_day" | "overnight" | "multi_night" | "flat";
   base_price_cents: number;
   max_pets_per_booking: number | null;
   location_id: string | null;
   module: string;
+  // 7.2: estimated duration in minutes. Required for flat services
+  // (the wizard uses it to compute end_at on submission). Optional
+  // metadata for time-window services.
+  estimated_minutes: number | null;
 };
 
 export type WizardPet = {

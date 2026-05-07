@@ -43,10 +43,19 @@ export default function StepReview({
       end.setHours(end.getHours() + hours);
       return { startISO: start.toISOString(), endISO: end.toISOString() };
     }
+    if (svc.duration_type === "flat") {
+      // 7.1: end = start + service.estimated_minutes. Falls back to
+      // 60 minutes if the operator hasn't set a duration; the wizard's
+      // earlier validation prevents reaching this fallback in practice.
+      const start = combineDateTime(dt.date, dt.startTime);
+      const minutes = svc.estimated_minutes ?? 60;
+      const end = new Date(start.getTime() + minutes * 60_000);
+      return { startISO: start.toISOString(), endISO: end.toISOString() };
+    }
     const start = combineDateTime(dt.date, dt.startTime);
     const end = combineDateTime(dt.date, dt.endTime ?? dt.startTime);
     return { startISO: start.toISOString(), endISO: end.toISOString() };
-  }, [dt, svc.duration_type, hours]);
+  }, [dt, svc.duration_type, svc.estimated_minutes, hours]);
 
   const estimate = estimatePriceCents({
     basePriceCents: svc.base_price_cents,
@@ -66,6 +75,12 @@ export default function StepReview({
       });
     if (svc.duration_type === "overnight" || svc.duration_type === "multi_night") {
       return `${fmt(startISO)} → ${fmt(endISO)} (${nights} night${nights === 1 ? "" : "s"})`;
+    }
+    if (svc.duration_type === "flat") {
+      // 7.1: appointment-style line reads "May 8, 10:00 AM (90 min)"
+      // — no end time; the duration is the more useful detail.
+      const minutes = svc.estimated_minutes ?? 60;
+      return `${fmt(startISO)} (${minutes} min)`;
     }
     return `${fmt(startISO)} – ${new Date(endISO).toLocaleTimeString(undefined, {
       hour: "numeric",

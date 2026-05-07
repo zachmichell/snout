@@ -5130,6 +5130,7 @@ export type Database = {
           description: string | null
           duration_minutes: number | null
           duration_type: Database["public"]["Enums"]["duration_type_enum"]
+          estimated_minutes: number | null
           id: string
           is_addon: boolean
           location_id: string | null
@@ -5150,6 +5151,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number | null
           duration_type: Database["public"]["Enums"]["duration_type_enum"]
+          estimated_minutes?: number | null
           id?: string
           is_addon?: boolean
           location_id?: string | null
@@ -5170,6 +5172,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number | null
           duration_type?: Database["public"]["Enums"]["duration_type_enum"]
+          estimated_minutes?: number | null
           id?: string
           is_addon?: boolean
           location_id?: string | null

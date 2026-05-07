@@ -28,6 +28,7 @@ type FormState = {
   duration_type: DurationEnum | "";
   base_price_dollars: string;
   max_pets_per_booking: string;
+  estimated_minutes: string;
   active: boolean;
   location_id: string;
   qbo_tax_code_id: string | null;
@@ -40,6 +41,7 @@ const empty: FormState = {
   duration_type: "",
   base_price_dollars: "0.00",
   max_pets_per_booking: "",
+  estimated_minutes: "",
   active: true,
   location_id: "",
   qbo_tax_code_id: null,
@@ -126,6 +128,8 @@ export default function ServiceForm() {
         base_price_dollars: centsToDollarString(existing.base_price_cents),
         max_pets_per_booking:
           (existing as any).max_pets_per_booking != null ? String((existing as any).max_pets_per_booking) : "",
+        estimated_minutes:
+          (existing as any).estimated_minutes != null ? String((existing as any).estimated_minutes) : "",
         active: existing.active ?? true,
         location_id: existing.location_id ?? "",
         qbo_tax_code_id: (existing as any).qbo_tax_code_id ?? null,
@@ -154,6 +158,17 @@ export default function ServiceForm() {
       const n = Number(form.max_pets_per_booking);
       if (!Number.isInteger(n) || n < 1) e.max_pets_per_booking = "Must be a whole number ≥ 1";
     }
+    // 7.2: estimated_minutes is required for "flat" services so the
+    // booking wizard can compute a sensible end time. Optional for
+    // time-window services where the customer picks the window.
+    if (form.estimated_minutes) {
+      const n = Number(form.estimated_minutes);
+      if (!Number.isInteger(n) || n < 5 || n > 1440) {
+        e.estimated_minutes = "Must be between 5 and 1440 minutes";
+      }
+    } else if (form.duration_type === "flat") {
+      e.estimated_minutes = "Required for appointment-style services";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -170,6 +185,7 @@ export default function ServiceForm() {
       duration_type: form.duration_type,
       base_price_cents: parseDollarsToCents(form.base_price_dollars) ?? 0,
       max_pets_per_booking: form.max_pets_per_booking ? Number(form.max_pets_per_booking) : null,
+      estimated_minutes: form.estimated_minutes ? Number(form.estimated_minutes) : null,
       active: form.active,
       location_id: form.location_id || null,
       organization_id: membership.organization_id,
@@ -231,6 +247,7 @@ export default function ServiceForm() {
                     <SelectItem value="full_day">Full Day</SelectItem>
                     <SelectItem value="overnight">Overnight</SelectItem>
                     <SelectItem value="multi_night">Multi-Night</SelectItem>
+                    <SelectItem value="flat">Flat (single appointment)</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
@@ -277,6 +294,33 @@ export default function ServiceForm() {
                   value={form.max_pets_per_booking}
                   onChange={(e) => update("max_pets_per_booking", e.target.value)}
                   placeholder="—"
+                />
+              </Field>
+              <Field
+                label={
+                  <span className="inline-flex items-center gap-1">
+                    Estimated Duration (minutes)
+                    {form.duration_type === "flat" && <span className="text-destructive">*</span>}
+                    <Tooltip>
+                      <TooltipTrigger type="button" asChild>
+                        <Info className="h-3.5 w-3.5 text-text-tertiary" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Required for flat (appointment-style) services so the booking
+                        wizard can compute the calendar slot. Optional for hourly,
+                        half-day, full-day, overnight services.
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                }
+                error={errors.estimated_minutes}
+                hint={form.duration_type !== "flat" ? "Optional. Used by reports and capacity planning." : undefined}
+              >
+                <Input
+                  inputMode="numeric"
+                  value={form.estimated_minutes}
+                  onChange={(e) => update("estimated_minutes", e.target.value)}
+                  placeholder={form.duration_type === "flat" ? "e.g. 60" : "—"}
                 />
               </Field>
               <Field

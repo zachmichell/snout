@@ -85,8 +85,9 @@ export default function StepDateTime({
     if (dur === "overnight" || dur === "multi_night") {
       startDateObj.setDate(startDateObj.getDate() + 1);
     } else {
-      // For hourly and full-day, default date is "tomorrow" via minDate; align
-      // startDateObj to it so day-of-week lookups match the input value.
+      // For hourly, full-day, and flat the default date is "tomorrow"
+      // via minDate; align startDateObj to it so day-of-week lookups
+      // match the input value.
       const [y, m, d] = minDate.split("-").map(Number);
       startDateObj.setFullYear(y, m - 1, d);
     }
@@ -117,6 +118,17 @@ export default function StepDateTime({
           date: minDate,
           startTime: facilityOpen ?? FALLBACK_START_HOURLY,
           hours: 1,
+        },
+      }));
+    } else if (dur === "flat") {
+      // 7.1: Appointment services pick a single start time. The end
+      // time is derived from service.estimated_minutes at submission.
+      // No endTime / hours field shown to the customer.
+      setState((s) => ({
+        ...s,
+        datetime: {
+          date: minDate,
+          startTime: facilityOpen ?? FALLBACK_START_DAY,
         },
       }));
     } else {
@@ -157,8 +169,15 @@ export default function StepDateTime({
     if (dur === "overnight" || dur === "multi_night") {
       if (!dt.endDate) return false;
       if (nights < 1) return false;
-    } else if (dur === "hourly") {
+    } else if (dur === "hourly" || dur === "flat") {
+      // Flat services need only a start time. End is computed at
+      // submission from service.estimated_minutes.
       if (!dt.startTime) return false;
+      if (dur === "flat" && !state.service?.estimated_minutes) {
+        // A flat service without a configured duration can't be booked.
+        // Surface this clearly rather than silently failing.
+        return false;
+      }
     } else {
       if (!dt.startTime || !dt.endTime) return false;
       const start = combineDateTime(dt.date, dt.startTime);
@@ -243,6 +262,28 @@ export default function StepDateTime({
               </Select>
             </Field>
           </div>
+        </>
+      )}
+
+      {dur === "flat" && (
+        <>
+          <Field label={`Date (${dayOfWeek})`}>
+            <Input type="date" min={minDate} value={dt.date} onChange={(e) => update({ date: e.target.value })} />
+          </Field>
+          <Field label="Appointment time">
+            <TimeSelect value={dt.startTime} onChange={(v) => update({ startTime: v })} />
+          </Field>
+          {state.service?.estimated_minutes ? (
+            <p className="text-xs text-muted-foreground">
+              Approximate duration: {state.service.estimated_minutes} minute
+              {state.service.estimated_minutes === 1 ? "" : "s"}
+            </p>
+          ) : (
+            <p className="text-xs text-destructive">
+              This service has no configured duration. Contact the facility to
+              set one before booking.
+            </p>
+          )}
         </>
       )}
 

@@ -2,7 +2,13 @@
  * Booking helpers: time slots, duration math, price estimates.
  */
 
-export type DurationType = "hourly" | "half_day" | "full_day" | "overnight" | "multi_night";
+export type DurationType =
+  | "hourly"
+  | "half_day"
+  | "full_day"
+  | "overnight"
+  | "multi_night"
+  | "flat";
 
 /** Generate 15-minute time options between two hours (inclusive of both). */
 export function generateTimeSlots(startHour = 6, endHour = 21): { value: string; label: string }[] {
@@ -64,6 +70,11 @@ export function estimatePriceCents(args: {
       return basePriceCents * pets;
     case "multi_night":
       return basePriceCents * Math.max(1, nights) * pets;
+    case "flat":
+      // 7.1: per-pet pricing for appointment-style services. A two-pet
+      // grooming visit gets billed twice the base price; the calendar
+      // slot is unaffected (still one appointment of estimated_minutes).
+      return basePriceCents * pets;
     default:
       return basePriceCents * pets;
   }
@@ -81,6 +92,8 @@ export function priceUnitLabel(durationType: DurationType): string {
       return "/night";
     case "multi_night":
       return "/night";
+    case "flat":
+      return "/visit";
     default:
       return "";
   }
