@@ -315,6 +315,11 @@ export default function StepDateTime({
                   ))}
                 </SelectContent>
               </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {groomers.length} groomer{groomers.length === 1 ? "" : "s"} on
+                staff. Pick one or leave on "Any available" and the facility
+                will assign someone when they confirm.
+              </p>
             </Field>
           )}
           {isGrooming && groomers.length === 0 && (
