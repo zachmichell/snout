@@ -160,7 +160,26 @@ export default function ServiceDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {reservations.map((r: any) => (
+                    {reservations.map((r: any) => {
+                      // Supabase PostgREST sometimes returns a singular
+                      // related record as an object instead of a 1-element
+                      // array depending on the relationship cardinality
+                      // it infers. Defensively coerce both shapes so the
+                      // renderer can't blow up on an unexpected type.
+                      const ownerObj = Array.isArray(r.owners) ? r.owners[0] : r.owners;
+                      const reservationPets = Array.isArray(r.reservation_pets)
+                        ? r.reservation_pets
+                        : r.reservation_pets
+                          ? [r.reservation_pets]
+                          : [];
+                      const petNames = reservationPets
+                        .map((rp: any) => {
+                          const pet = Array.isArray(rp?.pets) ? rp.pets[0] : rp?.pets;
+                          return pet?.name;
+                        })
+                        .filter(Boolean)
+                        .join(", ");
+                      return (
                       <tr key={r.id} className="border-t border-border-subtle hover:bg-background">
                         <td className="px-[18px] py-[12px]">
                           <Link to={`/reservations/${r.id}`} className="text-foreground hover:text-primary">
@@ -168,11 +187,10 @@ export default function ServiceDetail() {
                           </Link>
                         </td>
                         <td className="px-[18px] py-[12px] text-text-secondary">
-                          {r.owners ? `${r.owners.first_name} ${r.owners.last_name}` : "—"}
+                          {ownerObj ? `${ownerObj.first_name ?? ""} ${ownerObj.last_name ?? ""}`.trim() || "—" : "—"}
                         </td>
                         <td className="px-[18px] py-[12px] text-text-secondary">
-                          {(r.reservation_pets ?? []).map((rp: any) => rp.pets?.name).filter(Boolean).join(", ") ||
-                            "—"}
+                          {petNames || "—"}
                         </td>
                         <td className="px-[18px] py-[12px]">
                           <ReservationStatusBadge status={r.status} />
@@ -181,7 +199,8 @@ export default function ServiceDetail() {
                           {r.source === "owner_self_serve" ? "Owner" : "Staff"}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
