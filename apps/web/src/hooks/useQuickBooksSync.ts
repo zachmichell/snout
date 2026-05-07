@@ -565,7 +565,7 @@ export function useQuickBooksAccountSettings() {
       const { data, error } = await supabase
         .from("quickbooks_accounts")
         .select(
-          "default_fee_account_id, default_fee_account_name, default_deposit_account_id, default_deposit_account_name, default_income_account_id, default_income_account_name",
+          "default_fee_account_id, default_fee_account_name, default_deposit_account_id, default_deposit_account_name, default_income_account_id, default_income_account_name, default_tips_payable_account_id, default_tips_payable_account_name",
         )
         .eq("organization_id", membership.organization_id)
         .is("deleted_at", null)
@@ -578,6 +578,8 @@ export function useQuickBooksAccountSettings() {
         default_deposit_account_name: string | null;
         default_income_account_id: string | null;
         default_income_account_name: string | null;
+        default_tips_payable_account_id: string | null;
+        default_tips_payable_account_name: string | null;
       } | null;
     },
   });
@@ -609,6 +611,75 @@ export function useSyncQuickBooksPayouts() {
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke(
         "quickbooks-sync-payouts",
+        { body: {} },
+      );
+      if (error) throw error;
+      return {
+        processed: Number(data?.processed ?? 0),
+        succeeded: Number(data?.succeeded ?? 0),
+        failed: Number(data?.failed ?? 0),
+      };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-mapping-counts", membership?.organization_id],
+      });
+    },
+  });
+}
+
+// 6.6b: Tips. Liability account picker + sync button. Same shape as
+// the fee-account flow.
+
+export type QuickBooksLiabilityAccount = {
+  id: string;
+  name: string;
+  type: string;
+  subType: string | null;
+};
+
+export function useQuickBooksLiabilityAccounts() {
+  const { membership } = useAuth();
+  return useQuery<QuickBooksLiabilityAccount[]>({
+    queryKey: ["quickbooks-liability-accounts", membership?.organization_id],
+    enabled: !!membership?.organization_id,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke(
+        "quickbooks-list-liability-accounts",
+        { body: {} },
+      );
+      if (error) throw error;
+      return (data?.accounts ?? []) as QuickBooksLiabilityAccount[];
+    },
+  });
+}
+
+export function useSetQuickBooksTipsPayableAccount() {
+  const qc = useQueryClient();
+  const { membership } = useAuth();
+  return useMutation({
+    mutationFn: async (account: { id: string; name: string }) => {
+      const { error } = await supabase.rpc("qbo_set_tips_payable_account", {
+        _qbo_id: account.id,
+        _name: account.name,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ["quickbooks-account-settings", membership?.organization_id],
+      });
+    },
+  });
+}
+
+export function useSyncQuickBooksTips() {
+  const qc = useQueryClient();
+  const { membership } = useAuth();
+  return useMutation<{ processed: number; succeeded: number; failed: number }>({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke(
+        "quickbooks-sync-tips",
         { body: {} },
       );
       if (error) throw error;

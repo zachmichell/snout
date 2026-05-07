@@ -58,6 +58,9 @@ import {
   useSetQuickBooksFeeAccount,
   useSyncQuickBooksPayouts,
   useIngestStripePayouts,
+  useQuickBooksLiabilityAccounts,
+  useSetQuickBooksTipsPayableAccount,
+  useSyncQuickBooksTips,
   type SyncResult,
   type SyncCounts,
   type SyncAllProgress,
@@ -416,6 +419,119 @@ function SyncPanel() {
       <div className="mt-3">
         <PayoutsCard />
       </div>
+
+      <div className="mt-3">
+        <TipsCard />
+      </div>
+    </div>
+  );
+}
+
+// 6.6b: Tips. Liability account picker + on-demand sync. Iterates
+// Snout reservations + grooming_appointments with tip_cents > 0 and
+// posts a Journal Entry per record:
+//   Debit  Undeposited Funds  (tip)
+//   Credit Tips Payable       (tip)
+function TipsCard() {
+  const { data: settings } = useQuickBooksAccountSettings();
+  const { data: liabilityAccounts = [], isLoading: liabLoading } =
+    useQuickBooksLiabilityAccounts();
+  const setTips = useSetQuickBooksTipsPayableAccount();
+  const syncTips = useSyncQuickBooksTips();
+
+  const currentTipsId = settings?.default_tips_payable_account_id ?? "";
+  const currentTipsName = settings?.default_tips_payable_account_name ?? null;
+
+  return (
+    <div className="rounded-md border border-border bg-background p-4">
+      <div className="mb-3">
+        <div className="font-medium text-foreground">Tips</div>
+        <div className="mt-0.5 text-xs text-text-tertiary">
+          Tips your staff collected from customers (cash or via the Stripe
+          terminal) post to a QBO Liability account so the operator can
+          distribute them to staff later. One Journal Entry per tipped
+          record: debit Undeposited Funds, credit Tips Payable.
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-end">
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-text-secondary">
+            Tips Payable account
+          </label>
+          <Sel
+            value={currentTipsId || "__none__"}
+            onValueChange={(v) => {
+              if (v === "__none__") return;
+              const acct = liabilityAccounts.find((a) => a.id === v);
+              if (!acct) return;
+              setTips.mutate(
+                { id: acct.id, name: acct.name },
+                {
+                  onSuccess: () =>
+                    toast.success(`Tips Payable set to ${acct.name}`),
+                  onError: (e: any) => toast.error(e?.message ?? "Could not save"),
+                },
+              );
+            }}
+            disabled={liabLoading || liabilityAccounts.length === 0}
+          >
+            <SelTrigger>
+              <SelValue
+                placeholder={
+                  liabLoading
+                    ? "Loading…"
+                    : liabilityAccounts.length === 0
+                    ? "No liability accounts in QBO"
+                    : "Pick a liability account"
+                }
+              />
+            </SelTrigger>
+            <SelContent>
+              <SelItem value="__none__" disabled>
+                <span className="text-text-tertiary">Pick a liability account</span>
+              </SelItem>
+              {liabilityAccounts.map((a) => (
+                <SelItem key={a.id} value={a.id}>
+                  {a.name}{" "}
+                  <span className="text-text-tertiary">({a.type})</span>
+                </SelItem>
+              ))}
+            </SelContent>
+          </Sel>
+          {currentTipsName && (
+            <p className="mt-1 text-xs text-text-tertiary">
+              Currently routing tips to <strong>{currentTipsName}</strong>.
+            </p>
+          )}
+        </div>
+        <Button
+          onClick={async () => {
+            try {
+              const r = await syncTips.mutateAsync();
+              if (r.processed === 0) {
+                toast.success("No tips ready to sync");
+              } else {
+                toast.success(
+                  `Synced ${r.succeeded} of ${r.processed} tip${r.processed === 1 ? "" : "s"} to QBO`,
+                );
+              }
+            } catch (e: any) {
+              toast.error(e?.message ?? "Could not sync tips");
+            }
+          }}
+          disabled={syncTips.isPending || !currentTipsId}
+          size="sm"
+        >
+          {syncTips.isPending ? "Syncing…" : "Sync tips now"}
+        </Button>
+      </div>
+      {!currentTipsId && (
+        <p className="mt-3 text-xs text-text-tertiary">
+          Pick a Tips Payable account before syncing — Snout needs a
+          liability account to credit when tips post.
+        </p>
+      )}
     </div>
   );
 }

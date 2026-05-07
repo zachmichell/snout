@@ -4044,8 +4044,6 @@ export type Database = {
           fee_cents: number
           gross_cents: number
           id: string
-          last_request_body: Json | null
-          last_response_body: string | null
           net_cents: number
           organization_id: string
           payout_date: string
@@ -4061,8 +4059,6 @@ export type Database = {
           fee_cents: number
           gross_cents: number
           id?: string
-          last_request_body?: Json | null
-          last_response_body?: string | null
           net_cents: number
           organization_id: string
           payout_date: string
@@ -4078,8 +4074,6 @@ export type Database = {
           fee_cents?: number
           gross_cents?: number
           id?: string
-          last_request_body?: Json | null
-          last_response_body?: string | null
           net_cents?: number
           organization_id?: string
           payout_date?: string
@@ -4392,6 +4386,8 @@ export type Database = {
           default_fee_account_name: string | null
           default_income_account_id: string | null
           default_income_account_name: string | null
+          default_tips_payable_account_id: string | null
+          default_tips_payable_account_name: string | null
           deleted_at: string | null
           environment: string
           id: string
@@ -4416,6 +4412,8 @@ export type Database = {
           default_fee_account_name?: string | null
           default_income_account_id?: string | null
           default_income_account_name?: string | null
+          default_tips_payable_account_id?: string | null
+          default_tips_payable_account_name?: string | null
           deleted_at?: string | null
           environment?: string
           id?: string
@@ -4440,6 +4438,8 @@ export type Database = {
           default_fee_account_name?: string | null
           default_income_account_id?: string | null
           default_income_account_name?: string | null
+          default_tips_payable_account_id?: string | null
+          default_tips_payable_account_name?: string | null
           deleted_at?: string | null
           environment?: string
           id?: string
@@ -6608,6 +6608,10 @@ export type Database = {
         Returns: undefined
       }
       qbo_set_fee_account: {
+        Args: { _name: string; _qbo_id: string }
+        Returns: undefined
+      }
+      qbo_set_tips_payable_account: {
         Args: { _name: string; _qbo_id: string }
         Returns: undefined
       }
