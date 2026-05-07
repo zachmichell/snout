@@ -440,8 +440,9 @@ function PayoutsCard() {
         <div className="mt-0.5 text-xs text-text-tertiary">
           Stripe and Helcim batch your charges into daily/weekly payouts and
           deduct fees before depositing the net to your bank. Snout posts
-          one QBO Bank Deposit per payout: each charge as a Linked Payment,
-          plus a single negative line for the fees.
+          one QBO Journal Entry per payout: debit the bank for the net,
+          debit the fee account for the fees, credit Undeposited Funds for
+          the gross. Reconciles cleanly against your bank statement.
         </div>
       </div>
 
@@ -542,8 +543,8 @@ function PayoutsCard() {
       </div>
       {!currentFeeId && (
         <p className="mt-3 text-xs text-text-tertiary">
-          Pick a fee account before syncing — the QBO Bank Deposit needs an
-          expense account for the negative fee line.
+          Pick a fee account before syncing — the journal entry needs an
+          expense account to debit for the processor fees.
         </p>
       )}
       <p className="mt-3 text-xs text-text-tertiary">

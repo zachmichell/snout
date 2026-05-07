@@ -665,6 +665,69 @@ export async function findPaymentByRefNum(
   return { ok: true, status: res.status, data: res.data?.QueryResponse?.Payment?.[0] ?? null };
 }
 
+// ----- JournalEntry (6.6a) -----------------------------------------------
+//
+// We post processor payouts as Journal Entries rather than Deposits.
+// QBO's Deposit endpoint rejects validation on Canadian sandboxes
+// with multicurrency enabled even with otherwise-valid payloads
+// (code 6000 + empty element field — "Select a bank account for
+// this deposit"), and we couldn't find a body shape it accepts.
+// Journal Entries achieve the identical net GL effect:
+//   Debit  Bank          (net = gross - fee)
+//   Debit  Fee Expense   (fee)
+//   Credit Source        (gross — usually Undeposited Funds)
+// They appear correctly in the bank register, P&L, and bank
+// reconciliation tools.
+
+export type QboJournalEntryLine = {
+  DetailType: "JournalEntryLineDetail";
+  Amount: number;
+  Description?: string;
+  JournalEntryLineDetail: {
+    PostingType: "Debit" | "Credit";
+    AccountRef: { value: string; name?: string };
+    Entity?: { value: string; type: "Customer" | "Vendor" | "Employee" };
+  };
+};
+
+export type QboJournalEntryInput = {
+  Line: QboJournalEntryLine[];
+  TxnDate?: string;
+  PrivateNote?: string;
+  CurrencyRef?: { value: "CAD" | "USD" };
+  ExchangeRate?: number;
+  DocNumber?: string;
+};
+
+export type QboJournalEntry = QboJournalEntryInput & {
+  Id: string;
+  SyncToken: string;
+  TotalAmt?: number;
+};
+
+export function createJournalEntry(ctx: QboTokenContext, input: QboJournalEntryInput) {
+  return qboRequest<{ JournalEntry: QboJournalEntry }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/journalentry?minorversion=70`,
+    body: input,
+  });
+}
+
+export function updateJournalEntry(
+  ctx: QboTokenContext,
+  current: { Id: string; SyncToken: string },
+  patch: QboJournalEntryInput,
+) {
+  const body = { ...patch, Id: current.Id, SyncToken: current.SyncToken, sparse: true };
+  return qboRequest<{ JournalEntry: QboJournalEntry }>({
+    ctx,
+    method: "POST",
+    path: `/v3/company/${ctx.realmId}/journalentry?minorversion=70`,
+    body,
+  });
+}
+
 // ----- Deposit (6.6a) ----------------------------------------------------
 //
 // QBO's Deposit entity records money landing in a bank account from
