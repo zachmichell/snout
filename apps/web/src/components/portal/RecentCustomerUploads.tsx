@@ -39,18 +39,23 @@ export function RecentCustomerUploads() {
     enabled: !!orgId,
     queryFn: async () => {
       const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      // Filter actor_kind='owner' at the DB level via PostgREST's JSONB
+      // path. Previously we pulled 50 generic rows and filtered client-side,
+      // which on busy days could push owner uploads off the bottom of the
+      // window before they reached the staff. Filtering server-side means
+      // every returned row is a customer upload, so the 50-row cap covers a
+      // full week's worth of customer activity even at high volume.
       const { data, error } = await supabase
         .from("activity_log")
         .select("id, action, entity_type, entity_id, metadata, created_at")
         .eq("organization_id", orgId!)
         .in("action", UPLOAD_ACTIONS)
         .gte("created_at", since)
+        .filter("metadata->>actor_kind", "eq", "owner")
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data ?? []).filter(
-        (r) => (r.metadata as { actor_kind?: string } | null)?.actor_kind === "owner",
-      ) as UploadRow[];
+      return (data ?? []) as UploadRow[];
     },
   });
 
