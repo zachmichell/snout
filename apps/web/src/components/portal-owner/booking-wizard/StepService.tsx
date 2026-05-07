@@ -61,6 +61,7 @@ export default function StepService({
       // reset downstream selections if service changes
       pets: s.service?.id === svc.id ? s.pets : [],
       datetime: s.service?.id === svc.id ? s.datetime : null,
+      groomerId: s.service?.id === svc.id ? s.groomerId : null,
     }));
     onNext();
   };

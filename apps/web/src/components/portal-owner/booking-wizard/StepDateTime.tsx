@@ -69,6 +69,28 @@ export default function StepDateTime({
     },
   });
 
+  // 7.1 follow-up: groomer roster for grooming services. Empty for
+  // non-grooming. Customers can pick a specific groomer or leave the
+  // selection on "Any available" so staff can assign on confirmation.
+  const isGrooming = state.service?.module === "grooming";
+  const { data: groomers = [] } = useQuery({
+    queryKey: ["wizard-groomers", state.service?.id],
+    enabled: isGrooming,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("groomers")
+        .select("id, display_name, working_days")
+        .eq("status", "active")
+        .order("display_name");
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        display_name: string;
+        working_days: string[] | null;
+      }>;
+    },
+  });
+
   // Initialize sensible defaults once we know whether we have facility hours.
   // If the location is set we wait for the query so the visible default is
   // never the legacy 07:00/18:00 flashing into the real open/close.
@@ -273,6 +295,33 @@ export default function StepDateTime({
           <Field label="Appointment time">
             <TimeSelect value={dt.startTime} onChange={(v) => update({ startTime: v })} />
           </Field>
+          {isGrooming && groomers.length > 0 && (
+            <Field label="Groomer">
+              <Select
+                value={state.groomerId ?? "__any__"}
+                onValueChange={(v) =>
+                  setState((s) => ({ ...s, groomerId: v === "__any__" ? null : v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__any__">Any available groomer</SelectItem>
+                  {groomers.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
+          {isGrooming && groomers.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              The facility will assign a groomer when they confirm your booking.
+            </p>
+          )}
           {state.service?.estimated_minutes ? (
             <p className="text-xs text-muted-foreground">
               Approximate duration: {state.service.estimated_minutes} minute

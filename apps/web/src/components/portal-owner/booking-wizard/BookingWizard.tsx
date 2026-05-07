@@ -45,6 +45,9 @@ export type WizardState = {
   pets: WizardPet[];
   datetime: WizardDateTime | null;
   notes: string;
+  // 7.1 follow-up: customer-selected groomer for grooming services.
+  // Null means "any available groomer"; staff assigns on confirmation.
+  groomerId: string | null;
 };
 
 const STEPS = ["Service", "Pets", "Date & Time", "Review"];
@@ -63,12 +66,20 @@ export default function BookingWizard({
     pets: [],
     datetime: null,
     notes: "",
+    groomerId: null,
   });
   const qc = useQueryClient();
 
   const reset = () => {
     setStep(0);
-    setState({ locationId: null, service: null, pets: [], datetime: null, notes: "" });
+    setState({
+      locationId: null,
+      service: null,
+      pets: [],
+      datetime: null,
+      notes: "",
+      groomerId: null,
+    });
   };
 
   const handleClose = (v: boolean) => {
@@ -82,6 +93,12 @@ export default function BookingWizard({
   const onComplete = () => {
     qc.invalidateQueries({ queryKey: ["owner-bookings"] });
     qc.invalidateQueries({ queryKey: ["owner-upcoming"] });
+    // Staff side: refresh grooming requests + week calendar so the
+    // new appointment shows up immediately for any open staff session
+    // viewing the same browser. Realtime subscriptions would be ideal
+    // here; this keyed invalidation is the lightweight fix.
+    qc.invalidateQueries({ queryKey: ["grooming-requests"] });
+    qc.invalidateQueries({ queryKey: ["grooming-week"] });
     handleClose(false);
   };
 

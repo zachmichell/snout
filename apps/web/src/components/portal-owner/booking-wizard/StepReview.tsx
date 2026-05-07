@@ -139,6 +139,39 @@ export default function StepReview({
       }));
       const { error: rpErr } = await supabase.from("reservation_pets").insert(rows);
       if (rpErr) throw rpErr;
+
+      // 7.1 follow-up: grooming services need a parallel
+      // grooming_appointments row per pet so the staff Grooming page
+      // surfaces the request. groomer_id is the customer's pick (or
+      // null for "any available", in which case staff assigns on
+      // confirmation). estimated_duration_minutes comes from the
+      // service so the staff calendar shows the right block size.
+      if (svc.module === "grooming") {
+        const startDate = startISO.slice(0, 10); // yyyy-mm-dd
+        const startTimeOfDay = new Date(startISO).toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const apptRows = state.pets.map((p) => ({
+          organization_id: membership.organization_id,
+          reservation_id: res.id,
+          pet_id: p.id,
+          owner_id: owner.id,
+          groomer_id: state.groomerId, // null = "any available"
+          appointment_date: startDate,
+          start_time: startTimeOfDay,
+          estimated_duration_minutes: svc.estimated_minutes ?? 60,
+          services_requested: [svc.name],
+          price_cents: svc.base_price_cents,
+          status: "requested",
+          notes: state.notes || null,
+        }));
+        const { error: apptErr } = await supabase
+          .from("grooming_appointments")
+          .insert(apptRows);
+        if (apptErr) throw apptErr;
+      }
       return res.id;
     },
     onSuccess: () => {
