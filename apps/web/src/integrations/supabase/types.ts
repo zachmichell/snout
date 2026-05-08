@@ -3497,6 +3497,7 @@ export type Database = {
           name: string
           organization_id: string
           photo_url: string | null
+          preferred_kennel_run_id: string | null
           sex: Database["public"]["Enums"]["sex_enum"]
           spayed_neutered: boolean | null
           species: Database["public"]["Enums"]["species_enum"]
@@ -3528,6 +3529,7 @@ export type Database = {
           name: string
           organization_id: string
           photo_url?: string | null
+          preferred_kennel_run_id?: string | null
           sex?: Database["public"]["Enums"]["sex_enum"]
           spayed_neutered?: boolean | null
           species?: Database["public"]["Enums"]["species_enum"]
@@ -3559,6 +3561,7 @@ export type Database = {
           name?: string
           organization_id?: string
           photo_url?: string | null
+          preferred_kennel_run_id?: string | null
           sex?: Database["public"]["Enums"]["sex_enum"]
           spayed_neutered?: boolean | null
           species?: Database["public"]["Enums"]["species_enum"]
@@ -3580,6 +3583,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pets_preferred_kennel_run_id_fkey"
+            columns: ["preferred_kennel_run_id"]
+            isOneToOne: false
+            referencedRelation: "kennel_runs"
             referencedColumns: ["id"]
           },
           {
