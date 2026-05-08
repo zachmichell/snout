@@ -5586,6 +5586,70 @@ export type Database = {
           },
         ]
       }
+      sms_log: {
+        Row: {
+          body: string
+          error_message: string | null
+          id: string
+          message_sid: string | null
+          organization_id: string
+          owner_id: string | null
+          recipient_phone: string
+          reservation_id: string | null
+          sent_at: string
+          sms_type: string | null
+          status: string
+        }
+        Insert: {
+          body: string
+          error_message?: string | null
+          id?: string
+          message_sid?: string | null
+          organization_id: string
+          owner_id?: string | null
+          recipient_phone: string
+          reservation_id?: string | null
+          sent_at?: string
+          sms_type?: string | null
+          status: string
+        }
+        Update: {
+          body?: string
+          error_message?: string | null
+          id?: string
+          message_sid?: string | null
+          organization_id?: string
+          owner_id?: string | null
+          recipient_phone?: string
+          reservation_id?: string | null
+          sent_at?: string
+          sms_type?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_log_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_log_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_codes: {
         Row: {
           created_at: string
@@ -6702,6 +6766,7 @@ export type Database = {
       invoke_quickbooks_payouts_pipeline: { Args: never; Returns: string }
       invoke_quickbooks_process_queue: { Args: never; Returns: number }
       invoke_send_birthday_emails: { Args: never; Returns: string }
+      invoke_send_reservation_reminders: { Args: never; Returns: string }
       is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       is_org_member: { Args: { _org_id: string }; Returns: boolean }
       mark_conversation_read_by_owner: {
