@@ -76,6 +76,7 @@ export async function sendReservationConfirmation(args: {
   service_module?: "daycare" | "boarding" | "grooming" | "training" | "retail" | null;
   start_at: string;
   location_name: string;
+  location_id?: string | null;
   reservation_id: string;
   owner_first_name?: string;
   owner_id?: string;
@@ -102,6 +103,7 @@ export async function sendReservationConfirmation(args: {
     channel: "email",
     event_type: "reservation_confirmation",
     service_module: args.service_module ?? null,
+    location_id: args.location_id ?? null,
     vars: {
       pet_names: args.pet_names.join(", "),
       service_name: args.service_name,
@@ -143,6 +145,7 @@ export async function sendInvoiceCreated(args: {
   invoice_id: string;
   pay_now_url?: string;
   owner_id?: string;
+  location_id?: string | null;
 }) {
   firePushBeside({
     owner_id: args.owner_id,
@@ -161,6 +164,7 @@ export async function sendInvoiceCreated(args: {
     organization_id: org.id,
     channel: "email",
     event_type: "invoice_created",
+    location_id: args.location_id ?? null,
     vars: {
       invoice_number: args.invoice_number,
       amount_display: args.amount_display,
@@ -202,6 +206,7 @@ export async function sendReportCardPublished(args: {
   reservation_id: string;
   report_card_id?: string;
   owner_id?: string;
+  location_id?: string | null;
 }) {
   firePushBeside({
     owner_id: args.owner_id,
@@ -222,6 +227,7 @@ export async function sendReportCardPublished(args: {
     organization_id: org.id,
     channel: "email",
     event_type: "report_card_published",
+    location_id: args.location_id ?? null,
     vars: {
       pet_name: args.pet_name,
       rating: args.rating ?? "",
@@ -265,6 +271,7 @@ export async function sendPetBirthday(args: {
   pet_name: string;
   age?: number | null;
   owner_first_name?: string;
+  location_id?: string | null;
 }) {
   const { settings, org } = await loadEmailContext(args.organization_id);
   if (!org) return { success: false, error: "Org not found" };
@@ -273,6 +280,7 @@ export async function sendPetBirthday(args: {
     organization_id: org.id,
     channel: "email",
     event_type: "birthday",
+    location_id: args.location_id ?? null,
     vars: {
       pet_name: args.pet_name,
       age: args.age ?? "",
@@ -303,6 +311,7 @@ export async function sendWaiverReminder(args: {
   to: string;
   waiver_titles: string[];
   owner_first_name?: string;
+  location_id?: string | null;
 }) {
   const { settings, org } = await loadEmailContext(args.organization_id);
   if (!org) return { success: false, error: "Org not found" };
@@ -314,6 +323,7 @@ export async function sendWaiverReminder(args: {
     organization_id: org.id,
     channel: "email",
     event_type: "waiver_reminder",
+    location_id: args.location_id ?? null,
     vars: {
       waiver_titles: args.waiver_titles.join(", "),
       org_name: org.name,
