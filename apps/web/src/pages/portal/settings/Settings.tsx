@@ -24,6 +24,7 @@ import ChangelogTab from "./ChangelogTab";
 import WebcamsTab from "./WebcamsTab";
 import QuickBooksTab from "./QuickBooksTab";
 import SettingsHistoryTab from "./SettingsHistoryTab";
+import { SelfWashBaysSection } from "../self-wash-bays/SelfWashBays";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { Permission } from "@/lib/permissions";
 
@@ -41,6 +42,7 @@ const TAB_CONFIG: Array<{ key: string; label: string; permission: Permission }> 
   { key: "subscription", label: "Subscription", permission: "settings.subscription" },
   { key: "playgroups", label: "Playgroups", permission: "playgroups.manage" },
   { key: "kennel-runs", label: "Kennel Runs", permission: "kennels.manage" },
+  { key: "self-wash-bays", label: "Self-Wash Bays", permission: "settings.organization" },
   { key: "suites", label: "Suites", permission: "settings.organization" },
   { key: "groomers", label: "Groomers", permission: "settings.organization" },
   { key: "traits", label: "Traits", permission: "settings.organization" },
@@ -158,6 +160,11 @@ export default function Settings() {
         {can("kennels.manage") && (
           <TabsContent value="kennel-runs" className="mt-6">
             <KennelRunsSection />
+          </TabsContent>
+        )}
+        {can("settings.organization") && (
+          <TabsContent value="self-wash-bays" className="mt-6">
+            <SelfWashBaysSection />
           </TabsContent>
         )}
         {can("settings.organization") && (

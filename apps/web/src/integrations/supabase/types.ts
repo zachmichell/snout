@@ -5208,6 +5208,7 @@ export type Database = {
           primary_owner_id: string | null
           recurring_group_id: string | null
           requested_at: string | null
+          self_wash_bay_id: string | null
           service_id: string | null
           source: Database["public"]["Enums"]["reservation_source"]
           start_at: string
@@ -5240,6 +5241,7 @@ export type Database = {
           primary_owner_id?: string | null
           recurring_group_id?: string | null
           requested_at?: string | null
+          self_wash_bay_id?: string | null
           service_id?: string | null
           source?: Database["public"]["Enums"]["reservation_source"]
           start_at: string
@@ -5272,6 +5274,7 @@ export type Database = {
           primary_owner_id?: string | null
           recurring_group_id?: string | null
           requested_at?: string | null
+          self_wash_bay_id?: string | null
           service_id?: string | null
           source?: Database["public"]["Enums"]["reservation_source"]
           start_at?: string
@@ -5328,6 +5331,13 @@ export type Database = {
             columns: ["recurring_group_id"]
             isOneToOne: false
             referencedRelation: "recurring_reservation_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_self_wash_bay_id_fkey"
+            columns: ["self_wash_bay_id"]
+            isOneToOne: false
+            referencedRelation: "self_wash_bays"
             referencedColumns: ["id"]
           },
           {
@@ -5423,6 +5433,60 @@ export type Database = {
             columns: ["qbo_tax_code_id"]
             isOneToOne: false
             referencedRelation: "qbo_tax_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      self_wash_bays: {
+        Row: {
+          active: boolean
+          created_at: string
+          deleted_at: string | null
+          description: string | null
+          id: string
+          location_id: string | null
+          name: string
+          organization_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          location_id?: string | null
+          name: string
+          organization_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          location_id?: string | null
+          name?: string
+          organization_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "self_wash_bays_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "self_wash_bays_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -7075,7 +7139,13 @@ export type Database = {
       kennel_run_type: "standard" | "large" | "suite" | "indoor" | "outdoor"
       membership_role: "owner" | "admin" | "manager" | "staff" | "customer"
       message_sender_type: "staff" | "owner"
-      module_enum: "daycare" | "boarding" | "grooming" | "training" | "retail"
+      module_enum:
+        | "daycare"
+        | "boarding"
+        | "grooming"
+        | "training"
+        | "self_wash"
+        | "retail"
       org_status_enum: "trial" | "active" | "paused" | "past_due" | "cancelled"
       payment_method_enum: "card" | "ach" | "in_person"
       payment_processor_kind: "stripe" | "helcim"
@@ -7272,7 +7342,14 @@ export const Constants = {
       kennel_run_type: ["standard", "large", "suite", "indoor", "outdoor"],
       membership_role: ["owner", "admin", "manager", "staff", "customer"],
       message_sender_type: ["staff", "owner"],
-      module_enum: ["daycare", "boarding", "grooming", "training", "retail"],
+      module_enum: [
+        "daycare",
+        "boarding",
+        "grooming",
+        "training",
+        "self_wash",
+        "retail",
+      ],
       org_status_enum: ["trial", "active", "paused", "past_due", "cancelled"],
       payment_method_enum: ["card", "ach", "in_person"],
       payment_processor_kind: ["stripe", "helcim"],
