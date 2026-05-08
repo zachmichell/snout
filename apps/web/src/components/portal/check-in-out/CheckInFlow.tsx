@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { CheckCircle2, AlertTriangle, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrgModules } from "@/hooks/useOrgModules";
@@ -46,6 +47,7 @@ export default function CheckInFlow({
   const [override, setOverride] = useState(false);
   const [playgroupId, setPlaygroupId] = useState<string>("");
   const [kennelRunId, setKennelRunId] = useState<string>("");
+  const [selfWashBayId, setSelfWashBayId] = useState<string>("");
   const [dropoffOwnerId, setDropoffOwnerId] = useState<string>(ownerId ?? "");
   const checkIn = useCheckIn();
 
@@ -89,6 +91,7 @@ export default function CheckInFlow({
   // Assignment options
   const showPlaygroup = serviceModule === "daycare" && (modules?.has("daycare") ?? true);
   const showKennel = serviceModule === "boarding" && (modules?.has("boarding") ?? true);
+  const showSelfWash = serviceModule === "self_wash";
 
   // Enclosure memory: surface where this pet was last assigned so staff
   // can put them in the same space without scrolling. Pre-fills the
@@ -196,6 +199,23 @@ export default function CheckInFlow({
     },
   });
 
+  const { data: selfWashBays } = useQuery({
+    queryKey: ["checkin-self-wash-bays", orgId, locationId],
+    enabled: showSelfWash && !!orgId,
+    queryFn: async () => {
+      let q = supabase
+        .from("self_wash_bays")
+        .select("id, name, status")
+        .eq("organization_id", orgId!)
+        .eq("active", true)
+        .eq("status", "active")
+        .is("deleted_at", null);
+      if (locationId) q = q.eq("location_id", locationId);
+      const { data } = await q.order("name");
+      return data ?? [];
+    },
+  });
+
   // Build per-pet vax checks
   const petChecks = pets.map((p) => ({
     pet: p,
@@ -207,7 +227,7 @@ export default function CheckInFlow({
 
   const proceed = () => setStep(serviceModule ? "assign" : "confirm");
 
-  const submit = () => {
+  const submit = async () => {
     const firstPet = pets[0];
     let assignment = null;
     if (showPlaygroup && playgroupId && firstPet) {
@@ -215,6 +235,31 @@ export default function CheckInFlow({
     } else if (showKennel && kennelRunId && firstPet) {
       assignment = { kind: "kennel" as const, kennel_run_id: kennelRunId, pet_id: firstPet.id };
     }
+
+    // Self-wash bays live on the reservation row itself (not in a
+    // separate assignments table). Set the column directly before
+    // dispatching the regular check-in. The capacity-enforcement
+    // trigger blocks any double-booking server-side; if the operator
+    // skipped the picker we leave the column null and the check-in
+    // proceeds without an assigned bay (operator can attach one later
+    // from the reservation detail page).
+    if (showSelfWash && selfWashBayId) {
+      const { error } = await supabase
+        .from("reservations")
+        .update({ self_wash_bay_id: selfWashBayId })
+        .eq("id", reservationId);
+      if (error) {
+        // The trigger fires here if the bay's already double-booked.
+        // The error message is operator-friendly; surface it instead
+        // of swallowing.
+        const msg = error.message ?? "Could not assign bay";
+        // toast handled by caller when checkIn fails — easier to
+        // import here than to plumb through. fall through with a
+        // throw so the caller's onError fires.
+        throw new Error(msg);
+      }
+    }
+
     checkIn.mutate(
       { reservationId, petName: firstPet?.name, assignment },
       { onSuccess: () => onDone?.() },
@@ -376,7 +421,29 @@ export default function CheckInFlow({
               </Select>
             </div>
           )}
-          {!showPlaygroup && !showKennel && (
+          {showSelfWash && (
+            <div>
+              <label className="label-eyebrow mb-2 block">Self-wash bay</label>
+              <Select value={selfWashBayId} onValueChange={setSelfWashBayId}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Choose a bay…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(selfWashBays ?? []).map((b: any) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(selfWashBays ?? []).length === 0 && (
+                <p className="mt-1 text-xs text-text-tertiary">
+                  No active bays. Set one up under Settings → Self-Wash Bays.
+                </p>
+              )}
+            </div>
+          )}
+          {!showPlaygroup && !showKennel && !showSelfWash && (
             <p className="text-xs text-text-tertiary">No assignment needed for this service.</p>
           )}
           <div className="flex justify-between">
@@ -407,7 +474,15 @@ export default function CheckInFlow({
             <Button variant="outline" size="sm" onClick={() => setStep(serviceModule ? "assign" : "validate")}>
               Back
             </Button>
-            <Button size="sm" onClick={submit} disabled={checkIn.isPending}>
+            <Button
+              size="sm"
+              onClick={() => {
+                submit().catch((e: unknown) =>
+                  toast.error(e instanceof Error ? e.message : String(e)),
+                );
+              }}
+              disabled={checkIn.isPending}
+            >
               {checkIn.isPending ? "Checking in…" : "Confirm check-in"}
             </Button>
           </div>
