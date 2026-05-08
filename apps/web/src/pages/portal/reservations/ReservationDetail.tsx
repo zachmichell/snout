@@ -43,6 +43,7 @@ import { logActivity } from "@/lib/activity";
 import { useLogActivity } from "@/hooks/useLogActivity";
 import { ActivityLog } from "@/components/portal/ActivityLog";
 import { ownerCreditSummary } from "@/components/portal/ReservationCells";
+import SwitchServiceDialog from "@/components/portal/SwitchServiceDialog";
 
 export default function ReservationDetail() {
   const { id } = useParams();
@@ -54,7 +55,6 @@ export default function ReservationDetail() {
   const canEdit = can("reservations.edit");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
-  const [switchServiceId, setSwitchServiceId] = useState<string>("");
   const [cancelReason, setCancelReason] = useState("");
   const [noShowOpen, setNoShowOpen] = useState(false);
   const [addPetId, setAddPetId] = useState<string>("");
@@ -318,57 +318,9 @@ export default function ReservationDetail() {
     }
   };
 
-  // Org services for the switch dialog. Loaded once when the dialog opens.
-  const { data: switchServices = [] } = useQuery({
-    queryKey: ["switch-services", membership?.organization_id],
-    enabled: switchOpen && !!membership?.organization_id,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("id, name, module, duration_type, location_id")
-        .eq("organization_id", membership!.organization_id)
-        .eq("active", true)
-        .is("deleted_at", null)
-        .order("module")
-        .order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const handleSwitchService = async () => {
-    if (!switchServiceId || !membership) return;
-    const newService = switchServices.find((s) => s.id === switchServiceId);
-    if (!newService) return toast.error("Service not found");
-
-    const oldServiceName = (r as any).services?.name ?? "service";
-    const { error } = await supabase
-      .from("reservations")
-      .update({ service_id: switchServiceId })
-      .eq("id", r.id);
-    if (error) return toast.error(error.message);
-
-    try {
-      await log({
-        organization_id: membership.organization_id,
-        action: "updated",
-        entity_type: "reservation",
-        entity_id: r.id,
-        metadata: {
-          summary: `Service changed from ${oldServiceName} to ${newService.name}`,
-          previous_service_id: r.service_id ?? null,
-          new_service_id: switchServiceId,
-        },
-      });
-    } catch (logErr) {
-      console.warn("activity_log write failed", logErr);
-    }
-
-    toast.success(`Switched to ${newService.name}`);
-    setSwitchOpen(false);
-    setSwitchServiceId("");
-    refresh();
-  };
+  // Switch service handler is now owned by SwitchServiceDialog. We
+  // just trigger the dialog and refresh the page when it reports
+  // a successful save.
 
   const titleService = (r as any).services?.name ?? "Reservation";
   const reservationPets = (r as any).reservation_pets ?? [];
@@ -575,43 +527,16 @@ export default function ReservationDetail() {
         </div>
       </div>
 
-      {/* Switch service modal */}
-      <Dialog open={switchOpen} onOpenChange={setSwitchOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Switch service</DialogTitle>
-            <DialogDescription>
-              Pick a different service for this reservation. Times stay the same; adjust them
-              from the Edit screen if the new service requires it.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Select value={switchServiceId} onValueChange={setSwitchServiceId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pick a service..." />
-              </SelectTrigger>
-              <SelectContent>
-                {switchServices.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name} ({s.module})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setSwitchOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSwitchService}
-              disabled={!switchServiceId || switchServiceId === r.service_id}
-            >
-              Switch
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Switch service modal — extracted to a portable component so the
+          Dashboard rows can trigger the same flow inline. */}
+      <SwitchServiceDialog
+        open={switchOpen}
+        onOpenChange={setSwitchOpen}
+        reservationId={r.id}
+        currentServiceId={r.service_id ?? null}
+        currentServiceName={(r as any).services?.name ?? null}
+        onSaved={refresh}
+      />
 
       {/* Cancel modal */}
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>

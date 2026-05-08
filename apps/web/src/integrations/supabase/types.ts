@@ -3184,6 +3184,7 @@ export type Database = {
           refund_amount_cents: number | null
           refund_notes: string | null
           refund_reason_id: string | null
+          refunded_at: string | null
           status: Database["public"]["Enums"]["payment_status"]
           stripe_payment_intent_id: string | null
           updated_at: string
@@ -3205,6 +3206,7 @@ export type Database = {
           refund_amount_cents?: number | null
           refund_notes?: string | null
           refund_reason_id?: string | null
+          refunded_at?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_payment_intent_id?: string | null
           updated_at?: string
@@ -3226,6 +3228,7 @@ export type Database = {
           refund_amount_cents?: number | null
           refund_notes?: string | null
           refund_reason_id?: string | null
+          refunded_at?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           stripe_payment_intent_id?: string | null
           updated_at?: string
@@ -7076,7 +7079,12 @@ export type Database = {
       org_status_enum: "trial" | "active" | "paused" | "past_due" | "cancelled"
       payment_method_enum: "card" | "ach" | "in_person"
       payment_processor_kind: "stripe" | "helcim"
-      payment_status: "pending" | "succeeded" | "failed" | "refunded"
+      payment_status:
+        | "pending"
+        | "succeeded"
+        | "failed"
+        | "refunded"
+        | "partially_refunded"
       pet_owner_relationship: "primary" | "secondary" | "emergency_only"
       reservation_source: "staff_created" | "owner_self_serve"
       reservation_status:
@@ -7268,7 +7276,13 @@ export const Constants = {
       org_status_enum: ["trial", "active", "paused", "past_due", "cancelled"],
       payment_method_enum: ["card", "ach", "in_person"],
       payment_processor_kind: ["stripe", "helcim"],
-      payment_status: ["pending", "succeeded", "failed", "refunded"],
+      payment_status: [
+        "pending",
+        "succeeded",
+        "failed",
+        "refunded",
+        "partially_refunded",
+      ],
       pet_owner_relationship: ["primary", "secondary", "emergency_only"],
       reservation_source: ["staff_created", "owner_self_serve"],
       reservation_status: [

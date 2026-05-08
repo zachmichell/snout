@@ -38,8 +38,15 @@ import { tryConsumeCredits, formatCreditsUsed } from "@/lib/credits";
 import { useLogActivity } from "@/hooks/useLogActivity";
 import { reservationLabel, serviceLabel } from "@/components/portal/ReservationCells";
 import { AddOnDialog } from "@/components/portal/AddOnDialog";
+import SwitchServiceDialog from "@/components/portal/SwitchServiceDialog";
 import { RecentCustomerUploads } from "@/components/portal/RecentCustomerUploads";
-import { Plus } from "lucide-react";
+import { MoreVertical, Plus, Repeat } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatTime } from "@/lib/money";
 
 const TZ = "America/Edmonton";
@@ -67,6 +74,7 @@ type Row = {
   organization_id: string;
   location_id: string | null;
   primary_owner_id: string | null;
+  service_id: string | null;
   start_at: string;
   end_at: string;
   status: string;
@@ -104,7 +112,7 @@ async function fetchDashboardRange(
   let q = supabase
     .from("reservations")
     .select(
-      `id, organization_id, location_id, primary_owner_id, start_at, end_at, status, checked_in_at, checked_out_at, suite_id, parent_reservation_id,
+      `id, organization_id, location_id, primary_owner_id, service_id, start_at, end_at, status, checked_in_at, checked_out_at, suite_id, parent_reservation_id,
        services:service_id(name, module),
        owners:primary_owner_id(id, first_name, last_name, daycare_full_day_credits, daycare_half_day_credits, boarding_night_credits),
        suites:suite_id(name),
@@ -736,15 +744,22 @@ export default function Dashboard() {
                 rows={expected}
                 emptyText="No arrivals today. You're all caught up."
                 action={(r) => (
-                  <Button
-                    size="sm"
-                    onClick={() => checkInMut.mutate(r.id)}
-                    disabled={checkInMut.isPending}
-                    className="gap-1"
-                  >
-                    <LogIn className="h-3.5 w-3.5" />
-                    Check In
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      size="sm"
+                      onClick={() => checkInMut.mutate(r.id)}
+                      disabled={checkInMut.isPending}
+                      className="gap-1"
+                    >
+                      <LogIn className="h-3.5 w-3.5" />
+                      Check In
+                    </Button>
+                    {/* Inline overflow menu — gets the click-count for
+                        Switch service and Add add-on under four. The
+                        canonical Switch dialog and AddOnDialog open
+                        from this menu without a detail-page round-trip. */}
+                    <RowActions r={r} canSwitchService canAddAddOn invalidate={invalidate} />
+                  </div>
                 )}
               />
             </TabsContent>
@@ -754,16 +769,25 @@ export default function Dashboard() {
                 rows={checkedIn}
                 emptyText="Nobody checked in yet. The first arrival will appear here."
                 action={(r) => (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => checkOutMut.mutate(r.id)}
-                    disabled={checkOutMut.isPending}
-                    className="gap-1"
-                  >
-                    <LogOut className="h-3.5 w-3.5" />
-                    Check Out
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => checkOutMut.mutate(r.id)}
+                      disabled={checkOutMut.isPending}
+                      className="gap-1"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      Check Out
+                    </Button>
+                    {/* Switch service is intentionally NOT offered after
+                        check-in — the original audit's canSwitchService
+                        rule (`requested` or `confirmed` only) keeps the
+                        invariant that credits / invoicing keyed off the
+                        original service module never get retroactively
+                        rewritten. Add-on is fine post-arrival. */}
+                    <RowActions r={r} canAddAddOn invalidate={invalidate} />
+                  </div>
                 )}
               />
             </TabsContent>
@@ -773,16 +797,19 @@ export default function Dashboard() {
                 rows={goingHome}
                 emptyText="No departures today."
                 action={(r) => (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => checkOutMut.mutate(r.id)}
-                    disabled={checkOutMut.isPending}
-                    className="gap-1"
-                  >
-                    <LogOut className="h-3.5 w-3.5" />
-                    Check Out
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => checkOutMut.mutate(r.id)}
+                      disabled={checkOutMut.isPending}
+                      className="gap-1"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      Check Out
+                    </Button>
+                    <RowActions r={r} canAddAddOn invalidate={invalidate} />
+                  </div>
                 )}
               />
             </TabsContent>
@@ -1264,5 +1291,92 @@ function QuickCheckInDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Per-row overflow menu rendered to the right of the primary action
+// button on each Dashboard row. Hosts the Switch service and Add
+// add-on dialogs inline so neither flow needs a detail-page
+// round-trip (closes the click-count gap from
+// docs/click-counts-2026-Q2.md).
+//
+// Owns its own dialog state so each row's menu is independent —
+// opening one row's "Switch service" doesn't touch another row's
+// state.
+function RowActions({
+  r,
+  canSwitchService,
+  canAddAddOn,
+  invalidate,
+}: {
+  r: Row;
+  canSwitchService?: boolean;
+  canAddAddOn?: boolean;
+  invalidate: () => void;
+}) {
+  const [switchOpen, setSwitchOpen] = useState(false);
+  const [addOnOpen, setAddOnOpen] = useState(false);
+
+  // Hide the menu entirely if neither action applies for this row's
+  // status — keeps the row visually clean in the rare case the menu
+  // would have nothing in it.
+  if (!canSwitchService && !canAddAddOn) return null;
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 p-0"
+            aria-label="More actions"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {canSwitchService && (
+            <DropdownMenuItem onClick={() => setSwitchOpen(true)}>
+              <Repeat className="mr-2 h-3.5 w-3.5" />
+              Switch service
+            </DropdownMenuItem>
+          )}
+          {canAddAddOn && (
+            <DropdownMenuItem onClick={() => setAddOnOpen(true)}>
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              Add add-on
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {canSwitchService && (
+        <SwitchServiceDialog
+          open={switchOpen}
+          onOpenChange={setSwitchOpen}
+          reservationId={r.id}
+          currentServiceId={r.service_id ?? null}
+          currentServiceName={r.services?.name ?? null}
+          onSaved={invalidate}
+        />
+      )}
+
+      {canAddAddOn && (
+        <AddOnDialog
+          open={addOnOpen}
+          onOpenChange={setAddOnOpen}
+          parent={{
+            id: r.id,
+            organization_id: r.organization_id,
+            location_id: r.location_id,
+            primary_owner_id: r.primary_owner_id,
+            start_at: r.start_at,
+            end_at: r.end_at,
+          }}
+          petId={r.reservation_pets?.[0]?.pets?.id ?? ""}
+        />
+      )}
+    </>
   );
 }

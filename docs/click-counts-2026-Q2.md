@@ -11,6 +11,11 @@ records:
 3. The smallest UI change that brings each over-budget flow under the
    threshold.
 
+**Status update (2026-05-08, after batch `feature/click-count-fixes`):**
+all three over-budget flows are fixed. Section "Recommended fix" under
+each flow describes what shipped; "Predicted (post-fix)" is the new
+click count.
+
 ## Why this matters
 
 A staff member at a busy facility runs check-in / check-out hundreds
