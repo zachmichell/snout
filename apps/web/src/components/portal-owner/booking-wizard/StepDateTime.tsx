@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,13 +19,19 @@ import {
 import type { WizardState } from "./BookingWizard";
 
 // Hardcoded fallbacks used when the facility has no configured hours for the
-// initial date. Kept aligned with the prior pre-Cluster-4 behavior so an
+// selected day. Kept aligned with the prior pre-Cluster-4 behavior so an
 // operator that has not set up location_hours sees no regression.
 const FALLBACK_START_DAY = "07:00";
 const FALLBACK_END_DAY = "18:00";
 const FALLBACK_START_OVERNIGHT = "14:00";
 const FALLBACK_END_OVERNIGHT = "11:00";
 const FALLBACK_START_HOURLY = "09:00";
+
+// Outer boundary used when a facility has no location_hours configured at
+// all. Once we have rows we narrow the picker to the actual open window so
+// customers can't accidentally pick 4 AM at a 9-to-5 facility.
+const PICKER_FALLBACK_START_HOUR = 6;
+const PICKER_FALLBACK_END_HOUR = 21;
 
 type LocationHoursRow = {
   day_of_week: number;
@@ -40,7 +46,86 @@ function clipTime(t: string | null | undefined): string | null {
   return t.length >= 5 ? t.slice(0, 5) : t;
 }
 
-const TIMES = generateTimeSlots(6, 21);
+// "HH:MM" -> hour as integer (rounded down). Returns null on bad input.
+function parseHour(t: string | null | undefined): number | null {
+  if (!t) return null;
+  const h = Number(t.slice(0, 2));
+  return Number.isFinite(h) ? h : null;
+}
+
+// yyyy-mm-dd -> day-of-week (0 Sun .. 6 Sat). Parsed locally so the user's
+// timezone matches what they see on the date input.
+function dowFromIsoDate(iso: string): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y || 1970, (m || 1) - 1, d || 1);
+  return dt.getDay();
+}
+
+// Pick start/end defaults for the given duration on a specific date based on
+// what location_hours says about that day. Falls back to the legacy constants
+// when no row exists (e.g. operator hasn't configured hours yet) or the row is
+// marked closed (shouldn't happen via UI, but we don't crash on it).
+function defaultsForDate(args: {
+  durationType: string;
+  startDateIso: string;
+  endDateIso: string | null;
+  hoursRows: LocationHoursRow[];
+}): { startTime: string; endTime: string | null } {
+  const startDow = dowFromIsoDate(args.startDateIso);
+  const startHours = args.hoursRows.find((h) => h.day_of_week === startDow);
+  const open = startHours && !startHours.closed ? clipTime(startHours.open_time) : null;
+  const close = startHours && !startHours.closed ? clipTime(startHours.close_time) : null;
+
+  if (args.durationType === "overnight" || args.durationType === "multi_night") {
+    const endDow = args.endDateIso ? dowFromIsoDate(args.endDateIso) : startDow;
+    const endHoursRow = args.hoursRows.find((h) => h.day_of_week === endDow);
+    const endOpen =
+      endHoursRow && !endHoursRow.closed ? clipTime(endHoursRow.open_time) : null;
+    return {
+      startTime: open ?? FALLBACK_START_OVERNIGHT,
+      endTime: endOpen ?? FALLBACK_END_OVERNIGHT,
+    };
+  }
+  if (args.durationType === "hourly") {
+    return { startTime: open ?? FALLBACK_START_HOURLY, endTime: null };
+  }
+  if (args.durationType === "flat") {
+    return { startTime: open ?? FALLBACK_START_DAY, endTime: null };
+  }
+  return {
+    startTime: open ?? FALLBACK_START_DAY,
+    endTime: close ?? FALLBACK_END_DAY,
+  };
+}
+
+// Compute the time-picker range from the facility's location_hours. We take
+// MIN(open) across open days and MAX(close) so all open days are reachable in
+// one picker. When the facility has no configured hours we fall back to the
+// legacy 6 AM - 9 PM range.
+function pickerRangeFromHours(rows: LocationHoursRow[]): {
+  startHour: number;
+  endHour: number;
+} {
+  let minOpen: number | null = null;
+  let maxClose: number | null = null;
+  for (const r of rows) {
+    if (r.closed) continue;
+    const o = parseHour(r.open_time);
+    const c = parseHour(r.close_time);
+    if (o != null) minOpen = minOpen === null ? o : Math.min(minOpen, o);
+    if (c != null) {
+      // Round close up by an hour when there's a non-zero minute portion so
+      // the picker still includes the closing time.
+      const cm = Number(r.close_time?.slice(3, 5) ?? "0");
+      const eff = cm > 0 ? c + 1 : c;
+      maxClose = maxClose === null ? eff : Math.max(maxClose, eff);
+    }
+  }
+  if (minOpen === null || maxClose === null || maxClose <= minOpen) {
+    return { startHour: PICKER_FALLBACK_START_HOUR, endHour: PICKER_FALLBACK_END_HOUR };
+  }
+  return { startHour: minOpen, endHour: Math.min(maxClose, 23) };
+}
 
 export default function StepDateTime({
   state,
@@ -149,6 +234,12 @@ export default function StepDateTime({
   });
   const groomerSlots = groomerSlotsPayload?.slots ?? [];
 
+  // Track whether the customer has manually overridden the default times.
+  // We only auto-refresh defaults on date changes for users who haven't
+  // edited the times yet — once they pick something themselves we respect
+  // that across date changes.
+  const userTouchedTimesRef = useRef(false);
+
   // Initialize sensible defaults once we know whether we have facility hours.
   // If the location is set we wait for the query so the visible default is
   // never the legacy 07:00/18:00 flashing into the real open/close.
@@ -171,62 +262,134 @@ export default function StepDateTime({
       const [y, m, d] = minDate.split("-").map(Number);
       startDateObj.setFullYear(y, m - 1, d);
     }
-    const startDow = startDateObj.getDay();
-    const startHours = hoursRows.find((h) => h.day_of_week === startDow);
-    const facilityOpen = startHours && !startHours.closed ? clipTime(startHours.open_time) : null;
-    const facilityClose = startHours && !startHours.closed ? clipTime(startHours.close_time) : null;
+    const startDateIso = fmtDate(startDateObj);
 
     if (dur === "overnight" || dur === "multi_night") {
       const out = new Date(startDateObj);
       out.setDate(out.getDate() + (dur === "overnight" ? 1 : 2));
-      const outDow = out.getDay();
-      const outHours = hoursRows.find((h) => h.day_of_week === outDow);
-      const pickupOpen = outHours && !outHours.closed ? clipTime(outHours.open_time) : null;
+      const endDateIso = fmtDate(out);
+      const d = defaultsForDate({
+        durationType: dur,
+        startDateIso,
+        endDateIso,
+        hoursRows,
+      });
       setState((s) => ({
         ...s,
         datetime: {
-          date: fmtDate(startDateObj),
-          endDate: fmtDate(out),
-          startTime: facilityOpen ?? FALLBACK_START_OVERNIGHT,
-          endTime: pickupOpen ?? FALLBACK_END_OVERNIGHT,
+          date: startDateIso,
+          endDate: endDateIso,
+          startTime: d.startTime,
+          endTime: d.endTime ?? FALLBACK_END_OVERNIGHT,
         },
       }));
     } else if (dur === "hourly") {
+      const d = defaultsForDate({
+        durationType: "hourly",
+        startDateIso: minDate,
+        endDateIso: null,
+        hoursRows,
+      });
       setState((s) => ({
         ...s,
-        datetime: {
-          date: minDate,
-          startTime: facilityOpen ?? FALLBACK_START_HOURLY,
-          hours: 1,
-        },
+        datetime: { date: minDate, startTime: d.startTime, hours: 1 },
       }));
     } else if (dur === "flat") {
       // 7.1: Appointment services pick a single start time. The end
       // time is derived from service.estimated_minutes at submission.
       // No endTime / hours field shown to the customer.
+      const d = defaultsForDate({
+        durationType: "flat",
+        startDateIso: minDate,
+        endDateIso: null,
+        hoursRows,
+      });
       setState((s) => ({
         ...s,
-        datetime: {
-          date: minDate,
-          startTime: facilityOpen ?? FALLBACK_START_DAY,
-        },
+        datetime: { date: minDate, startTime: d.startTime },
       }));
     } else {
+      const d = defaultsForDate({
+        durationType: dur,
+        startDateIso: minDate,
+        endDateIso: null,
+        hoursRows,
+      });
       setState((s) => ({
         ...s,
         datetime: {
           date: minDate,
-          startTime: facilityOpen ?? FALLBACK_START_DAY,
-          endTime: facilityClose ?? FALLBACK_END_DAY,
+          startTime: d.startTime,
+          endTime: d.endTime ?? FALLBACK_END_DAY,
         },
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoursLoading, hoursRows.length]);
 
+  // When the customer changes the date(s) we re-derive the defaults so the
+  // selected day-of-week's open/close times become the new starting point.
+  // Skip if the customer has already chosen a time manually — that's a
+  // deliberate override and shouldn't get clobbered by a date change.
+  useEffect(() => {
+    if (!state.datetime) return;
+    if (locationId && hoursLoading) return;
+    if (userTouchedTimesRef.current) return;
+    if (hoursRows.length === 0) return;
+
+    const d = defaultsForDate({
+      durationType: dur,
+      startDateIso: state.datetime.date,
+      endDateIso: state.datetime.endDate ?? null,
+      hoursRows,
+    });
+    setState((s) => {
+      if (!s.datetime) return s;
+      const next: typeof s.datetime = { ...s.datetime, startTime: d.startTime };
+      // Only overwrite endTime when the duration carries one. For hourly /
+      // flat the end is implicit so we leave the field alone.
+      if (
+        d.endTime !== null &&
+        (dur === "half_day" ||
+          dur === "full_day" ||
+          dur === "overnight" ||
+          dur === "multi_night")
+      ) {
+        next.endTime = d.endTime;
+      }
+      return { ...s, datetime: next };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.datetime?.date, state.datetime?.endDate, hoursRows.length, hoursLoading]);
+
+  // Build the time-picker range from configured hours so customers can't
+  // pick 4 AM at a 9-to-5 facility.
+  const pickerRange = useMemo(() => pickerRangeFromHours(hoursRows), [hoursRows]);
+  const pickerTimes = useMemo(
+    () => generateTimeSlots(pickerRange.startHour, pickerRange.endHour),
+    [pickerRange.startHour, pickerRange.endHour],
+  );
+
+  // Surface a "facility is closed" hint when the customer has selected a
+  // closed day. Defaults already use the fallback hours in that case, but
+  // showing the warning prevents a "why isn't it accepting my booking" loop.
+  const closedDayWarning = useMemo(() => {
+    if (!state.datetime?.date || hoursRows.length === 0) return null;
+    const dow = dowFromIsoDate(state.datetime.date);
+    const row = hoursRows.find((h) => h.day_of_week === dow);
+    if (row?.closed) return "Facility is closed on this day.";
+    return null;
+  }, [state.datetime?.date, hoursRows]);
+
   const dt = state.datetime;
-  const update = (patch: Partial<NonNullable<WizardState["datetime"]>>) =>
+  const update = (patch: Partial<NonNullable<WizardState["datetime"]>>) => {
+    // Any change that touches startTime or endTime is a deliberate user
+    // edit, so we lock the auto-default behavior afterwards.
+    if (patch.startTime !== undefined || patch.endTime !== undefined) {
+      userTouchedTimesRef.current = true;
+    }
     setState((s) => ({ ...s, datetime: { ...(s.datetime as any), ...patch } }));
+  };
 
   const nights = dt?.endDate ? diffNights(dt.date, dt.endDate) : 0;
   const hours = dt?.hours ?? 1;
@@ -273,6 +436,12 @@ export default function StepDateTime({
 
   return (
     <div className="space-y-4 py-2">
+      {closedDayWarning && (
+        <div className="rounded-lg border border-warning/30 bg-warning-light p-3 text-xs">
+          {closedDayWarning} The default times below assume regular hours —
+          please pick a different date or contact the facility before booking.
+        </div>
+      )}
       {(dur === "half_day" || dur === "full_day") && (
         <>
           <Field label={`Date (${dayOfWeek})`}>
@@ -280,10 +449,18 @@ export default function StepDateTime({
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Drop-off time">
-              <TimeSelect value={dt.startTime} onChange={(v) => update({ startTime: v })} />
+              <TimeSelect
+                value={dt.startTime}
+                onChange={(v) => update({ startTime: v })}
+                times={pickerTimes}
+              />
             </Field>
             <Field label="Pick-up time">
-              <TimeSelect value={dt.endTime ?? ""} onChange={(v) => update({ endTime: v })} />
+              <TimeSelect
+                value={dt.endTime ?? ""}
+                onChange={(v) => update({ endTime: v })}
+                times={pickerTimes}
+              />
             </Field>
           </div>
         </>
@@ -309,10 +486,18 @@ export default function StepDateTime({
           </p>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Check-in time">
-              <TimeSelect value={dt.startTime} onChange={(v) => update({ startTime: v })} />
+              <TimeSelect
+                value={dt.startTime}
+                onChange={(v) => update({ startTime: v })}
+                times={pickerTimes}
+              />
             </Field>
             <Field label="Check-out time">
-              <TimeSelect value={dt.endTime ?? ""} onChange={(v) => update({ endTime: v })} />
+              <TimeSelect
+                value={dt.endTime ?? ""}
+                onChange={(v) => update({ endTime: v })}
+                times={pickerTimes}
+              />
             </Field>
           </div>
         </>
@@ -325,7 +510,11 @@ export default function StepDateTime({
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Start time">
-              <TimeSelect value={dt.startTime} onChange={(v) => update({ startTime: v })} />
+              <TimeSelect
+                value={dt.startTime}
+                onChange={(v) => update({ startTime: v })}
+                times={pickerTimes}
+              />
             </Field>
             <Field label="Duration">
               <Select value={String(hours)} onValueChange={(v) => update({ hours: Number(v) })}>
@@ -462,7 +651,11 @@ export default function StepDateTime({
             )
           ) : (
             <Field label="Appointment time">
-              <TimeSelect value={dt.startTime} onChange={(v) => update({ startTime: v })} />
+              <TimeSelect
+                value={dt.startTime}
+                onChange={(v) => update({ startTime: v })}
+                times={pickerTimes}
+              />
             </Field>
           )}
 
@@ -513,14 +706,22 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function TimeSelect({
+  value,
+  onChange,
+  times,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  times: { value: string; label: string }[];
+}) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger>
         <SelectValue placeholder="Select time" />
       </SelectTrigger>
       <SelectContent className="max-h-60">
-        {TIMES.map((t) => (
+        {times.map((t) => (
           <SelectItem key={t.value} value={t.value}>
             {t.label}
           </SelectItem>
