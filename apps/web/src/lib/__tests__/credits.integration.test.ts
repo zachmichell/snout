@@ -373,6 +373,209 @@ describe("expire_credits", () => {
   });
 });
 
+describe("transfer_credits", () => {
+  let fromOwnerId: string;
+  let toOwnerId: string;
+  beforeEach(async () => {
+    fromOwnerId = await createTestOwner();
+    toOwnerId = await createTestOwner();
+  });
+  afterEach(async () => {
+    await deleteTestOwner(fromOwnerId);
+    await deleteTestOwner(toOwnerId);
+  });
+
+  it("preserves the org-wide total: 5 full from A to B yields A=0,B=5 with both legs as manual_adjustment", async () => {
+    await insertLedger({ ownerId: fromOwnerId, kind: "purchase", full: 5 });
+    expect((await getCache(fromOwnerId)).full).toBe(5);
+    expect((await getCache(toOwnerId)).full).toBe(0);
+
+    const { data, error } = await sb.rpc("transfer_credits", {
+      p_from_owner_id: fromOwnerId,
+      p_to_owner_id: toOwnerId,
+      p_full: 5,
+      p_half: 0,
+      p_nights: 0,
+      p_note: "moved households",
+      p_actor_kind: "staff",
+      p_actor_label: "Test",
+      p_staff_code_id: null,
+    });
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ ok: true, full: 5 });
+    const transferId = (data as { transfer_id: string }).transfer_id;
+    expect(transferId).toBeTruthy();
+
+    expect((await getCache(fromOwnerId)).full).toBe(0);
+    expect((await getCache(toOwnerId)).full).toBe(5);
+
+    // Both legs are manual_adjustment rows tagged with the same transfer id.
+    const fromRows = (await getLedger(fromOwnerId)).filter(
+      (r) => r.kind === "manual_adjustment",
+    );
+    const toRows = (await getLedger(toOwnerId)).filter(
+      (r) => r.kind === "manual_adjustment",
+    );
+    expect(fromRows).toHaveLength(1);
+    expect(toRows).toHaveLength(1);
+    expect(fromRows[0].delta_full).toBe(-5);
+    expect(toRows[0].delta_full).toBe(5);
+  });
+
+  it("rejects when source has insufficient credits — neither leg lands", async () => {
+    await insertLedger({ ownerId: fromOwnerId, kind: "purchase", full: 2 });
+
+    const { error } = await sb.rpc("transfer_credits", {
+      p_from_owner_id: fromOwnerId,
+      p_to_owner_id: toOwnerId,
+      p_full: 5,
+      p_half: 0,
+      p_nights: 0,
+      p_note: null,
+      p_actor_kind: "staff",
+      p_actor_label: "Test",
+      p_staff_code_id: null,
+    });
+    expect(error).not.toBeNull();
+    expect(error?.message ?? "").toMatch(/[Ii]nsufficient/);
+
+    // Both owners untouched.
+    expect((await getCache(fromOwnerId)).full).toBe(2);
+    expect((await getCache(toOwnerId)).full).toBe(0);
+    expect(
+      (await getLedger(fromOwnerId)).filter((r) => r.kind === "manual_adjustment"),
+    ).toHaveLength(0);
+    expect(
+      (await getLedger(toOwnerId)).filter((r) => r.kind === "manual_adjustment"),
+    ).toHaveLength(0);
+  });
+
+  it("rejects same-owner self-transfer", async () => {
+    await insertLedger({ ownerId: fromOwnerId, kind: "purchase", full: 5 });
+    const { error } = await sb.rpc("transfer_credits", {
+      p_from_owner_id: fromOwnerId,
+      p_to_owner_id: fromOwnerId,
+      p_full: 1,
+      p_half: 0,
+      p_nights: 0,
+      p_note: null,
+      p_actor_kind: "staff",
+      p_actor_label: "Test",
+      p_staff_code_id: null,
+    });
+    expect(error).not.toBeNull();
+    expect(error?.message ?? "").toMatch(/owners must differ|differ/);
+  });
+
+  it("rejects zero-count transfer", async () => {
+    const { error } = await sb.rpc("transfer_credits", {
+      p_from_owner_id: fromOwnerId,
+      p_to_owner_id: toOwnerId,
+      p_full: 0,
+      p_half: 0,
+      p_nights: 0,
+      p_note: null,
+      p_actor_kind: "staff",
+      p_actor_label: "Test",
+      p_staff_code_id: null,
+    });
+    expect(error).not.toBeNull();
+    expect(error?.message ?? "").toMatch(/at least one credit/);
+  });
+
+  it("transfers a mix of types in one call: full + nights together", async () => {
+    await insertLedger({ ownerId: fromOwnerId, kind: "purchase", full: 3 });
+    await insertLedger({ ownerId: fromOwnerId, kind: "purchase", nights: 2 });
+
+    const { error } = await sb.rpc("transfer_credits", {
+      p_from_owner_id: fromOwnerId,
+      p_to_owner_id: toOwnerId,
+      p_full: 2,
+      p_half: 0,
+      p_nights: 1,
+      p_note: null,
+      p_actor_kind: "staff",
+      p_actor_label: "Test",
+      p_staff_code_id: null,
+    });
+    expect(error).toBeNull();
+
+    const from = await getCache(fromOwnerId);
+    const to = await getCache(toOwnerId);
+    expect(from.full).toBe(1);
+    expect(from.nights).toBe(1);
+    expect(to.full).toBe(2);
+    expect(to.nights).toBe(1);
+    // Total preserved across the org
+    expect(from.full + to.full).toBe(3);
+    expect(from.nights + to.nights).toBe(2);
+  });
+});
+
+describe("full-reservation refund", () => {
+  let ownerId: string;
+  beforeEach(async () => {
+    ownerId = await createTestOwner();
+  });
+  afterEach(async () => {
+    await deleteTestOwner(ownerId);
+  });
+
+  it("refunds the entire consumption of a cancelled reservation back to the original purchase", async () => {
+    // Operator buys a 10-pack, two reservations consume from it,
+    // then one of those reservations is cancelled and we want the
+    // full consumption of THAT reservation to refund.
+    const purchaseId = await insertLedger({
+      ownerId,
+      kind: "purchase",
+      full: 10,
+    });
+
+    const reservationA = crypto.randomUUID();
+    const reservationB = crypto.randomUUID();
+
+    await sb.rpc("consume_credits", {
+      p_owner_id: ownerId,
+      p_reservation_id: reservationA,
+      p_need_full: 3,
+      p_need_half: 0,
+      p_need_nights: 0,
+      p_actor_kind: "staff",
+      p_actor_label: "Test",
+      p_staff_code_id: null,
+    });
+    await sb.rpc("consume_credits", {
+      p_owner_id: ownerId,
+      p_reservation_id: reservationB,
+      p_need_full: 2,
+      p_need_half: 0,
+      p_need_nights: 0,
+      p_actor_kind: "staff",
+      p_actor_label: "Test",
+      p_staff_code_id: null,
+    });
+    expect((await getCache(ownerId)).full).toBe(5);
+
+    // Reservation A is cancelled and we refund its three credits.
+    await insertLedger({
+      ownerId,
+      kind: "refund",
+      full: 3,
+      sourcePurchaseId: purchaseId,
+      note: `Reservation ${reservationA} cancelled`,
+    });
+
+    expect((await getCache(ownerId)).full).toBe(8);
+
+    // The refund is anchored to the original purchase so the audit trail
+    // can match cancellation to its source.
+    const refunds = (await getLedger(ownerId)).filter((r) => r.kind === "refund");
+    expect(refunds).toHaveLength(1);
+    expect(refunds[0].source_purchase_id).toBe(purchaseId);
+    expect(refunds[0].delta_full).toBe(3);
+  });
+});
+
 describe("apply_credit_adjustment", () => {
   let ownerId: string;
   beforeEach(async () => {

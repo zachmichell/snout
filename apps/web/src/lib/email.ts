@@ -4,6 +4,7 @@ import {
   invoiceCreatedEmail,
   reportCardEmail,
   waiverReminderEmail,
+  petBirthdayEmail,
 } from "./email-templates";
 import { dispatchOwnerPush } from "./push";
 
@@ -29,7 +30,7 @@ function firePushBeside(args: {
   }).catch((e) => console.warn("push fan-out failed:", e));
 }
 
-export type EmailType = "reservation" | "invoice" | "report_card" | "waiver" | "auth";
+export type EmailType = "reservation" | "invoice" | "report_card" | "waiver" | "auth" | "birthday";
 
 interface SendEmailParams {
   to: string;
@@ -250,6 +251,49 @@ export async function sendReportCardPublished(args: {
     from_name: settings?.sender_name || org.name,
     organization_id: org.id,
     email_type: "report_card",
+  });
+}
+
+// 5. Pet birthday — fired by the daily birthday cron. Resolves the
+// org's per-event template (event_type='birthday') with optional
+// per-service-module overrides; falls back to the hardcoded
+// `petBirthdayEmail` shell. Skipped if EmailSettings have a future
+// birthday-disable toggle (not present today; reserved).
+export async function sendPetBirthday(args: {
+  organization_id: string;
+  to: string;
+  pet_name: string;
+  age?: number | null;
+  owner_first_name?: string;
+}) {
+  const { settings, org } = await loadEmailContext(args.organization_id);
+  if (!org) return { success: false, error: "Org not found" };
+  const { resolveOrFallback } = await import("./message-templates");
+  const { subject, html } = await resolveOrFallback({
+    organization_id: org.id,
+    channel: "email",
+    event_type: "birthday",
+    vars: {
+      pet_name: args.pet_name,
+      age: args.age ?? "",
+      org_name: org.name,
+      owner_first_name: args.owner_first_name ?? "",
+    },
+    fallback: () =>
+      petBirthdayEmail({
+        pet_name: args.pet_name,
+        age: args.age,
+        org_name: org.name,
+        owner_first_name: args.owner_first_name,
+      }),
+  });
+  return sendEmail({
+    to: args.to,
+    subject,
+    html_body: html,
+    from_name: settings?.sender_name || org.name,
+    organization_id: org.id,
+    email_type: "birthday" as EmailType,
   });
 }
 
