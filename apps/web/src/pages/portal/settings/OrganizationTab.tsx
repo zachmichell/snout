@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
+import { Info, Download, Loader2 } from "lucide-react";
 import { TIMEZONE_OPTIONS } from "@/lib/timezones";
 
 export default function OrganizationTab() {
@@ -46,6 +46,44 @@ export default function OrganizationTab() {
       setTimezone(org.timezone);
     }
   }, [org]);
+
+  // Bulk export of every CSV the org might want — operator backup or
+  // migration off Snout. Streams a zip from the export-org-data edge
+  // function. Admin-only on the server (membership role check), so we
+  // don't gate the button client-side beyond what permissions already
+  // hide.
+  const exportData = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("export-org-data", {
+        body: {},
+      });
+      if (error) throw new Error(error.message ?? String(error));
+      const blob =
+        data instanceof Blob
+          ? data
+          : data instanceof ArrayBuffer
+            ? new Blob([data], { type: "application/zip" })
+            : data instanceof Uint8Array
+              ? new Blob([data], { type: "application/zip" })
+              : null;
+      if (!blob) throw new Error("Could not read export response");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const slug = (org?.name ?? "snout-export")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 60) || "snout-export";
+      a.download = `${slug}-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Could not export data"),
+    onSuccess: () => toast.success("Export downloaded"),
+  });
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -148,6 +186,32 @@ export default function OrganizationTab() {
             disabled={saveMut.isPending || (name === org.name && timezone === org.timezone)}
           >
             {saveMut.isPending ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
+
+        <div className="mt-2 border-t border-border pt-5">
+          <div className="mb-2 text-sm font-medium text-foreground">
+            Bulk data export
+          </div>
+          <p className="mb-3 text-xs text-text-secondary">
+            Download a single zip containing CSVs of every owner, pet,
+            reservation, invoice, payment, and package. Includes a
+            manifest of vaccination documents and pet photos in storage
+            (the files themselves are not bundled — fetch individually
+            from the per-record links).
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => exportData.mutate()}
+            disabled={exportData.isPending}
+            className="gap-2"
+          >
+            {exportData.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {exportData.isPending ? "Preparing export…" : "Download all data"}
           </Button>
         </div>
       </CardContent>
