@@ -819,6 +819,69 @@ export type Database = {
           },
         ]
       }
+      config_snapshots: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_label: string | null
+          after_json: Json | null
+          before_json: Json
+          created_at: string
+          id: string
+          organization_id: string
+          restore_snapshot_id: string | null
+          restored_at: string | null
+          restored_by: string | null
+          row_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_label?: string | null
+          after_json?: Json | null
+          before_json: Json
+          created_at?: string
+          id?: string
+          organization_id: string
+          restore_snapshot_id?: string | null
+          restored_at?: string | null
+          restored_by?: string | null
+          row_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_label?: string | null
+          after_json?: Json | null
+          before_json?: Json
+          created_at?: string
+          id?: string
+          organization_id?: string
+          restore_snapshot_id?: string | null
+          restored_at?: string | null
+          restored_by?: string | null
+          row_id?: string
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "config_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "config_snapshots_restore_snapshot_id_fkey"
+            columns: ["restore_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "config_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           created_at: string
@@ -6708,6 +6771,7 @@ export type Database = {
         Returns: undefined
       }
       resolve_line_tax_code: { Args: { _line_id: string }; Returns: string }
+      restore_config_snapshot: { Args: { _snapshot_id: string }; Returns: Json }
       set_helcim_api_token: {
         Args: { _api_token: string; _org_id: string }
         Returns: string
