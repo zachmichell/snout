@@ -23,6 +23,7 @@ import ImportWizard from "./import/ImportWizard";
 import ChangelogTab from "./ChangelogTab";
 import WebcamsTab from "./WebcamsTab";
 import QuickBooksTab from "./QuickBooksTab";
+import SettingsHistoryTab from "./SettingsHistoryTab";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { Permission } from "@/lib/permissions";
 
@@ -47,6 +48,7 @@ const TAB_CONFIG: Array<{ key: string; label: string; permission: Permission }> 
   { key: "changelog", label: "Changelog", permission: "settings.organization" },
   { key: "webcams", label: "Webcams", permission: "settings.organization" },
   { key: "quickbooks", label: "QuickBooks", permission: "settings.billing" },
+  { key: "history", label: "History", permission: "settings.organization" },
 ];
 
 export default function Settings() {
@@ -191,6 +193,11 @@ export default function Settings() {
         {can("settings.billing") && (
           <TabsContent value="quickbooks" className="mt-6">
             <QuickBooksTab />
+          </TabsContent>
+        )}
+        {can("settings.organization") && (
+          <TabsContent value="history" className="mt-6">
+            <SettingsHistoryTab />
           </TabsContent>
         )}
       </Tabs>
