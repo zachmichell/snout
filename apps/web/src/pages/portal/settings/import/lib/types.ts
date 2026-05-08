@@ -1,5 +1,11 @@
 export type DataType = "owners" | "pets" | "vaccinations" | "reservations";
-export type SourceSystem = "gingr" | "petexec" | "daysmart" | "other";
+export type SourceSystem =
+  | "gingr"
+  | "petexec"
+  | "daysmart"
+  | "moego"
+  | "timetopet"
+  | "other";
 
 export type ParsedFile = {
   fileName: string;

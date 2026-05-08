@@ -15,6 +15,8 @@ const SOURCES: { key: SourceSystem; label: string; desc: string }[] = [
   { key: "gingr", label: "Gingr", desc: "Auto-maps Gingr export columns" },
   { key: "petexec", label: "PetExec", desc: "Auto-maps PetExec export columns" },
   { key: "daysmart", label: "DaySmart Pet", desc: "Auto-maps DaySmart export columns" },
+  { key: "moego", label: "MoeGo", desc: "Auto-maps MoeGo export columns" },
+  { key: "timetopet", label: "Time To Pet", desc: "Auto-maps Time To Pet export columns" },
   { key: "other", label: "Other / Generic CSV", desc: "Map columns manually" },
 ];
 

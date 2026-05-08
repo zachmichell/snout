@@ -131,6 +131,104 @@ const TEMPLATES: Record<SourceSystem, Record<DataType, Template>> = {
       notes: ["Comments", "Notes"],
     },
   },
+  // MoeGo column maps. MoeGo is grooming-first SaaS popular with
+  // independent salons. Their CSV exports use friendly column names
+  // ("Customer Name", "Pet Name") rather than the system-y headers
+  // some others use. The candidate lists below cover headers seen in
+  // MoeGo's standard customer / pet / appointment exports — operators
+  // exporting from a customized MoeGo report may need to fall through
+  // to the manual-mapping step.
+  moego: {
+    owners: {
+      first_name: ["First Name", "Customer First Name"],
+      last_name: ["Last Name", "Customer Last Name"],
+      email: ["Email", "Customer Email"],
+      phone: ["Phone", "Mobile", "Cell"],
+      home_phone: ["Home Phone"],
+      street_address: ["Address", "Address 1", "Street"],
+      city: ["City"],
+      state_province: ["State", "Province"],
+      postal_code: ["Zip", "Postal Code"],
+      notes: ["Notes", "Customer Notes"],
+    },
+    pets: {
+      name: ["Pet Name", "Pet"],
+      species: ["Species", "Type"],
+      breed: ["Breed"],
+      sex: ["Gender", "Sex"],
+      is_fixed: ["Spayed/Neutered", "Fixed"],
+      date_of_birth: ["Birthday", "DOB", "Date of Birth"],
+      weight_lbs: ["Weight"],
+      color: ["Color", "Coat Color"],
+      microchip_id: ["Microchip"],
+      veterinarian: ["Vet", "Veterinarian"],
+      owner_email: ["Owner Email", "Customer Email"],
+    },
+    vaccinations: {
+      pet_name: ["Pet Name"],
+      owner_email: ["Owner Email", "Customer Email"],
+      vaccine_name: ["Vaccine", "Vaccination"],
+      administered_date: ["Date Given", "Vaccination Date"],
+      expiry_date: ["Expiration", "Expires"],
+      vet_name: ["Vet"],
+      vet_clinic: ["Clinic"],
+    },
+    reservations: {
+      owner_email: ["Owner Email", "Customer Email"],
+      pet_name: ["Pet Name", "Pet"],
+      service_name: ["Service", "Appointment Type"],
+      start_at: ["Start Time", "Appointment Time", "Drop Off"],
+      end_at: ["End Time", "Pick Up"],
+      notes: ["Notes", "Comments"],
+    },
+  },
+  // Time To Pet column maps. TTP is dog-walking-first but used by some
+  // boarding/daycare operators too. Their exports tend to use
+  // capitalized two-word headers ("First Name", "Pet Name", etc.).
+  timetopet: {
+    owners: {
+      first_name: ["First Name"],
+      last_name: ["Last Name"],
+      email: ["Email"],
+      phone: ["Phone", "Mobile Phone", "Cell"],
+      home_phone: ["Home Phone"],
+      street_address: ["Address", "Address Line 1"],
+      city: ["City"],
+      state_province: ["State"],
+      postal_code: ["Zip", "Zip Code"],
+      notes: ["Notes"],
+    },
+    pets: {
+      name: ["Pet Name", "Pet"],
+      species: ["Species", "Animal Type"],
+      breed: ["Breed"],
+      sex: ["Sex", "Gender"],
+      is_fixed: ["Spayed/Neutered"],
+      date_of_birth: ["Date of Birth", "Birthday"],
+      weight_lbs: ["Weight"],
+      color: ["Color"],
+      microchip_id: ["Microchip Number", "Microchip"],
+      veterinarian: ["Veterinarian", "Vet"],
+      owner_email: ["Client Email", "Owner Email"],
+    },
+    vaccinations: {
+      pet_name: ["Pet Name"],
+      owner_email: ["Client Email", "Owner Email"],
+      vaccine_name: ["Vaccine"],
+      administered_date: ["Vaccination Date"],
+      expiry_date: ["Expiration Date"],
+      vet_name: ["Vet"],
+      vet_clinic: ["Clinic"],
+    },
+    reservations: {
+      owner_email: ["Client Email", "Owner Email"],
+      pet_name: ["Pet Name"],
+      service_name: ["Service", "Service Type"],
+      start_at: ["Start Date", "Visit Date"],
+      end_at: ["End Date"],
+      notes: ["Notes", "Visit Notes"],
+    },
+  },
   other: { owners: {}, pets: {}, vaccinations: {}, reservations: {} },
 };
 
