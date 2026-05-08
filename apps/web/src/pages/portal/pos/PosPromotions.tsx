@@ -26,7 +26,12 @@ type Promo = {
   discount_type: "percent" | "fixed"; discount_value: number;
   valid_from: string | null; valid_to: string | null;
   usage_count: number; max_uses: number | null; active: boolean;
+  location_id: string | null;
 };
+
+type LocationOption = { id: string; name: string };
+
+const ANY_LOCATION = "__any__";
 
 function emptyForm() {
   return {
@@ -35,6 +40,7 @@ function emptyForm() {
     discount_input: "", // %, or $ amount
     valid_from: "", valid_to: "",
     max_uses: "", active: true,
+    location_id: "" as string,  // "" means "all locations"
   };
 }
 
@@ -64,6 +70,27 @@ export function PosPromotionsSection({ showHeader = true }: { showHeader?: boole
     },
   });
 
+  // Locations for the per-promotion scope picker. Operators can attach a
+  // promotion to a single location ("Saskatoon-only weekend special") or
+  // leave it organization-wide. Multi-location orgs typically want at
+  // least some location-specific codes for events.
+  const { data: locations = [] } = useQuery({
+    queryKey: ["promotions-locations", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<LocationOption[]> => {
+      const { data, error } = await supabase
+        .from("locations")
+        .select("id, name")
+        .eq("organization_id", orgId!)
+        .is("deleted_at", null)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as LocationOption[];
+    },
+  });
+  const locationName = (id: string | null) =>
+    id ? locations.find((l) => l.id === id)?.name ?? "—" : "All locations";
+
   const openCreate = () => { setEditing(null); setForm(emptyForm()); setOpen(true); };
   const openEdit = (p: Promo) => {
     setEditing(p);
@@ -77,6 +104,7 @@ export function PosPromotionsSection({ showHeader = true }: { showHeader?: boole
       valid_to: p.valid_to ? p.valid_to.slice(0, 10) : "",
       max_uses: p.max_uses != null ? String(p.max_uses) : "",
       active: p.active,
+      location_id: p.location_id ?? "",
     });
     setOpen(true);
   };
@@ -104,6 +132,7 @@ export function PosPromotionsSection({ showHeader = true }: { showHeader?: boole
         max_uses: form.max_uses ? parseInt(form.max_uses) : null,
         active: form.active,
         organization_id: orgId!,
+        location_id: form.location_id ? form.location_id : null,
       };
       if (editing) {
         const { error } = await supabase.from("promotions").update(payload).eq("id", editing.id);
@@ -148,6 +177,7 @@ export function PosPromotionsSection({ showHeader = true }: { showHeader?: boole
                   <th className="px-[18px] py-[14px] label-eyebrow">Code</th>
                   <th className="px-[18px] py-[14px] label-eyebrow">Description</th>
                   <th className="px-[18px] py-[14px] label-eyebrow">Discount</th>
+                  <th className="px-[18px] py-[14px] label-eyebrow">Location</th>
                   <th className="px-[18px] py-[14px] label-eyebrow">Valid</th>
                   <th className="px-[18px] py-[14px] label-eyebrow">Uses</th>
                   <th className="px-[18px] py-[14px] label-eyebrow">Status</th>
@@ -160,6 +190,7 @@ export function PosPromotionsSection({ showHeader = true }: { showHeader?: boole
                     <td className="px-[18px] py-[14px] font-mono font-medium text-foreground">{p.code}</td>
                     <td className="px-[18px] py-[14px] text-text-secondary">{p.description ?? "—"}</td>
                     <td className="px-[18px] py-[14px] text-foreground">{formatDiscount(p)}</td>
+                    <td className="px-[18px] py-[14px] text-text-secondary">{locationName(p.location_id)}</td>
                     <td className="px-[18px] py-[14px] text-text-secondary">
                       {p.valid_from ? formatDate(p.valid_from) : "—"} → {p.valid_to ? formatDate(p.valid_to) : "—"}
                     </td>
@@ -216,6 +247,26 @@ export function PosPromotionsSection({ showHeader = true }: { showHeader?: boole
             </div>
             <div className="space-y-1.5"><Label className="text-xs">Max Uses</Label>
               <Input inputMode="numeric" value={form.max_uses} onChange={(e) => setForm({ ...form, max_uses: e.target.value })} placeholder="unlimited" /></div>
+            {locations.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Scope</Label>
+                <Select
+                  value={form.location_id || ANY_LOCATION}
+                  onValueChange={(v) => setForm({ ...form, location_id: v === ANY_LOCATION ? "" : v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ANY_LOCATION}>All locations</SelectItem>
+                    {locations.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-text-tertiary">
+                  Pick a single location to make this code only valid there, or leave on "All locations" for org-wide use.
+                </p>
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
               <Label className="text-sm">Active</Label>

@@ -2659,6 +2659,7 @@ export type Database = {
           deleted_at: string | null
           event_type: string | null
           id: string
+          location_id: string | null
           name: string
           organization_id: string
           service_module: Database["public"]["Enums"]["module_enum"] | null
@@ -2674,6 +2675,7 @@ export type Database = {
           deleted_at?: string | null
           event_type?: string | null
           id?: string
+          location_id?: string | null
           name: string
           organization_id: string
           service_module?: Database["public"]["Enums"]["module_enum"] | null
@@ -2689,6 +2691,7 @@ export type Database = {
           deleted_at?: string | null
           event_type?: string | null
           id?: string
+          location_id?: string | null
           name?: string
           organization_id?: string
           service_module?: Database["public"]["Enums"]["module_enum"] | null
@@ -2696,6 +2699,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "message_templates_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "message_templates_organization_id_fkey"
             columns: ["organization_id"]
@@ -2840,6 +2850,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          location_id: string | null
           next_billing_date: string | null
           organization_id: string
           owner_id: string
@@ -2853,6 +2864,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          location_id?: string | null
           next_billing_date?: string | null
           organization_id: string
           owner_id: string
@@ -2866,6 +2878,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          location_id?: string | null
           next_billing_date?: string | null
           organization_id?: string
           owner_id?: string
@@ -2876,7 +2889,15 @@ export type Database = {
           stripe_checkout_session_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "owner_subscriptions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       owner_tags: {
         Row: {
@@ -4057,6 +4078,7 @@ export type Database = {
           discount_value: number
           end_date: string | null
           id: string
+          location_id: string | null
           name: string
           organization_id: string
           priority: number
@@ -4074,6 +4096,7 @@ export type Database = {
           discount_value?: number
           end_date?: string | null
           id?: string
+          location_id?: string | null
           name: string
           organization_id: string
           priority?: number
@@ -4091,6 +4114,7 @@ export type Database = {
           discount_value?: number
           end_date?: string | null
           id?: string
+          location_id?: string | null
           name?: string
           organization_id?: string
           priority?: number
@@ -4100,6 +4124,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pricing_rules_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pricing_rules_organization_id_fkey"
             columns: ["organization_id"]
@@ -4208,6 +4239,7 @@ export type Database = {
           discount_type: string
           discount_value: number
           id: string
+          location_id: string | null
           max_uses: number | null
           organization_id: string
           updated_at: string
@@ -4224,6 +4256,7 @@ export type Database = {
           discount_type?: string
           discount_value?: number
           id?: string
+          location_id?: string | null
           max_uses?: number | null
           organization_id: string
           updated_at?: string
@@ -4240,6 +4273,7 @@ export type Database = {
           discount_type?: string
           discount_value?: number
           id?: string
+          location_id?: string | null
           max_uses?: number | null
           organization_id?: string
           updated_at?: string
@@ -4247,7 +4281,15 @@ export type Database = {
           valid_from?: string | null
           valid_to?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "promotions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       push_subscriptions: {
         Row: {
@@ -5245,6 +5287,7 @@ export type Database = {
           deleted_at: string | null
           description: string | null
           id: string
+          location_id: string | null
           manufacturer: string | null
           name: string
           organization_id: string
@@ -5265,6 +5308,7 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           id?: string
+          location_id?: string | null
           manufacturer?: string | null
           name: string
           organization_id: string
@@ -5285,6 +5329,7 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           id?: string
+          location_id?: string | null
           manufacturer?: string | null
           name?: string
           organization_id?: string
@@ -5298,6 +5343,13 @@ export type Database = {
           vendor?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "retail_products_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "retail_products_qbo_tax_code_id_fkey"
             columns: ["qbo_tax_code_id"]
@@ -5823,6 +5875,7 @@ export type Database = {
           description: string | null
           id: string
           included_credits: Json
+          location_id: string | null
           name: string
           organization_id: string
           price_cents: number
@@ -5838,6 +5891,7 @@ export type Database = {
           description?: string | null
           id?: string
           included_credits?: Json
+          location_id?: string | null
           name: string
           organization_id: string
           price_cents?: number
@@ -5853,6 +5907,7 @@ export type Database = {
           description?: string | null
           id?: string
           included_credits?: Json
+          location_id?: string | null
           name?: string
           organization_id?: string
           price_cents?: number
@@ -5860,7 +5915,15 @@ export type Database = {
           updated_at?: string
           validity_days?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "subscription_packages_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -6638,6 +6701,7 @@ export type Database = {
       }
       invoke_quickbooks_payouts_pipeline: { Args: never; Returns: string }
       invoke_quickbooks_process_queue: { Args: never; Returns: number }
+      invoke_send_birthday_emails: { Args: never; Returns: string }
       is_org_admin: { Args: { _org_id: string }; Returns: boolean }
       is_org_member: { Args: { _org_id: string }; Returns: boolean }
       mark_conversation_read_by_owner: {
@@ -6795,6 +6859,20 @@ export type Database = {
           _refresh_token: string
         }
         Returns: string
+      }
+      transfer_credits: {
+        Args: {
+          p_actor_kind?: string
+          p_actor_label?: string
+          p_from_owner_id: string
+          p_full?: number
+          p_half?: number
+          p_nights?: number
+          p_note?: string
+          p_staff_code_id?: string
+          p_to_owner_id: string
+        }
+        Returns: Json
       }
       update_helcim_verification: {
         Args: {
