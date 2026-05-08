@@ -1,13 +1,30 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Send, CheckCircle2, Ban, Link2 } from "lucide-react";
+import { Send, CheckCircle2, Ban, Link2, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import PortalLayout from "@/components/portal/PortalLayout";
 import PageHeader from "@/components/portal/PageHeader";
 import InvoiceStatusBadge from "@/components/portal/InvoiceStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCentsShort, formatDateTime } from "@/lib/money";
 import { effectiveInvoiceStatus } from "@/lib/invoice";
@@ -25,6 +42,12 @@ export default function InvoiceDetail() {
   const qc = useQueryClient();
   const [notes, setNotes] = useState("");
   const [notesDirty, setNotesDirty] = useState(false);
+  const [refundFor, setRefundFor] = useState<{
+    id: string;
+    amount_cents: number;
+    currency: string;
+  } | null>(null);
+  const canRefundPerm = can("invoices.refund") || can("invoices.edit");
 
   const { data: inv, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -482,9 +505,14 @@ export default function InvoiceDetail() {
                             ? "In person"
                             : p.method;
                     const when = p.processed_at ?? p.created_at;
+                    const refundable =
+                      p.status === "succeeded" &&
+                      !!p.stripe_payment_intent_id &&
+                      canRefundPerm;
+                    const isRefunded = p.status === "refunded" || p.status === "partially_refunded";
                     return (
                       <li key={p.id} className="border-b border-border-subtle pb-3 last:border-b-0 last:pb-0">
-                        <div className="flex items-baseline justify-between">
+                        <div className="flex items-baseline justify-between gap-3">
                           <span className="font-medium text-foreground">
                             {formatCentsShort(p.amount_cents)} {p.currency}
                           </span>
@@ -492,7 +520,33 @@ export default function InvoiceDetail() {
                             {when ? formatDateTime(when, tz) : ""}
                           </span>
                         </div>
-                        <div className="mt-0.5 text-xs text-text-secondary">{fundingLabel}</div>
+                        <div className="mt-0.5 flex items-center justify-between gap-3 text-xs text-text-secondary">
+                          <span>
+                            {fundingLabel}
+                            {isRefunded && (
+                              <span className="ml-2 inline-flex items-center rounded-pill border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-text-tertiary">
+                                {p.status === "partially_refunded" ? "partial refund" : "refunded"}
+                              </span>
+                            )}
+                          </span>
+                          {refundable && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-xs"
+                              onClick={() =>
+                                setRefundFor({
+                                  id: p.id,
+                                  amount_cents: p.amount_cents,
+                                  currency: p.currency,
+                                })
+                              }
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Refund
+                            </Button>
+                          )}
+                        </div>
                         {p.expected_payout_at && (
                           <div className="mt-1 text-xs text-text-tertiary">
                             Expected to settle in your bank on{" "}
@@ -525,6 +579,141 @@ export default function InvoiceDetail() {
           </div>
         </div>
       </div>
+
+      <RefundPaymentDialog
+        payment={refundFor}
+        onOpenChange={(o) => !o && setRefundFor(null)}
+        onRefunded={() => {
+          // Refresh the payments list and the invoice (status may flip
+          // when the underlying balance changes).
+          qc.invalidateQueries({ queryKey: ["invoice-payments", id] });
+          qc.invalidateQueries({ queryKey: ["invoice", id] });
+        }}
+      />
     </PortalLayout>
+  );
+}
+
+// Confirm-and-submit dialog for a Stripe refund. Defaults to a full
+// refund; the operator can edit the amount for a partial refund. Calls
+// stripe-refund-payment, which handles the org's connected account,
+// flips the payments row, and writes an activity_log row.
+function RefundPaymentDialog({
+  payment,
+  onOpenChange,
+  onRefunded,
+}: {
+  payment: { id: string; amount_cents: number; currency: string } | null;
+  onOpenChange: (open: boolean) => void;
+  onRefunded: () => void;
+}) {
+  const open = !!payment;
+  const [reason, setReason] = useState<string>("requested_by_customer");
+  const [amountStr, setAmountStr] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Reset the form whenever a different payment is selected.
+  useEffect(() => {
+    if (payment) {
+      setAmountStr((payment.amount_cents / 100).toFixed(2));
+      setReason("requested_by_customer");
+    }
+  }, [payment?.id]);
+
+  const submit = async () => {
+    if (!payment) return;
+    const cents = Math.round(parseFloat(amountStr || "0") * 100);
+    if (!Number.isFinite(cents) || cents <= 0) {
+      toast.error("Invalid refund amount");
+      return;
+    }
+    if (cents > payment.amount_cents) {
+      toast.error("Refund amount exceeds the original payment");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const isFull = cents === payment.amount_cents;
+      const { data, error } = await supabase.functions.invoke(
+        "stripe-refund-payment",
+        {
+          body: {
+            payment_id: payment.id,
+            reason: reason || null,
+            // Stripe refunds the full amount when amount_cents is omitted;
+            // pass it only for partial.
+            ...(isFull ? {} : { amount_cents: cents }),
+          },
+        },
+      );
+      if (error) {
+        toast.error(error.message ?? String(error));
+        return;
+      }
+      const result = data as { success?: boolean; error?: string };
+      if (!result?.success) {
+        toast.error(result?.error ?? "Could not refund payment");
+        return;
+      }
+      toast.success(isFull ? "Refund issued" : "Partial refund issued");
+      onRefunded();
+      onOpenChange(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!payment) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Refund payment</DialogTitle>
+          <DialogDescription>
+            This issues a refund through Stripe and updates the invoice.
+            Your QuickBooks integration (if connected) syncs the
+            RefundReceipt automatically on its next tick.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div>
+            <Label className="text-xs">Amount ({payment.currency})</Label>
+            <Input
+              inputMode="decimal"
+              value={amountStr}
+              onChange={(e) => setAmountStr(e.target.value)}
+            />
+            <p className="mt-1 text-[11px] text-text-tertiary">
+              Original payment was{" "}
+              {(payment.amount_cents / 100).toFixed(2)} {payment.currency}.
+              Edit for a partial refund.
+            </p>
+          </div>
+          <div>
+            <Label className="text-xs">Reason</Label>
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="requested_by_customer">Requested by customer</SelectItem>
+                <SelectItem value="duplicate">Duplicate charge</SelectItem>
+                <SelectItem value="fraudulent">Fraudulent</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={submitting} className="gap-2">
+            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {submitting ? "Refunding…" : "Issue refund"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
