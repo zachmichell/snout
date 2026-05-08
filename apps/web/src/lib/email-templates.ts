@@ -195,7 +195,33 @@ export function reportCardEmail(data: {
   return { subject, html };
 }
 
-// 4. Waiver reminder
+// 5. Pet birthday
+export function petBirthdayEmail(data: {
+  pet_name: string;
+  age?: number | null;
+  org_name: string;
+  owner_first_name?: string;
+}) {
+  const greeting = data.owner_first_name ? `${data.owner_first_name}, ` : "";
+  const ageLine =
+    data.age && data.age > 0
+      ? `${data.pet_name} is turning ${data.age} today.`
+      : `It's ${data.pet_name}'s birthday today.`;
+  const subject = `Happy birthday, ${data.pet_name}! 🎂`;
+  const html = shell({
+    title: subject,
+    preview: `Wishing ${data.pet_name} a wonderful birthday from ${data.org_name}`,
+    footer: { org_name: data.org_name },
+    body: `
+      ${h1(`Happy birthday, ${data.pet_name}! 🎂`)}
+      ${p(`${greeting}${ageLine} The whole team at ${data.org_name} is sending the warmest birthday wishes.`)}
+      ${p(`Whether it's a treat at the next visit or a special belly rub, today's a day to celebrate them. Thanks for letting us be part of your pet's life.`)}
+    `,
+  });
+  return { subject, html };
+}
+
+// 6. Waiver reminder
 export function waiverReminderEmail(data: {
   waiver_titles: string[];
   org_name: string;
