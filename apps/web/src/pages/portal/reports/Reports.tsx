@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocationFilter } from "@/contexts/LocationContext";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import * as R from "@/lib/reports";
 
@@ -168,30 +169,30 @@ function SimpleTable({ rows, columns }: { rows: any[]; columns: { key: string; l
 }
 
 // ===== FINANCIAL =====
-function FinancialTab({ orgId, range }: { orgId: string; range: R.DateRange }) {
+function FinancialTab({ orgId, range, locationId }: { orgId: string; range: R.DateRange; locationId: string | null }) {
   const [bucket, setBucket] = useState<R.Bucket>("day");
 
   const revenueQ = useQuery({
-    queryKey: ["rep-rev", orgId, range.from.toISOString(), range.to.toISOString(), bucket],
-    queryFn: () => R.fetchRevenueByDate(orgId, range, bucket),
+    queryKey: ["rep-rev", orgId, locationId, range.from.toISOString(), range.to.toISOString(), bucket],
+    queryFn: () => R.fetchRevenueByDate(orgId, range, bucket, locationId),
   });
-  const eodQ = useQuery({ queryKey: ["rep-eod", orgId], queryFn: () => R.fetchEndOfDay(orgId, new Date()) });
+  const eodQ = useQuery({ queryKey: ["rep-eod", orgId, locationId], queryFn: () => R.fetchEndOfDay(orgId, new Date(), locationId) });
   const taxQ = useQuery({
-    queryKey: ["rep-tax", orgId, range.from.toISOString(), range.to.toISOString(), bucket],
-    queryFn: () => R.fetchSalesTax(orgId, range, bucket),
+    queryKey: ["rep-tax", orgId, locationId, range.from.toISOString(), range.to.toISOString(), bucket],
+    queryFn: () => R.fetchSalesTax(orgId, range, bucket, locationId),
   });
-  const outstandingQ = useQuery({ queryKey: ["rep-out", orgId], queryFn: () => R.fetchOutstanding(orgId) });
+  const outstandingQ = useQuery({ queryKey: ["rep-out", orgId, locationId], queryFn: () => R.fetchOutstanding(orgId, locationId) });
   const refundsQ = useQuery({
-    queryKey: ["rep-refunds", orgId, range.from.toISOString(), range.to.toISOString()],
-    queryFn: () => R.fetchRefunds(orgId, range),
+    queryKey: ["rep-refunds", orgId, locationId, range.from.toISOString(), range.to.toISOString()],
+    queryFn: () => R.fetchRefunds(orgId, range, locationId),
   });
   const depositsQ = useQuery({
-    queryKey: ["rep-deps", orgId, range.from.toISOString(), range.to.toISOString()],
-    queryFn: () => R.fetchDeposits(orgId, range),
+    queryKey: ["rep-deps", orgId, locationId, range.from.toISOString(), range.to.toISOString()],
+    queryFn: () => R.fetchDeposits(orgId, range, locationId),
   });
   const pkgQ = useQuery({
-    queryKey: ["rep-pkg", orgId, range.from.toISOString(), range.to.toISOString()],
-    queryFn: () => R.fetchPackageSales(orgId, range),
+    queryKey: ["rep-pkg", orgId, locationId, range.from.toISOString(), range.to.toISOString()],
+    queryFn: () => R.fetchPackageSales(orgId, range, locationId),
   });
 
   return (
@@ -350,28 +351,28 @@ function FinancialTab({ orgId, range }: { orgId: string; range: R.DateRange }) {
 }
 
 // ===== RESERVATIONS =====
-function ReservationsTab({ orgId, range }: { orgId: string; range: R.DateRange }) {
+function ReservationsTab({ orgId, range, locationId }: { orgId: string; range: R.DateRange; locationId: string | null }) {
   const occQ = useQuery({
-    queryKey: ["rep-occ", orgId, range.from.toISOString(), range.to.toISOString()],
-    queryFn: () => R.fetchOccupancyByDay(orgId, range),
+    queryKey: ["rep-occ", orgId, locationId, range.from.toISOString(), range.to.toISOString()],
+    queryFn: () => R.fetchOccupancyByDay(orgId, range, locationId),
   });
   const noShowQ = useQuery({
-    queryKey: ["rep-noshow", orgId, range.from.toISOString(), range.to.toISOString()],
-    queryFn: () => R.fetchNoShows(orgId, range),
+    queryKey: ["rep-noshow", orgId, locationId, range.from.toISOString(), range.to.toISOString()],
+    queryFn: () => R.fetchNoShows(orgId, range, locationId),
   });
   const cancQ = useQuery({
-    queryKey: ["rep-canc", orgId, range.from.toISOString(), range.to.toISOString()],
-    queryFn: () => R.fetchCancellations(orgId, range),
+    queryKey: ["rep-canc", orgId, locationId, range.from.toISOString(), range.to.toISOString()],
+    queryFn: () => R.fetchCancellations(orgId, range, locationId),
   });
   const svcQ = useQuery({
-    queryKey: ["rep-svc", orgId, range.from.toISOString(), range.to.toISOString()],
-    queryFn: () => R.fetchServiceTypeComparison(orgId, range),
+    queryKey: ["rep-svc", orgId, locationId, range.from.toISOString(), range.to.toISOString()],
+    queryFn: () => R.fetchServiceTypeComparison(orgId, range, locationId),
   });
-  const futureQ = useQuery({ queryKey: ["rep-future", orgId], queryFn: () => R.fetchFutureReservations(orgId) });
-  const standingQ = useQuery({ queryKey: ["rep-standing", orgId], queryFn: () => R.fetchStandingReservations(orgId) });
+  const futureQ = useQuery({ queryKey: ["rep-future", orgId, locationId], queryFn: () => R.fetchFutureReservations(orgId, locationId) });
+  const standingQ = useQuery({ queryKey: ["rep-standing", orgId, locationId], queryFn: () => R.fetchStandingReservations(orgId, locationId) });
   const avgQ = useQuery({
-    queryKey: ["rep-avg", orgId, range.from.toISOString(), range.to.toISOString()],
-    queryFn: () => R.fetchAvgPetsPerWeek(orgId, range),
+    queryKey: ["rep-avg", orgId, locationId, range.from.toISOString(), range.to.toISOString()],
+    queryFn: () => R.fetchAvgPetsPerWeek(orgId, range, locationId),
   });
 
   return (
@@ -510,16 +511,16 @@ function ReservationsTab({ orgId, range }: { orgId: string; range: R.DateRange }
 }
 
 // ===== OWNERS =====
-function OwnersTab({ orgId, range }: { orgId: string; range: R.DateRange }) {
+function OwnersTab({ orgId, range, locationId }: { orgId: string; range: R.DateRange; locationId: string | null }) {
   const [bucket, setBucket] = useState<R.Bucket>("week");
   const newQ = useQuery({
-    queryKey: ["rep-newowners", orgId, range.from.toISOString(), range.to.toISOString(), bucket],
-    queryFn: () => R.fetchNewCustomers(orgId, range, bucket),
+    queryKey: ["rep-newowners", orgId, locationId, range.from.toISOString(), range.to.toISOString(), bucket],
+    queryFn: () => R.fetchNewCustomers(orgId, range, bucket, locationId),
   });
-  const subsQ = useQuery({ queryKey: ["rep-subs", orgId], queryFn: () => R.fetchActiveSubscriptions(orgId) });
+  const subsQ = useQuery({ queryKey: ["rep-subs", orgId, locationId], queryFn: () => R.fetchActiveSubscriptions(orgId, locationId) });
   const spendQ = useQuery({
-    queryKey: ["rep-spend", orgId, range.from.toISOString(), range.to.toISOString()],
-    queryFn: () => R.fetchOwnerSpend(orgId, range),
+    queryKey: ["rep-spend", orgId, locationId, range.from.toISOString(), range.to.toISOString()],
+    queryFn: () => R.fetchOwnerSpend(orgId, range, locationId),
   });
 
   return (
@@ -625,12 +626,16 @@ function OwnersTab({ orgId, range }: { orgId: string; range: R.DateRange }) {
 }
 
 // ===== PETS =====
-function PetsTab({ orgId, range }: { orgId: string; range: R.DateRange }) {
+function PetsTab({ orgId, range, locationId }: { orgId: string; range: R.DateRange; locationId: string | null }) {
+  // Vaccinations and birthdays are pet-level facts and pets are org-wide
+  // (the same dog can use multiple locations). The Pets tab leaves these
+  // org-wide on purpose — narrowing them by location would mis-imply a
+  // pet "belongs" to a single location.
   const vaxQ = useQuery({ queryKey: ["rep-vax", orgId], queryFn: () => R.fetchVaccineExpirations(orgId) });
   const bdayQ = useQuery({ queryKey: ["rep-bdays", orgId], queryFn: () => R.fetchBirthdaysThisMonth(orgId) });
   const incQ = useQuery({
-    queryKey: ["rep-inc", orgId, range.from.toISOString(), range.to.toISOString()],
-    queryFn: () => R.fetchIncidentReport(orgId, range),
+    queryKey: ["rep-inc", orgId, locationId, range.from.toISOString(), range.to.toISOString()],
+    queryFn: () => R.fetchIncidentReport(orgId, range, locationId),
   });
 
   const vaxBuckets = useMemo(() => {
@@ -712,6 +717,7 @@ function PetsTab({ orgId, range }: { orgId: string; range: R.DateRange }) {
 export default function Reports() {
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
+  const locationId = useLocationFilter();
   const [range, setRange] = useState<R.DateRange>(R.presets.last30());
 
   if (!orgId) {
@@ -727,7 +733,11 @@ export default function Reports() {
     <PortalLayout>
       <PageHeader
         title="Reports"
-        description="Financial, reservation, owner and pet insights for your business."
+        description={
+          locationId
+            ? "Financial, reservation, owner and pet insights — scoped to the selected location (use the location switcher in the header to change scope)."
+            : "Financial, reservation, owner and pet insights for your business across all locations."
+        }
         actions={<RangePicker range={range} onChange={setRange} />}
       />
 
@@ -739,16 +749,16 @@ export default function Reports() {
           <TabsTrigger value="pets">Pets</TabsTrigger>
         </TabsList>
         <TabsContent value="financial" className="mt-6">
-          <FinancialTab orgId={orgId} range={range} />
+          <FinancialTab orgId={orgId} range={range} locationId={locationId} />
         </TabsContent>
         <TabsContent value="reservations" className="mt-6">
-          <ReservationsTab orgId={orgId} range={range} />
+          <ReservationsTab orgId={orgId} range={range} locationId={locationId} />
         </TabsContent>
         <TabsContent value="owners" className="mt-6">
-          <OwnersTab orgId={orgId} range={range} />
+          <OwnersTab orgId={orgId} range={range} locationId={locationId} />
         </TabsContent>
         <TabsContent value="pets" className="mt-6">
-          <PetsTab orgId={orgId} range={range} />
+          <PetsTab orgId={orgId} range={range} locationId={locationId} />
         </TabsContent>
       </Tabs>
     </PortalLayout>

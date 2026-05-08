@@ -101,12 +101,16 @@ type Template = {
   channel: "email" | "sms";
   event_type: string | null;
   service_module: string | null;
+  location_id: string | null;
   subject: string | null;
   body: string;
   active: boolean;
   category: string;
   updated_at: string;
 };
+
+type LocationOption = { id: string; name: string };
+const ANY_LOCATION = "__default__";
 
 export default function MessageTemplatesTab() {
   const { membership } = useAuth();
@@ -122,7 +126,7 @@ export default function MessageTemplatesTab() {
       const { data, error } = await supabase
         .from("message_templates")
         .select(
-          "id, name, channel, event_type, service_module, subject, body, active, category, updated_at",
+          "id, name, channel, event_type, service_module, location_id, subject, body, active, category, updated_at",
         )
         .eq("organization_id", orgId!)
         .is("deleted_at", null)
@@ -132,6 +136,26 @@ export default function MessageTemplatesTab() {
       return (data ?? []) as Template[];
     },
   });
+
+  // Locations for the editor's per-location scope picker. Multi-location
+  // orgs typically want at least the welcome / confirmation emails per
+  // location; single-location orgs get a no-op picker.
+  const { data: locations = [] } = useQuery({
+    queryKey: ["templates-locations", orgId],
+    enabled: !!orgId,
+    queryFn: async (): Promise<LocationOption[]> => {
+      const { data, error } = await supabase
+        .from("locations")
+        .select("id, name")
+        .eq("organization_id", orgId!)
+        .is("deleted_at", null)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as LocationOption[];
+    },
+  });
+  const locationName = (id: string | null) =>
+    id ? locations.find((l) => l.id === id)?.name ?? "Unknown location" : null;
 
   const grouped = useMemo(() => {
     const map = new Map<string, Template[]>();
@@ -203,6 +227,11 @@ export default function MessageTemplatesTab() {
                               {t.service_module}
                             </span>
                           )}
+                          {locationName(t.location_id) && (
+                            <span className="ml-2 inline-flex items-center rounded-pill border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-text-secondary">
+                              {locationName(t.location_id)}
+                            </span>
+                          )}
                           {!t.active && (
                             <span className="ml-2 inline-flex items-center rounded-pill border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-text-tertiary">
                               inactive
@@ -243,6 +272,7 @@ export default function MessageTemplatesTab() {
         <TemplateEditor
           orgId={orgId}
           existing={editing}
+          locations={locations}
           onClose={() => {
             setEditing(null);
             setCreating(false);
@@ -259,11 +289,13 @@ export default function MessageTemplatesTab() {
 function TemplateEditor({
   orgId,
   existing,
+  locations,
   onClose,
   onSaved,
 }: {
   orgId: string;
   existing: Template | null;
+  locations: LocationOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -271,6 +303,7 @@ function TemplateEditor({
   const [channel, setChannel] = useState<"email" | "sms">(existing?.channel ?? "email");
   const [eventType, setEventType] = useState<string>(existing?.event_type ?? EVENTS[0].value);
   const [serviceModule, setServiceModule] = useState<string>(existing?.service_module ?? "__default__");
+  const [locationId, setLocationId] = useState<string>(existing?.location_id ?? ANY_LOCATION);
   const [subject, setSubject] = useState(existing?.subject ?? "");
   const [body, setBody] = useState(existing?.body ?? "");
   const [active, setActive] = useState(existing?.active ?? true);
@@ -294,6 +327,7 @@ function TemplateEditor({
         channel,
         event_type: eventType,
         service_module: serviceModule === "__default__" ? null : (serviceModule as any),
+        location_id: locationId === ANY_LOCATION ? null : locationId,
         subject: subject.trim() || null,
         body,
         active,
@@ -375,6 +409,28 @@ function TemplateEditor({
                 </SelectContent>
               </Select>
             </div>
+            {locations.length > 0 && (
+              <div>
+                <Label className="text-xs">Location</Label>
+                <Select value={locationId} onValueChange={setLocationId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ANY_LOCATION}>All locations</SelectItem>
+                    {locations.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-[11px] text-text-tertiary">
+                  Pick a single location to override the default for that
+                  facility, or leave on "All locations" for org-wide use.
+                </p>
+              </div>
+            )}
             {channel === "email" && (
               <div>
                 <Label className="text-xs">Subject</Label>

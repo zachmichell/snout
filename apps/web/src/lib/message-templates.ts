@@ -2,11 +2,19 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Per-organization, per-channel, per-event, optionally per-service-module
- * message templates. Resolution order is most-specific first:
+ * and per-location message templates. Resolution order is most-specific
+ * first across the (service_module, location_id) axes:
  *
- *   1. (org, channel, event_type, service_module)
- *   2. (org, channel, event_type, NULL)
- *   3. null  (caller falls back to the hardcoded default in email-templates.ts)
+ *   1. (org, channel, event, module, location)        — both axes match
+ *   2. (org, channel, event, module, NULL location)   — module-specific, org-wide
+ *   3. (org, channel, event, NULL module, location)   — location-specific, any service
+ *   4. (org, channel, event, NULL module, NULL)       — org-wide default
+ *   5. null (caller falls back to the hardcoded default in email-templates.ts)
+ *
+ * Rows with a non-null location_id are EXCLUDED when no location is
+ * supplied. That keeps a location-specific row from accidentally getting
+ * applied to a different location's email until the senders are wired to
+ * pass location_id.
  *
  * Templates use {{token}} placeholders. `renderTemplate` substitutes a flat
  * key-value bag into the template body; unknown tokens render as empty
@@ -39,10 +47,11 @@ export async function resolveTemplate(args: {
   channel: MessageChannel;
   event_type: MessageEventType;
   service_module?: ServiceModule | null;
+  location_id?: string | null;
 }): Promise<ResolvedTemplate | null> {
   const { data, error } = await supabase
     .from("message_templates")
-    .select("id, subject, body, service_module")
+    .select("id, subject, body, service_module, location_id")
     .eq("organization_id", args.organization_id)
     .eq("channel", args.channel)
     .eq("event_type", args.event_type)
@@ -52,19 +61,40 @@ export async function resolveTemplate(args: {
   if (error) throw error;
   if (!data || data.length === 0) return null;
 
-  // Prefer the row whose service_module matches the requested one; fall back
-  // to the row with NULL service_module (the org's default for this event).
-  const wanted = args.service_module ?? null;
-  const specific = data.find((t) => t.service_module === wanted) ?? null;
-  const fallback = data.find((t) => t.service_module === null) ?? null;
-  const chosen = specific ?? fallback;
+  const wantedModule = args.service_module ?? null;
+  const wantedLocation = args.location_id ?? null;
+
+  // Filter the candidate set so a location-specific template never
+  // matches a request for a different location. Without this, a row
+  // tagged for Location A could be applied to Location B's email.
+  const candidates = data.filter((t) => {
+    if (t.location_id == null) return true;
+    return t.location_id === wantedLocation;
+  });
+  if (candidates.length === 0) return null;
+
+  // Most-specific-first: both axes match > module-only match >
+  // location-only match > org default.
+  const both = candidates.find(
+    (t) => t.service_module === wantedModule && t.location_id === wantedLocation,
+  );
+  const moduleOnly = candidates.find(
+    (t) => t.service_module === wantedModule && t.location_id == null,
+  );
+  const locationOnly = candidates.find(
+    (t) => t.service_module == null && t.location_id === wantedLocation,
+  );
+  const orgDefault = candidates.find(
+    (t) => t.service_module == null && t.location_id == null,
+  );
+  const chosen = both ?? moduleOnly ?? locationOnly ?? orgDefault;
   if (!chosen) return null;
 
   return {
     id: chosen.id,
     subject: chosen.subject ?? null,
     body: chosen.body ?? "",
-    module_specific: specific !== null && specific.service_module !== null,
+    module_specific: chosen.service_module != null,
   };
 }
 
@@ -94,6 +124,7 @@ export async function resolveOrFallback(args: {
   channel: MessageChannel;
   event_type: MessageEventType;
   service_module?: ServiceModule | null;
+  location_id?: string | null;
   vars: Record<string, string | number | null | undefined>;
   fallback: () => { subject: string; html: string };
 }): Promise<{ subject: string; html: string }> {
@@ -102,6 +133,7 @@ export async function resolveOrFallback(args: {
     channel: args.channel,
     event_type: args.event_type,
     service_module: args.service_module ?? null,
+    location_id: args.location_id ?? null,
   });
   if (tpl?.subject && tpl.body) {
     return {
