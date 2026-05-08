@@ -4068,6 +4068,71 @@ export type Database = {
           },
         ]
       }
+      pricing_change_acknowledgments: {
+        Row: {
+          acknowledged_at: string
+          id: string
+          notice_id: string
+          profile_id: string
+        }
+        Insert: {
+          acknowledged_at?: string
+          id?: string
+          notice_id: string
+          profile_id: string
+        }
+        Update: {
+          acknowledged_at?: string
+          id?: string
+          notice_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_change_acknowledgments_notice_id_fkey"
+            columns: ["notice_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_change_notices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pricing_change_notices: {
+        Row: {
+          body_md: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          effective_at: string
+          id: string
+          link_url: string | null
+          severity: string
+          title: string
+        }
+        Insert: {
+          body_md: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          effective_at: string
+          id?: string
+          link_url?: string | null
+          severity?: string
+          title: string
+        }
+        Update: {
+          body_md?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          effective_at?: string
+          id?: string
+          link_url?: string | null
+          severity?: string
+          title?: string
+        }
+        Relationships: []
+      }
       pricing_rules: {
         Row: {
           applies_to_services: string[]
@@ -6604,6 +6669,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acknowledge_pricing_change_notice: {
+        Args: { _notice_id: string }
+        Returns: undefined
+      }
       apply_credit_adjustment: {
         Args: {
           p_actor_kind: string

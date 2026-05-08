@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import PausedOverlay from "./billing/PausedOverlay";
 import PastDueBanner from "./billing/PastDueBanner";
+import PricingChangeBanner from "./billing/PricingChangeBanner";
 import TrialBanner from "./billing/TrialBanner";
 import SupportWidget from "./support/SupportWidget";
 
@@ -39,6 +40,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <main className="flex-1 overflow-y-auto">
         {sub?.isPastDue && <PastDueBanner />}
         {showTrialBanner && <TrialBanner daysRemaining={sub.trialDaysRemaining} />}
+        <PricingChangeBanner />
         {children}
       </main>
       {showPausedOverlay && <PausedOverlay />}
