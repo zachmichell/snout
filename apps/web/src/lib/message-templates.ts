@@ -119,6 +119,36 @@ export function renderTemplate(template: string, vars: Record<string, string | n
  * hardcoded default if no template applies. Keeps the four senders in
  * email.ts symmetrical and short.
  */
+/**
+ * Text-only variant for SMS: resolves a per-org template and renders
+ * it against `vars`, falling back to a hardcoded short string if no
+ * template applies. Mirrors `resolveOrFallback` but returns a single
+ * string instead of `{subject, html}` because SMS has no subject and
+ * no HTML markup. The fallback is invoked lazily so the import graph
+ * doesn't pay for SMS templates that never fire.
+ */
+export async function resolveOrFallbackText(args: {
+  organization_id: string;
+  channel: MessageChannel;
+  event_type: MessageEventType;
+  service_module?: ServiceModule | null;
+  location_id?: string | null;
+  vars: Record<string, string | number | null | undefined>;
+  fallback: () => string;
+}): Promise<string> {
+  const tpl = await resolveTemplate({
+    organization_id: args.organization_id,
+    channel: args.channel,
+    event_type: args.event_type,
+    service_module: args.service_module ?? null,
+    location_id: args.location_id ?? null,
+  });
+  if (tpl?.body) {
+    return renderTemplate(tpl.body, args.vars);
+  }
+  return args.fallback();
+}
+
 export async function resolveOrFallback(args: {
   organization_id: string;
   channel: MessageChannel;
