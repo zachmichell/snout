@@ -79,6 +79,24 @@ export default function PetDetail() {
     },
   });
 
+  // Resolve the pet's preferred kennel run for display. The trigger keeps
+  // pets.preferred_kennel_run_id current with the most recent assignment;
+  // we look up the run name here so we can render "Run B" rather than a UUID.
+  const preferredRunId = (pet as any)?.preferred_kennel_run_id ?? null;
+  const { data: preferredRun } = useQuery({
+    queryKey: ["preferred-kennel-run", preferredRunId],
+    enabled: !!preferredRunId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("kennel_runs")
+        .select("id, name")
+        .eq("id", preferredRunId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const archive = async () => {
     const { error } = await supabase.from("pets").update({ deleted_at: new Date().toISOString() }).eq("id", id!);
     if (error) return toast.error(error.message);
@@ -193,6 +211,16 @@ export default function PetDetail() {
                 <Detail label="Color" value={pet.color} />
                 <Detail label="Markings" value={(pet as any).markings} />
                 <Detail label="Microchip" value={pet.microchip_id} />
+                <Detail
+                  label="Preferred kennel run"
+                  value={
+                    preferredRun?.name
+                      ? preferredRun.name
+                      : preferredRunId
+                      ? "Run no longer exists"
+                      : null
+                  }
+                />
               </dl>
             </div>
 
