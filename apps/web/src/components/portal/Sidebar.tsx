@@ -20,6 +20,12 @@ import {
   Wrench,
   GraduationCap,
   BarChart3,
+  LogIn,
+  AlertTriangle,
+  FileSignature,
+  HandCoins,
+  NotebookPen,
+  LineChart,
 } from "lucide-react";
 import Logo from "./Logo";
 import StaffCodeSwitcher from "./StaffCodeSwitcher";
@@ -37,7 +43,10 @@ const sections: Array<{
 }> = [
   {
     label: "Overview",
-    items: [{ to: "/dashboard", icon: LayoutDashboard, label: "Pack View" }],
+    items: [
+      { to: "/dashboard", icon: LayoutDashboard, label: "Pack View" },
+      { to: "/check-in-out", icon: LogIn, label: "Check-In / Out" },
+    ],
   },
   {
     label: "Operations",
@@ -49,6 +58,8 @@ const sections: Array<{
       { to: "/grooming", icon: Scissors, label: "Grooming" },
       { to: "/pet-care", icon: HeartPulse, label: "Pet Care" },
       { to: "/report-cards", icon: FileText, label: "Report Cards" },
+      { to: "/care-logs", icon: NotebookPen, label: "Care Logs", permission: "carelogs.create" as Permission },
+      { to: "/incidents", icon: AlertTriangle, label: "Incidents" },
     ],
   },
   {
@@ -56,6 +67,8 @@ const sections: Array<{
     items: [
       { to: "/pos/cart", icon: ShoppingCart, label: "POS" },
       { to: "/invoices", icon: Receipt, label: "Invoices", permission: "invoices.view" as Permission },
+      { to: "/deposits", icon: HandCoins, label: "Deposits" },
+      { to: "/agreements", icon: FileSignature, label: "Agreements" },
       { to: "/products", icon: Package, label: "Products" },
       { to: "/services", icon: Wrench, label: "Services", permission: "services.manage" as Permission },
     ],
@@ -64,6 +77,7 @@ const sections: Array<{
     label: "Insights",
     items: [
       { to: "/analytics", icon: BarChart3, label: "Analytics", permission: "revenue.view" as Permission },
+      { to: "/reports", icon: LineChart, label: "Reports", permission: "analytics.view" as Permission },
     ],
   },
   {
