@@ -28,7 +28,19 @@
 -- timestamp re-applies as a no-op (every statement is guarded).
 
 -- =====================================================================
--- 0. Custom enum types
+-- 0a. Extensions used by later migrations.
+--
+-- pg_cron is pre-installed on Supabase Cloud but not on the local
+-- `supabase start` Postgres (it IS in shared_preload_libraries so
+-- CREATE EXTENSION works). Migration 20260507060300_qbo_66a_payouts_cron
+-- calls `cron.schedule(...)` directly, which needs the cron schema to
+-- exist. Installing here once is the simplest fix.
+-- =====================================================================
+
+create extension if not exists pg_cron;
+
+-- =====================================================================
+-- 0b. Custom enum types
 --    Must come before the tables that reference them as column types
 --    (credit_ledger.kind, webcams.source_kind, helcim_accounts.processor).
 -- =====================================================================
