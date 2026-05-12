@@ -11,8 +11,21 @@
 --     everything the tests depend on)
 --   * any new local dev DB
 --
--- This is timestamped 1 second before the earliest existing migration
--- (20260417160136) so it always applies first.
+-- Ordering note: this file is timestamped 20260423234000 so it runs
+-- AFTER the foundational migrations it depends on:
+--   * 20260417160136 — creates module_enum, organizations, owners,
+--     profiles, locations
+--   * 20260423133631 — creates groomers
+--   * 20260423233421 — creates staff_codes
+-- and BEFORE the migrations that reference baseline objects:
+--   * 20260507040400 — uses quickbooks_accounts
+--   * 20260507080000 — uses credit_ledger
+--
+-- An earlier draft was committed as 20260417160100 but that placement
+-- runs the baseline before module_enum exists, which breaks fresh CI
+-- databases. The live DB has 20260417160100 recorded as applied in
+-- supabase_migrations.schema_migrations; this file under its new
+-- timestamp re-applies as a no-op (every statement is guarded).
 
 -- =====================================================================
 -- 0. Custom enum types
