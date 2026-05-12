@@ -94,6 +94,7 @@ import Deposits from "./pages/portal/deposits/Deposits";
 import AgreementTemplates from "./pages/portal/agreements/AgreementTemplates";
 import AgreementTracking from "./pages/portal/agreements/AgreementTracking";
 import OwnerAgreements from "./pages/portal-owner/Agreements";
+import CheckInOut from "./pages/portal/check-in-out/CheckInOut";
 
 const queryClient = new QueryClient();
 
@@ -178,7 +179,8 @@ const App = () => (
             <Route path="/invoices" element={staff(<Invoices />, "invoices.view")} />
             <Route path="/invoices/list" element={staff(<InvoicesList />, "invoices.view")} />
             <Route path="/invoices/:id" element={staff(<InvoiceDetail />, "invoices.view")} />
-            <Route path="/dashboard/check-in-out" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/check-in-out" element={staff(<CheckInOut />)} />
+            <Route path="/dashboard/check-in-out" element={<Navigate to="/check-in-out" replace />} />
             <Route path="/dashboard/analytics" element={<Navigate to="/analytics" replace />} />
             <Route path="/analytics" element={staff(<Analytics />, "revenue.view")} />
             <Route path="/reports" element={staff(<Reports />, "analytics.view")} />
@@ -224,6 +226,33 @@ const App = () => (
             <Route path="/portal/classes" element={customer(<OwnerClasses />)} />
             <Route path="/portal/agreements" element={customer(<OwnerAgreements />)} />
             <Route path="/portal/webcams" element={customer(<OwnerWebcams />)} />
+
+            {/* Common URL-bar aliases — operators occasionally type
+                short paths from memory or paste a link that uses an
+                older slug. Catching these as redirects beats showing
+                a 404. */}
+            <Route path="/checkin" element={<Navigate to="/check-in-out" replace />} />
+            <Route path="/check-in" element={<Navigate to="/check-in-out" replace />} />
+            <Route path="/checkout" element={<Navigate to="/check-in-out" replace />} />
+            <Route path="/check-out" element={<Navigate to="/check-in-out" replace />} />
+            <Route path="/users" element={<Navigate to="/user-management" replace />} />
+            <Route path="/team" element={<Navigate to="/settings?tab=team" replace />} />
+            <Route path="/staff" element={<Navigate to="/user-management" replace />} />
+            <Route path="/billing" element={<Navigate to="/settings?tab=billing" replace />} />
+            <Route path="/payments" element={<Navigate to="/settings?tab=payments" replace />} />
+            <Route path="/email" element={<Navigate to="/settings?tab=email" replace />} />
+            <Route path="/templates" element={<Navigate to="/settings?tab=templates" replace />} />
+            <Route path="/changelog" element={<Navigate to="/settings?tab=changelog" replace />} />
+            <Route path="/webcams" element={<Navigate to="/settings?tab=webcams" replace />} />
+            <Route path="/quickbooks" element={<Navigate to="/settings?tab=quickbooks" replace />} />
+            <Route path="/coupons" element={<Navigate to="/products?tab=promotions" replace />} />
+            <Route path="/promotions" element={<Navigate to="/products?tab=promotions" replace />} />
+            <Route path="/packages" element={<Navigate to="/products?tab=packages" replace />} />
+            <Route path="/products/all" element={<Navigate to="/products" replace />} />
+            <Route path="/self-wash" element={<Navigate to="/settings?tab=self-wash-bays" replace />} />
+            <Route path="/self-wash-bays" element={<Navigate to="/settings?tab=self-wash-bays" replace />} />
+            <Route path="/locations" element={<Navigate to="/settings/locations" replace />} />
+            <Route path="/audit-log" element={<Navigate to="/settings/audit-log" replace />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
