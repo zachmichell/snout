@@ -95,6 +95,20 @@ beforeAll(async () => {
     .select("id")
     .single();
   if (refundedInvErr) throw refundedInvErr;
+  // The 3000 invoice was paid in full at 09:00, then partially refunded
+  // (1500) at 14:00. The succeeded payment must exist for the day's
+  // transactions count to match the assertion (2 succeeded payments on
+  // Mar 11: this one + the 12000 paid at 12:00).
+  const { error: paidErr } = await sb.from("payments").insert({
+    organization_id: ORG_ID,
+    invoice_id: refundedInv!.id,
+    amount_cents: 3000,
+    currency: "CAD",
+    method: "card",
+    status: "succeeded",
+    processed_at: "2027-03-11T09:00:00Z",
+  });
+  if (paidErr) throw paidErr;
   const { error: refundErr } = await sb.from("payments").insert({
     organization_id: ORG_ID,
     invoice_id: refundedInv!.id,
