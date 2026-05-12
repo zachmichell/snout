@@ -32,15 +32,10 @@ jobs:
   integration:
     name: Integration tests
     runs-on: ubuntu-latest
-    # Pre-existing repo hygiene gap: most foundational schema
-    # (organizations, owners, services, invoices, etc.) was applied to
-    # the live DB via the Supabase MCP during early development and
-    # was never committed as migration files in supabase/migrations.
-    # CI's `supabase start` initializes from migrations only, so
-    # integration tests can't see the tables they depend on. This job
-    # is informational until a "baseline schema" migration captures
-    # the live DB shape. Tracked as a separate cleanup task.
-    continue-on-error: true
+    # Now enforcing. The schema baseline gap was closed by migration
+    # 20260423234000_baseline_missing_schema.sql (PR #29/#30) and the
+    # localStorage + capacity bugs that surfaced once tests actually ran
+    # were fixed by PR #31/#32.
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
