@@ -67,8 +67,7 @@ struct RootView: View {
         ZStack {
             SnoutTheme.background.ignoresSafeArea()
             VStack(spacing: SnoutTheme.Spacing.lg) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 40))
+                SnoutGlyph("exclamationmark.triangle", size: 40)
                     .foregroundStyle(SnoutTheme.accent)
                 Text("Couldn't load your account")
                     .font(SnoutTheme.titleMD)

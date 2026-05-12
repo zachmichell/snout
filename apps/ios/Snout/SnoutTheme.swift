@@ -44,8 +44,21 @@ enum SnoutTheme {
     /// Hairline divider.
     static let divider           = Color(red: 0.94, green: 0.91, blue: 0.87)      // #F0E8DE
 
-    /// Text on the warm primary (accent) button.
-    static let onAccent          = Color.white
+    /// Text on the warm primary (accent) button. Dark warm brown — matches web's
+    /// `--primary-foreground` and gives proper WCAG AA contrast against Soft Camel.
+    /// (White on Soft Camel fails AA at ~2.5:1.)
+    static let onAccent          = Color(red: 0.20, green: 0.15, blue: 0.13)      // #332620
+
+    // MARK: - Destructive action
+    /// Background for destructive primary buttons (e.g. "Cancel visit"). We
+    /// deliberately do NOT use system red — it clashes with the Boho palette
+    /// and reads as a generic iOS error rather than a considered facility
+    /// action. Instead we use the same deep warm brown as `onSurface`, which
+    /// hits AAA contrast against white text and stays inside the brand
+    /// family. The dark fill carries the visual gravitas; the explicit
+    /// "Cancel visit" label carries the meaning.
+    static let destructive       = onSurface                                     // #332620
+    static let onDestructive     = Color.white
 
     // MARK: - Status semantic colors (mapped to palette tones, never raw red/green)
     static func statusBackground(for status: ReservationStatus) -> Color {
@@ -97,14 +110,36 @@ enum SnoutTheme {
     static let heroShadowY:       CGFloat = 6
 
     // MARK: - Typography
-    // Display: serif (Fraunces on web; SF Serif as iOS substitute until font is licensed).
-    // Body: SF Text rounded for a softer consumer feel.
-    static func display(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: .serif)
+    // Display: Grandiflora One (Google Font, single-weight 400). The brand display face.
+    //   File: Snout/Resources/Fonts/GrandifloraOne-Regular.ttf
+    //
+    // Body: Montserrat (Google Font, multi-weight). The brand body face. We dispatch
+    //   the requested SwiftUI Font.Weight to the matching PostScript-named .ttf so
+    //   weights actually render correctly (SwiftUI's `.weight()` modifier on a custom
+    //   font does not synthesize bold/medium from a single regular file).
+    //   Files (Snout/Resources/Fonts/):
+    //     Montserrat-Regular.ttf, Montserrat-Medium.ttf,
+    //     Montserrat-SemiBold.ttf, Montserrat-Bold.ttf
+    //
+    // All fonts are registered via Info.plist `UIAppFonts`. If a .ttf is missing at
+    // runtime, SwiftUI silently falls back to the system font — the app still builds.
+    static func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        Font.custom("Grandiflora One", size: size).weight(weight)
     }
 
     static func body(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
+        let postScriptName: String
+        if weight == .bold || weight == .heavy || weight == .black {
+            postScriptName = "Montserrat-Bold"
+        } else if weight == .semibold {
+            postScriptName = "Montserrat-SemiBold"
+        } else if weight == .medium {
+            postScriptName = "Montserrat-Medium"
+        } else {
+            // .regular and lighter weights all map to Regular (Light not bundled)
+            postScriptName = "Montserrat-Regular"
+        }
+        return Font.custom(postScriptName, size: size)
     }
 
     static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {

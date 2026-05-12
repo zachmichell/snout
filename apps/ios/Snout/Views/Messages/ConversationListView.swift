@@ -121,8 +121,7 @@ struct ConversationListView: View {
 
     private func errorState(_ message: String) -> some View {
         VStack(spacing: SnoutTheme.Spacing.md) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 40))
+            SnoutGlyph("exclamationmark.triangle", size: 40)
                 .foregroundStyle(SnoutTheme.accent)
             Text("Couldn't load messages")
                 .font(SnoutTheme.titleMD)

@@ -1,5 +1,9 @@
 /**
  * Booking helpers: time slots, duration math, price estimates.
+ *
+ * Swift parity: apps/ios/Snout/Utilities/BookingHelpers.swift
+ * Both implementations must produce the same outputs for the same inputs.
+ * See docs/PARITY_LOG.md.
  */
 
 export type DurationType =
@@ -9,6 +13,14 @@ export type DurationType =
   | "overnight"
   | "multi_night"
   | "flat";
+
+/**
+ * Default reservation duration in minutes for `flat` services. Used to derive
+ * end_at from start_at when the wizard only collects a start time.
+ * Could become per-service configurable via a future
+ * `services.default_duration_minutes` column.
+ */
+export const FLAT_SERVICE_DEFAULT_DURATION_MINUTES = 60;
 
 /** Generate 15-minute time options between two hours (inclusive of both). */
 export function generateTimeSlots(startHour = 6, endHour = 21): { value: string; label: string }[] {

@@ -115,9 +115,22 @@ async function handleCheckoutCompleted(
   session: Stripe.Checkout.Session,
   connectedAccountId: string | null,
 ) {
+  // Two flavors of checkout fund this app:
+  //   - Invoice payments (metadata.invoice_id) → mark invoice paid + record payment.
+  //   - Credit-package purchases (metadata.package_id) → grant credits to the
+  //     owner and create an owner_subscriptions row, idempotently keyed by
+  //     session.id.
+  // Sessions without either id in metadata are unhandled (pre-existing
+  // direct charges, marketing test transactions, etc).
+  const packageId = session.metadata?.package_id;
+  if (packageId) {
+    await handlePackagePurchaseCompleted(session, connectedAccountId);
+    return;
+  }
+
   const invoiceId = session.metadata?.invoice_id;
   if (!invoiceId) {
-    console.warn("checkout.session.completed without invoice_id in metadata");
+    console.warn("checkout.session.completed without invoice_id or package_id in metadata");
     return;
   }
   const amountPaid = session.amount_total ?? 0;
@@ -169,10 +182,154 @@ async function handleCheckoutCompleted(
   );
 }
 
+// Apply a successful credit-package purchase. Idempotent via the unique
+// partial index on `owner_subscriptions.stripe_checkout_session_id`: a
+// re-delivered Stripe event yields a duplicate-key error which we treat as
+// "already applied" and silently skip.
+//
+// Credit-key convention (the keys we expect inside subscription_packages.
+// included_credits): `daycare_full_day`, `daycare_half_day`, `boarding_night`,
+// `store_credit_cents`. Anything else is preserved on owner_subscriptions
+// .remaining_credits so staff retain visibility, but isn't denormalized to
+// owners' fast-access columns.
+async function handlePackagePurchaseCompleted(
+  session: Stripe.Checkout.Session,
+  connectedAccountId: string | null,
+) {
+  const packageId = session.metadata?.package_id as string | undefined;
+  const ownerId = session.metadata?.owner_id as string | undefined;
+  const organizationId = session.metadata?.organization_id as string | undefined;
+  if (!packageId || !ownerId || !organizationId) {
+    console.warn(
+      `Package purchase missing metadata; got package_id=${packageId} owner_id=${ownerId} org=${organizationId}`,
+    );
+    return;
+  }
+
+  const amountPaid = session.amount_total ?? 0;
+  if (amountPaid <= 0) {
+    console.warn(`Package purchase session ${session.id} has zero amount; skipping`);
+    return;
+  }
+
+  // Connect-account match: the operator's stripe_account_id must equal the
+  // event's connected account so we don't fulfill against the wrong org.
+  if (connectedAccountId) {
+    const { data: connect } = await admin
+      .from("stripe_connect_accounts")
+      .select("stripe_account_id")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (connect?.stripe_account_id !== connectedAccountId) {
+      console.warn(
+        `Package purchase connect mismatch: event=${connectedAccountId} org=${connect?.stripe_account_id}`,
+      );
+      return;
+    }
+  }
+
+  // Load the package so we know what credits to grant. We use service-role
+  // here because the webhook isn't acting as a user.
+  const { data: pkg, error: pkgErr } = await admin
+    .from("subscription_packages")
+    .select("id, included_credits, validity_days, billing_cycle")
+    .eq("id", packageId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (pkgErr || !pkg) {
+    console.warn(`Package ${packageId} not found for purchase fulfillment`);
+    return;
+  }
+
+  const credits = (pkg.included_credits ?? {}) as Record<string, number>;
+
+  // next_billing_date for one-time packages is null; for recurring (monthly /
+  // quarterly / annual) we set to now + cycle. validity_days, when set,
+  // additionally caps when un-used credits expire (handled by expire-credits).
+  const nextBilling = nextBillingDateFromCycle(pkg.billing_cycle);
+
+  // Insert owner_subscriptions with idempotency via stripe_checkout_session_id.
+  const { error: subErr } = await admin
+    .from("owner_subscriptions")
+    .insert({
+      organization_id: organizationId,
+      owner_id: ownerId,
+      package_id: packageId,
+      remaining_credits: credits,
+      status: "active",
+      next_billing_date: nextBilling,
+      stripe_checkout_session_id: session.id,
+    });
+  if (subErr) {
+    // Duplicate-key error means we've already processed this session — fine.
+    if ((subErr as { code?: string }).code === "23505") {
+      console.log(`Package purchase ${session.id} already applied; idempotent skip`);
+      return;
+    }
+    console.error(`owner_subscriptions insert failed for session ${session.id}:`, subErr);
+    return;
+  }
+
+  // Denormalize the well-known keys onto owners.* so the home credits card
+  // doesn't have to aggregate across all owner_subscriptions on every render.
+  const incFull   = Number(credits.daycare_full_day ?? 0) | 0;
+  const incHalf   = Number(credits.daycare_half_day ?? 0) | 0;
+  const incNights = Number(credits.boarding_night ?? 0) | 0;
+  const incStoreCents = Number(credits.store_credit_cents ?? 0) | 0;
+
+  if (incFull || incHalf || incNights || incStoreCents) {
+    const { data: ownerRow, error: ownErr } = await admin
+      .from("owners")
+      .select("daycare_full_day_credits, daycare_half_day_credits, boarding_night_credits, store_credit_cents")
+      .eq("id", ownerId)
+      .maybeSingle();
+    if (ownErr || !ownerRow) {
+      console.error(`owner ${ownerId} not found for credit denormalization`);
+      return;
+    }
+    const updated = {
+      daycare_full_day_credits: (ownerRow.daycare_full_day_credits ?? 0) + incFull,
+      daycare_half_day_credits: (ownerRow.daycare_half_day_credits ?? 0) + incHalf,
+      boarding_night_credits:   (ownerRow.boarding_night_credits ?? 0) + incNights,
+      store_credit_cents:       (ownerRow.store_credit_cents ?? 0) + incStoreCents,
+    };
+    const { error: updErr } = await admin
+      .from("owners")
+      .update(updated)
+      .eq("id", ownerId);
+    if (updErr) {
+      console.error(`owner credit increment failed for ${ownerId}:`, updErr);
+    }
+  }
+
+  console.log(
+    `Package purchase fulfilled: owner=${ownerId} package=${packageId} session=${session.id} credits=${JSON.stringify(credits)}`,
+  );
+}
+
+function nextBillingDateFromCycle(cycle: string | null | undefined): string | null {
+  if (!cycle || cycle === "one_time") return null;
+  const now = new Date();
+  switch (cycle) {
+    case "monthly":   now.setMonth(now.getMonth() + 1); break;
+    case "quarterly": now.setMonth(now.getMonth() + 3); break;
+    case "annual":    now.setFullYear(now.getFullYear() + 1); break;
+    default:          return null;
+  }
+  return now.toISOString();
+}
+
 async function handlePaymentIntentSucceeded(
   intent: Stripe.PaymentIntent,
   connectedAccountId: string | null,
 ) {
+  // Package purchases are fulfilled by handlePackagePurchaseCompleted via
+  // checkout.session.completed (which also fires payment_intent.succeeded
+  // for the same charge). Skip here so we don't try to treat a package
+  // purchase as an invoice payment.
+  if (intent.metadata?.package_id) return;
+
   const invoiceId = intent.metadata?.invoice_id;
   if (!invoiceId) return;
 

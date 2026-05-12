@@ -28,25 +28,18 @@ final class CurrentOwnerService: ObservableObject {
     }
 
     func load(userId: String) async {
-        // Wait briefly for the keychain session to hydrate. Without a session in
-        // client.auth, PostgREST requests go out without a bearer token and RLS
-        // sees auth.uid() = NULL, so policies that compare profile_id = auth.uid()
-        // never match.
-        var session: Session?
-        for attempt in 0..<10 {
-            do {
-                session = try await client.auth.session
-                break
-            } catch {
-                let delayNs = UInt64(150_000_000) * UInt64(attempt + 1)
-                try? await Task.sleep(nanoseconds: delayNs)
-            }
-        }
-        guard session != nil else {
-            loadError = "Couldn't restore your sign-in session. Please sign out and try again."
-            return
-        }
-
+        // Trust the userId: AuthService gave it to us from a validated session
+        // (either the bootstrap keychain read or a fresh signIn). supabase-swift's
+        // PostgREST client pulls the bearer token from client.auth at request time,
+        // so if there's a session it'll be attached. If there isn't one, the query
+        // fails and we surface the real error rather than guessing.
+        //
+        // (Previously this had a 10-attempt × progressive-delay retry loop that
+        // waited up to ~8 seconds for client.auth.session to resolve. That was
+        // overcautious — the session is already in the keychain by the time signIn()
+        // returns — and it made every transient PostgREST error look like a
+        // "session missing" error to the user. Removed 2026-04-29.)
+        //
         // Use the lowercased UUID. supabase-swift returns UUID().uuidString in uppercase,
         // but Postgres stores UUIDs lowercased and PostgREST's eq filter is a literal
         // string match before the database re-parses.
@@ -70,7 +63,33 @@ final class CurrentOwnerService: ObservableObject {
             organizationId = firstOwner.organizationId
             loadError = nil
         } catch {
-            loadError = error.localizedDescription
+            // Surface the actual error verbatim so RLS / auth / network failures are
+            // diagnosable from the UI rather than being masked behind a generic message.
+            print("[CurrentOwnerService] owners query failed for profile=\(normalizedId): \(error)")
+            loadError = "Couldn't load your account: \(error.localizedDescription)"
+        }
+    }
+
+    /// Re-fetches the current owner row from the database. Use this after actions
+    /// that change owner-cached fields (e.g. credit consumption updates the
+    /// `daycare_full_day_credits` columns via a trigger). Keeps the same ownerId
+    /// — does not re-resolve from userId.
+    func refreshOwner() async {
+        guard let id = ownerId else { return }
+        do {
+            let rows: [Owner] = try await client
+                .from("owners")
+                .select()
+                .eq("id", value: id)
+                .is("deleted_at", value: nil)
+                .limit(1)
+                .execute()
+                .value
+            if let fresh = rows.first {
+                owner = fresh
+            }
+        } catch {
+            // Non-fatal — leave the cached owner in place.
         }
     }
 

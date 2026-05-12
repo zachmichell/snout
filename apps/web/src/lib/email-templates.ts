@@ -13,7 +13,7 @@ const ACCENT = "#CBA48F";
 const ACCENT_HOVER = "#B8927C";
 
 const FONTS_LINK =
-  '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:wght@600;700&display=swap" rel="stylesheet">';
+  '<link href="https://fonts.googleapis.com/css2?family=Grandiflora+One&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">';
 
 interface Footer {
   org_name: string;
@@ -28,13 +28,13 @@ function shell(opts: { title: string; preview?: string; body: string; footer: Fo
 <title>${escapeHtml(opts.title)}</title>
 ${FONTS_LINK}
 </head>
-<body style="margin:0;padding:0;background:${BG};font-family:'DM Sans',Arial,sans-serif;color:${TEXT};">
+<body style="margin:0;padding:0;background:${BG};font-family:'Montserrat',Arial,sans-serif;color:${TEXT};">
 ${opts.preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(opts.preview)}</div>` : ""}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:32px 16px;">
   <tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${CARD};border:1px solid ${BORDER};border-radius:14px;overflow:hidden;">
       <tr><td style="padding:28px 32px 8px;text-align:center;">
-        <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:28px;color:${TEXT};letter-spacing:-0.5px;">Snout<span style="color:${ACCENT};">.</span>app</div>
+        <div style="font-family:'Grandiflora One',Georgia,serif;font-weight:700;font-size:28px;color:${TEXT};letter-spacing:-0.5px;">Snout<span style="color:${ACCENT};">.</span>app</div>
       </td></tr>
       <tr><td style="padding:8px 32px 32px;">
         ${opts.body}
@@ -52,7 +52,7 @@ ${opts.preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:
 }
 
 function h1(text: string) {
-  return `<h1 style="margin:0 0 12px;font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:24px;line-height:1.2;color:${TEXT};">${escapeHtml(text)}</h1>`;
+  return `<h1 style="margin:0 0 12px;font-family:'Grandiflora One',Georgia,serif;font-weight:700;font-size:24px;line-height:1.2;color:${TEXT};">${escapeHtml(text)}</h1>`;
 }
 function p(text: string) {
   return `<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:${TEXT_SECONDARY};">${escapeHtml(text)}</p>`;
@@ -60,7 +60,7 @@ function p(text: string) {
 function button(label: string, href: string) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;">
     <tr><td style="background:${ACCENT};border-radius:10px;">
-      <a href="${href}" style="display:inline-block;padding:12px 22px;font-family:'DM Sans',Arial,sans-serif;font-weight:600;font-size:14px;color:#ffffff;text-decoration:none;">${escapeHtml(label)}</a>
+      <a href="${href}" style="display:inline-block;padding:12px 22px;font-family:'Montserrat',Arial,sans-serif;font-weight:600;font-size:14px;color:#2A1E16;text-decoration:none;">${escapeHtml(label)}</a>
     </td></tr>
   </table>`;
 }
@@ -138,7 +138,7 @@ export function invoiceCreatedEmail(data: {
       ${h1("You've got a new invoice")}
       ${p(`${data.org_name} has issued an invoice for your recent visit.`)}
       <div style="text-align:center;margin:24px 0;">
-        <div style="font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:40px;color:${ACCENT};line-height:1;">${escapeHtml(data.amount_display)}</div>
+        <div style="font-family:'Grandiflora One',Georgia,serif;font-weight:700;font-size:40px;color:${ACCENT};line-height:1;">${escapeHtml(data.amount_display)}</div>
         <div style="margin-top:6px;font-size:12px;color:${TEXT_TERTIARY};text-transform:uppercase;letter-spacing:0.6px;font-weight:600;">Amount due</div>
       </div>
       ${detailsCard([
@@ -170,7 +170,7 @@ export function reportCardEmail(data: {
     ? `<div style="text-align:center;margin:0 0 20px;">
         <div style="display:inline-block;background:linear-gradient(135deg,#F2D3C9 0%,#EED4BB 100%);border-radius:14px;padding:16px 28px;">
           <div style="font-size:32px;line-height:1;">${escapeHtml(data.rating_emoji ?? "⭐")}</div>
-          <div style="margin-top:6px;font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:18px;color:${TEXT};text-transform:capitalize;">${escapeHtml(data.rating)}</div>
+          <div style="margin-top:6px;font-family:'Grandiflora One',Georgia,serif;font-weight:700;font-size:18px;color:${TEXT};text-transform:capitalize;">${escapeHtml(data.rating)}</div>
         </div>
       </div>`
     : "";

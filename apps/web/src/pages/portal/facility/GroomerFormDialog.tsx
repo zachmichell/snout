@@ -8,12 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X } from "lucide-react";
+import { X, CalendarDays } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import type { Groomer } from "@/hooks/useGroomers";
+import GroomerAvailabilityDialog from "./GroomerAvailabilityDialog";
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const SPECIALTY_SUGGESTIONS = [
@@ -44,6 +45,7 @@ export default function GroomerFormDialog({ open, onOpenChange, groomer }: Props
   const [workingDays, setWorkingDays] = useState<string[]>(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
   const [bio, setBio] = useState("");
   const [active, setActive] = useState(true);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const { data: staff = [] } = useQuery({
     queryKey: ["org-staff-profiles", orgId],
@@ -224,7 +226,10 @@ export default function GroomerFormDialog({ open, onOpenChange, groomer }: Props
           </div>
 
           <div>
-            <Label>Working Days</Label>
+            <Label>Working Days (typical pattern)</Label>
+            <p className="mt-1 text-xs text-text-tertiary">
+              Quick at-a-glance summary. The actual day-by-day schedule lives in the Working Calendar.
+            </p>
             <div className="grid grid-cols-7 gap-2 mt-2">
               {WEEKDAYS.map((d) => (
                 <label key={d} className="flex flex-col items-center gap-1 text-xs cursor-pointer">
@@ -234,6 +239,31 @@ export default function GroomerFormDialog({ open, onOpenChange, groomer }: Props
               ))}
             </div>
           </div>
+
+          {isEdit && groomer && (
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <CalendarDays className="h-4 w-4 text-primary" />
+                    Working Calendar
+                  </div>
+                  <p className="mt-1 text-xs text-text-secondary">
+                    Day-by-day availability + hours. Open the calendar to mark specific days
+                    on or off and edit per-day hours — this is what the booking wizard reads.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCalendarOpen(true)}
+                >
+                  Open
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div>
             <Label>Bio</Label>
@@ -255,6 +285,17 @@ export default function GroomerFormDialog({ open, onOpenChange, groomer }: Props
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Child dialog: full-calendar availability editor. Only available
+          when editing an existing groomer (you need a groomer.id to write
+          rows in groomer_availability). */}
+      {isEdit && groomer && (
+        <GroomerAvailabilityDialog
+          open={calendarOpen}
+          onOpenChange={setCalendarOpen}
+          groomer={groomer}
+        />
+      )}
     </Dialog>
   );
 }

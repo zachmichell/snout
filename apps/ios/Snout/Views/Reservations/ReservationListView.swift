@@ -48,7 +48,7 @@ final class ReservationListViewModel: ObservableObject {
             schema: "public",
             table: "reservations"
         )
-        await channel.subscribe()
+        try? await channel.subscribeWithError()
         realtimeChannel = channel
 
         Task { [weak self] in
@@ -162,8 +162,7 @@ struct ReservationListView: View {
 
     private var emptyState: some View {
         VStack(spacing: SnoutTheme.Spacing.md) {
-            Image(systemName: "calendar")
-                .font(.system(size: 44, weight: .light))
+            SnoutGlyph("calendar", size: 44, weight: .light)
                 .foregroundStyle(SnoutTheme.onSurfaceFaint)
             Text("No visits yet")
                 .font(SnoutTheme.titleMD)
@@ -179,8 +178,7 @@ struct ReservationListView: View {
 
     private func errorState(_ message: String) -> some View {
         VStack(spacing: SnoutTheme.Spacing.md) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 40))
+            SnoutGlyph("exclamationmark.triangle", size: 40)
                 .foregroundStyle(SnoutTheme.accent)
             Text("Couldn't load your visits")
                 .font(SnoutTheme.titleMD)
@@ -219,8 +217,7 @@ struct ReservationCard: View {
 
             Spacer()
 
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
+            SnoutGlyph("chevron.right", size: 13, weight: .semibold)
                 .foregroundStyle(SnoutTheme.onSurfaceFaint)
                 .padding(.top, 4)
         }

@@ -29,6 +29,7 @@ targets:
       - path: Snout
     resources:
       - path: Snout/Resources/Assets.xcassets
+      - path: Snout/Resources/Fonts
     info:
       path: Snout/Resources/Info.plist
       properties:
@@ -50,6 +51,12 @@ targets:
         NSCameraUsageDescription: "Snout needs camera access if you ever want to attach a photo to a message."
         NSPhotoLibraryUsageDescription: "Snout saves report card photos to your library when you tap Save."
         NSUserNotificationsUsageDescription: "Snout sends you report cards, photos, and booking updates from your facility."
+        UIAppFonts:
+          - GrandifloraOne-Regular.ttf
+          - Montserrat-Regular.ttf
+          - Montserrat-Medium.ttf
+          - Montserrat-SemiBold.ttf
+          - Montserrat-Bold.ttf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.snout.ios

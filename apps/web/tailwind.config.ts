@@ -12,9 +12,12 @@ export default {
     },
     extend: {
       fontFamily: {
-        serif: ["Fraunces", "Georgia", "serif"],
-        sans: ["DM Sans", "system-ui", "sans-serif"],
-        display: ["Fraunces", "Georgia", "serif"],
+        // Brand display: Grandiflora One (Google Font, single-weight 400).
+        // Brand body: Montserrat (Google Font, multi-weight 400/500/600/700).
+        // iOS counterparts: SnoutTheme.display(...) and SnoutTheme.body(...).
+        serif: ["Grandiflora One", "Georgia", "serif"],
+        sans: ["Montserrat", "system-ui", "sans-serif"],
+        display: ["Grandiflora One", "Georgia", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
