@@ -11,10 +11,13 @@
 // (payments, deposits, owners, pets, vaccinations) either filter via
 // the parent that does carry location, or stay org-wide where the
 // concept doesn't fit (e.g., a customer record exists across locations).
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 export type DateRange = { from: Date; to: Date };
 export type LocationFilter = string | null | undefined;
+export type ReportClient = SupabaseClient<Database>;
 
 export const presets = {
   last7: () => ({ from: daysAgo(7), to: new Date() }),
@@ -53,8 +56,8 @@ export function bucketKey(date: Date, bucket: Bucket): string {
 
 // ===== FINANCIAL =====
 
-export async function fetchRevenueByDate(orgId: string, range: DateRange, bucket: Bucket, locationId?: LocationFilter) {
-  let q = supabase
+export async function fetchRevenueByDate(orgId: string, range: DateRange, bucket: Bucket, locationId?: LocationFilter, client: ReportClient = supabase) {
+  let q = client
     .from("invoices")
     .select("total_cents, paid_at, status")
     .eq("organization_id", orgId)
@@ -76,12 +79,12 @@ export async function fetchRevenueByDate(orgId: string, range: DateRange, bucket
   return Array.from(map.values()).sort((a, b) => a.period.localeCompare(b.period));
 }
 
-export async function fetchEndOfDay(orgId: string, day: Date, locationId?: LocationFilter) {
+export async function fetchEndOfDay(orgId: string, day: Date, locationId?: LocationFilter, client: ReportClient = supabase) {
   const start = new Date(day);
   start.setHours(0, 0, 0, 0);
   const end = new Date(day);
   end.setHours(23, 59, 59, 999);
-  let invQ = supabase
+  let invQ = client
     .from("invoices")
     .select("id, total_cents, tax_cents, status, paid_at, location_id")
     .eq("organization_id", orgId)
@@ -93,7 +96,7 @@ export async function fetchEndOfDay(orgId: string, day: Date, locationId?: Locat
   // Payments don't carry location_id, so we filter via the invoice id
   // set we just resolved (preserving the location scope upstream).
   const invIds = (invoices ?? []).map((i: { id: string }) => i.id);
-  let payQ = supabase
+  let payQ = client
     .from("payments")
     .select("amount_cents, status, processed_at, method, invoice_id")
     .eq("organization_id", orgId)

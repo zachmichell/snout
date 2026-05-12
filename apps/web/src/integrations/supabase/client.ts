@@ -2,16 +2,27 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const isBrowser = typeof window !== "undefined";
+
+// In the browser these come from Vite's static replacement of import.meta.env.
+// In Node (vitest integration tests) Vite's apps/web/.env isn't checked in to
+// CI, so the values are undefined and createClient would throw
+// "supabaseUrl is required" at module load. The integration tests never use
+// this exported client (they inject their own service-role client via
+// `@/test/supabase-test-client`), so a harmless placeholder is fine: the
+// import just needs to succeed so transitive importers like @/lib/reports
+// can load.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? (isBrowser ? undefined : "http://localhost");
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? (isBrowser ? undefined : "placeholder");
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// `storage: localStorage` is browser-only — same Node-vs-browser split.
+const browserAuth = isBrowser
+  ? { storage: localStorage, persistSession: true, autoRefreshToken: true }
+  : { persistSession: false, autoRefreshToken: false };
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
+  auth: browserAuth,
 });
