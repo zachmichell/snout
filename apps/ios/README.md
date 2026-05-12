@@ -38,6 +38,25 @@ Add a `Config.example.plist` (committed) with placeholder values so a new dev kn
 
 For Firebase: add the `GoogleService-Info.plist` from the Firebase console for the iOS app. Also gitignored.
 
+## Xcode Cloud
+
+`Config.plist` is gitignored, so Xcode Cloud's fresh clone of the repo does
+not contain it. Instead, the file is generated at build time from environment
+variables by `ci_scripts/ci_post_clone.sh`, which Xcode Cloud runs
+automatically after cloning.
+
+Configure these **secret** environment variables in App Store Connect →
+Apps → Snout → Xcode Cloud → Settings → Environment:
+
+| Variable            | Value                                              |
+| ------------------- | -------------------------------------------------- |
+| `SUPABASE_URL`      | `https://empdnuzfjgfnphwauhah.supabase.co`         |
+| `SUPABASE_ANON_KEY` | The Supabase project's public anon key            |
+
+Both must be marked as **Secret** so they aren't echoed in build logs. If
+either is missing, the build fails fast in `ci_post_clone.sh` with a clear
+error rather than later inside the Swift compile.
+
 ## Running
 
 - Simulator: select an iPhone simulator and Cmd+R.
