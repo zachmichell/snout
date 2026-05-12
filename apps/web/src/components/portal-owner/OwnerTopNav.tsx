@@ -25,6 +25,7 @@ const navItems = [
   { to: "/portal/messages", label: "Messages", badge: "messages" as const },
   { to: "/portal/invoices", label: "Invoices" },
   { to: "/portal/purchases", label: "Purchases" },
+  { to: "/portal/credits", label: "Credits" },
   { to: "/portal/agreements", label: "Agreements" },
 ];
 
