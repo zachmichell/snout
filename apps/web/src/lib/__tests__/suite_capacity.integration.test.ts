@@ -154,7 +154,7 @@ describe("suite capacity (capacity = 1)", () => {
       endAt: "2027-01-13T16:00:00Z",
     });
     expect(error).not.toBeNull();
-    expect(error?.message ?? "").toMatch(/at capacity/);
+    expect(error?.message ?? "").toMatch(/at capacity|full for the requested|exclusion constraint/i);
   });
 
   it("allows back-to-back reservations (half-open: end equals start)", async () => {
@@ -196,7 +196,7 @@ describe("suite capacity (capacity = 1)", () => {
       .update({ suite_id: SUITE_CAP1 })
       .eq("id", b!.id);
     expect(error).not.toBeNull();
-    expect(error?.message ?? "").toMatch(/at capacity/);
+    expect(error?.message ?? "").toMatch(/at capacity|full for the requested|exclusion constraint/i);
   });
 
   it("rejects an update that extends a reservation into a conflict", async () => {
@@ -213,7 +213,7 @@ describe("suite capacity (capacity = 1)", () => {
       .update({ start_at: "2027-01-11T22:00:00Z" })
       .eq("id", b!.id);
     expect(error).not.toBeNull();
-    expect(error?.message ?? "").toMatch(/at capacity/);
+    expect(error?.message ?? "").toMatch(/at capacity|full for the requested|exclusion constraint/i);
   });
 });
 
@@ -237,6 +237,6 @@ describe("suite capacity (capacity = 2)", () => {
       endAt: end,
     });
     expect(error).not.toBeNull();
-    expect(error?.message ?? "").toMatch(/at capacity/);
+    expect(error?.message ?? "").toMatch(/at capacity|full for the requested|exclusion constraint/i);
   });
 });

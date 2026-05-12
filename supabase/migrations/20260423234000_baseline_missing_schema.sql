@@ -28,7 +28,19 @@
 -- timestamp re-applies as a no-op (every statement is guarded).
 
 -- =====================================================================
--- 0. Custom enum types
+-- 0a. Extensions used by later migrations.
+--
+-- pg_cron is pre-installed on Supabase Cloud but not on the local
+-- `supabase start` Postgres (it IS in shared_preload_libraries so
+-- CREATE EXTENSION works). Migration 20260507060300_qbo_66a_payouts_cron
+-- calls `cron.schedule(...)` directly, which needs the cron schema to
+-- exist. Installing here once is the simplest fix.
+-- =====================================================================
+
+create extension if not exists pg_cron;
+
+-- =====================================================================
+-- 0b. Custom enum types
 --    Must come before the tables that reference them as column types
 --    (credit_ledger.kind, webcams.source_kind, helcim_accounts.processor).
 -- =====================================================================
@@ -639,7 +651,12 @@ end $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS qbo_mappings_one_per_qbo_entity ON public.quickbooks_entity_mappings USING btree (organization_id, qbo_entity_type, qbo_id) WHERE (deleted_at IS NULL);
 CREATE INDEX IF NOT EXISTS qbo_mappings_org_state_idx ON public.quickbooks_entity_mappings USING btree (organization_id, sync_state) WHERE (deleted_at IS NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS qbo_mappings_one_per_snout_entity_qbo_type ON public.quickbooks_entity_mappings USING btree (organization_id, snout_table, snout_id, qbo_entity_type) WHERE (deleted_at IS NULL);
+-- Note: `qbo_mappings_one_per_snout_entity_qbo_type` is intentionally NOT
+-- created here. Migration 20260507060000_qbo_64b_mapping_per_entity_type.sql
+-- creates it (as a non-idempotent CREATE UNIQUE INDEX). On the live DB the
+-- index already exists; this baseline re-apply is a no-op. On a fresh CI DB,
+-- migration 20260507060000 creates it cleanly without conflicting with a
+-- baseline pre-creation.
 
 alter table public.quickbooks_entity_mappings enable row level security;
 
@@ -944,6 +961,56 @@ create policy webcams_update_admin on public.webcams
 alter table public.owners add column if not exists daycare_full_day_credits integer not null default 0;
 alter table public.owners add column if not exists daycare_half_day_credits integer not null default 0;
 alter table public.owners add column if not exists boarding_night_credits integer not null default 0;
+
+-- ----------------------------------------------------------------------------
+-- 2b. Missing columns on other pre-existing tables.
+--
+-- These columns exist on the live DB but were added via the Supabase
+-- dashboard and never landed as migrations. Later migration files
+-- reference them (e.g. 20260507040300_qbo_65_reconciliation_export.sql
+-- selects payments.helcim_transaction_id), so a fresh CI Postgres
+-- can't apply the chain without them.
+--
+-- Each statement is idempotent via ADD COLUMN IF NOT EXISTS.
+-- ----------------------------------------------------------------------------
+
+-- invoice_lines
+alter table public.invoice_lines add column if not exists line_type text not null default 'item'::text;
+
+-- invoices
+alter table public.invoices add column if not exists surcharge_cents integer not null default 0;
+alter table public.invoices add column if not exists helcim_checkout_token text;
+alter table public.invoices add column if not exists helcim_checkout_secret_token text;
+alter table public.invoices add column if not exists helcim_checkout_expires_at timestamptz;
+
+-- message_templates
+alter table public.message_templates add column if not exists event_type text;
+alter table public.message_templates add column if not exists service_module module_enum;
+alter table public.message_templates add column if not exists deleted_at timestamptz;
+
+-- messages
+alter table public.messages add column if not exists attachments jsonb not null default '[]'::jsonb;
+
+-- organizations
+alter table public.organizations add column if not exists credit_expiration_days integer;
+alter table public.organizations add column if not exists payment_processor payment_processor_kind not null default 'stripe'::payment_processor_kind;
+alter table public.organizations add column if not exists cancellation_policy_hours integer not null default 24;
+alter table public.organizations add column if not exists grooming_cancellation_policy_hours integer not null default 48;
+
+-- owner_subscriptions
+alter table public.owner_subscriptions add column if not exists stripe_checkout_session_id text;
+
+-- payments
+alter table public.payments add column if not exists card_funding text;
+alter table public.payments add column if not exists expected_payout_at timestamptz;
+alter table public.payments add column if not exists helcim_transaction_id text;
+alter table public.payments add column if not exists helcim_invoice_number text;
+
+-- reservations
+alter table public.reservations add column if not exists parent_reservation_id uuid;
+
+-- services
+alter table public.services add column if not exists default_duration_minutes integer;
 
 -- ----------------------------------------------------------------------------
 -- 3. Credit-system functions (verbatim from pg_get_functiondef)
