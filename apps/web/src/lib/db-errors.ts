@@ -25,7 +25,13 @@ const FRIENDLY_CODES: Record<string, string> = {
 // fallback. Keep keys in sync with migration names.
 const FRIENDLY_CONSTRAINTS: Record<string, string> = {
   // Booking exclusion constraints (20260424130300)
+  // Note: reservations_no_suite_overlap was replaced by the capacity-aware
+  // trigger in 20260513120000; kept here in case older deployments still
+  // surface the constraint name.
   reservations_no_suite_overlap:
+    "That suite is already booked in this time window.",
+  // Capacity-aware trigger (20260507090000, 20260513120000)
+  "is full for the requested dates":
     "That suite is already booked in this time window.",
   grooming_no_groomer_overlap:
     "That groomer already has an appointment at that time.",
