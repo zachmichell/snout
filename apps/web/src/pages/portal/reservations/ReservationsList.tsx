@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useLocationFilter } from "@/contexts/LocationContext";
 import { downloadCsv, toCsv } from "@/lib/csv";
+import { toArray } from "@/lib/postgrest";
 
 const PAGE_SIZE = 10;
 
@@ -104,7 +105,7 @@ export function ReservationsListSection({ headerSlot }: { headerSlot?: React.Rea
     if (!term) return rows;
     return rows.filter((r: any) => {
       const owner = `${r.owners?.first_name ?? ""} ${r.owners?.last_name ?? ""}`.toLowerCase();
-      const pets = (r.reservation_pets ?? [])
+      const pets = toArray((r as any).reservation_pets)
         .map((rp: any) => rp.pets?.name)
         .filter(Boolean)
         .join(" ")
@@ -140,7 +141,7 @@ export function ReservationsListSection({ headerSlot }: { headerSlot?: React.Rea
                     suite: r.suites?.name ?? "",
                     owner: r.owners ? `${r.owners.first_name} ${r.owners.last_name}` : "",
                     service: r.services?.name ?? "",
-                    pets: (r.reservation_pets ?? []).map((rp: any) => rp.pets?.name).filter(Boolean).join("; "),
+                    pets: toArray((r as any).reservation_pets).map((rp: any) => rp.pets?.name).filter(Boolean).join("; "),
                     created_at: r.created_at,
                   }));
                   downloadCsv(`reservations-${startDate}-to-${endDate}.csv`, toCsv(rows));
@@ -288,7 +289,7 @@ export function ReservationsListSection({ headerSlot }: { headerSlot?: React.Rea
                     <tr key={r.id} className="border-t border-border-subtle hover:bg-background">
                       <td className="px-[18px] py-[14px]">
                         <PetCell
-                          pets={(r.reservation_pets ?? []).map((rp: any) => rp.pets)}
+                          pets={toArray((r as any).reservation_pets).map((rp: any) => rp.pets)}
                           linkTo={`/reservations/${r.id}`}
                         />
                       </td>

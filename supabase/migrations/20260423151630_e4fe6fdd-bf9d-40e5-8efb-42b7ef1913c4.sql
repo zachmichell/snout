@@ -22,6 +22,21 @@ DECLARE
 
   inv_id uuid;
 BEGIN
+  -- Demo data seed for the Happy Tails Pet Care fixture org. The
+  -- organization + matching location rows were originally created
+  -- via the Supabase admin UI / MCP on the live DB and never landed
+  -- as schema migrations. On a fresh database (CI integration tests,
+  -- a new local supabase start, a staging branch) those rows don't
+  -- exist, so this seed's INSERTs fail FK on owners.organization_id.
+  --
+  -- Guard the entire block so it becomes a no-op when the parent org
+  -- isn't present. The live DB has the org; this branch keeps running
+  -- as before. Fresh DBs skip the seed entirely.
+  IF NOT EXISTS (SELECT 1 FROM organizations WHERE id = v_org) THEN
+    RAISE NOTICE 'Skipping Happy Tails demo seed — organization % not present on this DB', v_org;
+    RETURN;
+  END IF;
+
   -- OWNERS
   INSERT INTO owners (organization_id, first_name, last_name, email, phone, street_address, city, state_province, postal_code) VALUES
     (v_org,'Sarah','Mitchell','sarah.mitchell@example.com','+1-780-555-0142','1024 Whyte Ave','Edmonton','AB','T6E 1A1') RETURNING id INTO o_sarah;

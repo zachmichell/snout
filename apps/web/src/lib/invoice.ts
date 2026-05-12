@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { toArray } from "@/lib/postgrest";
 
 /** Compute quantity for an invoice line based on the service duration type. */
 export function computeQuantity(durationType: string | null | undefined, startISO: string, endISO: string): number {
@@ -90,7 +91,7 @@ export async function createInvoiceForReservation(reservationId: string): Promis
   if (orgErr) throw orgErr;
   const currency = (org?.currency ?? "CAD") as "CAD" | "USD";
 
-  const pets = ((r as any).reservation_pets ?? []).map((rp: any) => rp.pets).filter(Boolean) as {
+  const pets = toArray((r as any).reservation_pets).map((rp: any) => rp.pets).filter(Boolean) as {
     id: string;
     name: string;
   }[];

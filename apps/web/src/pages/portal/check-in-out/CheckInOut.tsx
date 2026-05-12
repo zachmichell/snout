@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { toArray } from "@/lib/postgrest";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toArray } from "@/lib/postgrest";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, MessageSquareWarning, FileHeart, MapPin } from "lucide-react";
 import PortalLayout from "@/components/portal/PortalLayout";
@@ -117,7 +119,7 @@ export default function CheckInOut() {
       // Strip soft-deleted vaccinations
       return ((data ?? []) as any[]).map((r) => ({
         ...r,
-        reservation_pets: (r.reservation_pets ?? []).map((rp: any) => ({
+        reservation_pets: toArray((r as any).reservation_pets).map((rp: any) => ({
           ...rp,
           pets: rp.pets
             ? {
@@ -388,7 +390,7 @@ function Empty({ text }: { text: string }) {
 }
 
 function PetBlock({ res }: { res: ResRow }) {
-  const pets = (res.reservation_pets ?? []).map((rp) => rp.pets).filter(Boolean) as NonNullable<
+  const pets = toArray((res as any).reservation_pets).map((rp) => rp.pets).filter(Boolean) as NonNullable<
     ResRow["reservation_pets"][number]["pets"]
   >[];
   const primary = pets[0];
@@ -421,7 +423,7 @@ function PetBlock({ res }: { res: ResRow }) {
 
 function ArrivalCard({ res, onCheckIn }: { res: ResRow; onCheckIn: () => void }) {
   const noShow = useMarkNoShow();
-  const pets = (res.reservation_pets ?? []).map((rp) => rp.pets).filter(Boolean);
+  const pets = toArray((res as any).reservation_pets).map((rp) => rp.pets).filter(Boolean);
   const allVax = pets.flatMap((p) => validateVaccinations(p?.species, p?.vaccinations ?? []));
   const worstVax = vaxOverallStatus(allVax);
 

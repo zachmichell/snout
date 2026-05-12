@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
+import { toArray } from "@/lib/postgrest";
 import { StickyNote } from "lucide-react";
+import { toArray } from "@/lib/postgrest";
 import { Button } from "@/components/ui/button";
 import ModuleBadge from "@/components/portal/ModuleBadge";
 import { formatTime } from "@/lib/money";
@@ -44,7 +46,7 @@ export default function ReservationCard({
   overdue?: boolean;
 }) {
   const navigate = useNavigate();
-  const pets = (reservation.reservation_pets ?? [])
+  const pets = toArray((reservation as any).reservation_pets)
     .map((rp) => rp.pets)
     .filter(Boolean) as { name: string; breed: string | null }[];
   const primary = pets[0];

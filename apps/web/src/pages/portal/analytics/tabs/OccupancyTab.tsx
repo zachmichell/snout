@@ -19,6 +19,17 @@ export default function OccupancyTab({ data, range }: { data: any; range: DateRa
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
 
+  // Guard against the parent's analytics query still loading. Without
+  // this, accessing data.totals on first paint throws and crashes the
+  // entire /analytics route.
+  if (!data?.totals) {
+    return (
+      <div className="rounded-lg border border-border bg-surface p-8 text-center text-sm text-text-secondary shadow-card">
+        Loading occupancy data…
+      </div>
+    );
+  }
+
   const { data: extra } = useQuery({
     enabled: !!orgId,
     queryKey: ["occupancy-extra", orgId, range.from.toISOString(), range.to.toISOString()],

@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { toArray } from "@/lib/postgrest";
 import PortalLayout from "@/components/portal/PortalLayout";
+import { toArray } from "@/lib/postgrest";
 import PageHeader from "@/components/portal/PageHeader";
 // PlaygroupsSection: body-only (no PortalLayout) for embedding inside Settings tabs.
 import ModuleGate from "@/components/portal/facility/ModuleGate";
@@ -100,7 +102,7 @@ function PlaygroupsInner() {
       const ownerName = r.owners
         ? `${r.owners.first_name ?? ""} ${r.owners.last_name ?? ""}`.trim()
         : "—";
-      for (const rp of r.reservation_pets ?? []) {
+      for (const rp of toArray((r as any).reservation_pets)) {
         if (rp.pets) {
           list.push({
             petId: rp.pet_id,
