@@ -15,10 +15,17 @@ GoogleService-Info.plist
 xcuserdata/
 *.xcuserstate
 
-# Swift Package Manager artifacts (resolved dependencies cached locally)
+# Swift Package Manager artifacts (resolved dependencies cached locally).
+# Note: we intentionally COMMIT the workspace-level Package.resolved so
+# Xcode Cloud has the pinned dependency tree to resolve from. Ignoring
+# every Package.resolved indiscriminately is what broke the Xcode Cloud
+# build with "automatic dependency resolution is disabled" errors.
 .swiftpm/
 .build/
-Package.resolved
+# Ignore SPM resolved files inside checkouts (build artifacts), but NOT
+# the workspace-level one.
+**/SourcePackages/**/Package.resolved
+**/checkouts/**/Package.resolved
 
 # fastlane (future)
 fastlane/report.xml

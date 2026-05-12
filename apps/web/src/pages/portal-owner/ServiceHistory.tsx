@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { toArray } from "@/lib/postgrest";
 import { Link } from "react-router-dom";
+import { toArray } from "@/lib/postgrest";
 import { History, ChevronRight, Filter } from "lucide-react";
 import { useOwnerRecord } from "@/hooks/useOwnerRecord";
 import { useOwnerServiceHistory, type OwnerHistoryEntry } from "@/hooks/useOwnerServiceHistory";
@@ -152,7 +154,7 @@ export default function ServiceHistory() {
       ) : (
         <ul className="space-y-3">
           {filtered.map((h) => {
-            const petNames = (h.reservation_pets ?? [])
+            const petNames = toArray((h as any).reservation_pets)
               .map((rp) => rp.pets?.name)
               .filter(Boolean)
               .join(", ");

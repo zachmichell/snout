@@ -40,6 +40,17 @@ export default function RevenueTab({
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
 
+  // Loading guard — same pattern as OccupancyTab. The parent's
+  // useAnalytics query starts as undefined, and accessing data.totals
+  // crashes the route before the data arrives.
+  if (!data?.totals) {
+    return (
+      <div className="rounded-lg border border-border bg-surface p-8 text-center text-sm text-text-secondary shadow-card">
+        Loading revenue data…
+      </div>
+    );
+  }
+
   const { data: extra } = useQuery({
     enabled: !!orgId,
     queryKey: ["revenue-extra", orgId, range.from.toISOString(), range.to.toISOString()],

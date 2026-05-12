@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { toArray } from "@/lib/postgrest";
 import { Link, useParams } from "react-router-dom";
+import { toArray } from "@/lib/postgrest";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Send, CheckCircle2, Ban, Link2, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -253,7 +255,7 @@ export default function InvoiceDetail() {
   const reservation: any = (inv as any).reservations;
   const owner: any = (inv as any).owners;
   const location: any = reservation?.locations;
-  const pets: any[] = (reservation?.reservation_pets ?? []).map((rp: any) => rp.pets).filter(Boolean);
+  const pets: any[] = toArray((reservation as any)?.reservation_pets).map((rp: any) => rp.pets).filter(Boolean);
 
   const canSendPaymentLink =
     (inv.status === "sent" || eff === "overdue" || inv.status === "partial") &&

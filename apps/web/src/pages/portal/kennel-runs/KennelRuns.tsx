@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { toArray } from "@/lib/postgrest";
 import PortalLayout from "@/components/portal/PortalLayout";
+import { toArray } from "@/lib/postgrest";
 import PageHeader from "@/components/portal/PageHeader";
 import ModuleGate from "@/components/portal/facility/ModuleGate";
 import LocationFilter from "@/components/portal/facility/LocationFilter";
@@ -115,7 +117,7 @@ function KennelRunsInner() {
         : "—";
       const start = new Date(r.start_at).toLocaleDateString();
       const end = new Date(r.end_at).toLocaleDateString();
-      for (const rp of r.reservation_pets ?? []) {
+      for (const rp of toArray((r as any).reservation_pets)) {
         if (rp.pets) {
           list.push({
             petId: rp.pet_id,

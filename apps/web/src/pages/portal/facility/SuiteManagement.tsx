@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { toArray } from "@/lib/postgrest";
 import PortalLayout from "@/components/portal/PortalLayout";
+import { toArray } from "@/lib/postgrest";
 import PageHeader from "@/components/portal/PageHeader";
 import StatusBadge from "@/components/portal/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -79,7 +81,7 @@ export function SuiteManagementSection() {
   const occupantBySuite = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of occupants as any[]) {
-      const names = (r.reservation_pets ?? [])
+      const names = toArray((r as any).reservation_pets)
         .map((rp: any) => rp.pets?.name)
         .filter(Boolean)
         .join(", ");

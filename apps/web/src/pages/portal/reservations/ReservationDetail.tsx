@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { toArray } from "@/lib/postgrest";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toArray } from "@/lib/postgrest";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, CheckCircle2, LogIn, LogOut, XCircle, AlertTriangle, Plus, Trash2, FileHeart, Repeat } from "lucide-react";
 import PortalLayout from "@/components/portal/PortalLayout";
@@ -142,7 +144,7 @@ export default function ReservationDetail() {
       const owner: any = (r as any).owners;
       const service: any = (r as any).services;
       const location: any = (r as any).locations;
-      const pets: any[] = ((r as any).reservation_pets ?? []).map((rp: any) => rp.pets).filter(Boolean);
+      const pets: any[] = toArray((r as any).reservation_pets).map((rp: any) => rp.pets).filter(Boolean);
       if (owner?.email && r.organization_id) {
         sendReservationConfirmation({
           organization_id: r.organization_id,
@@ -269,7 +271,7 @@ export default function ReservationDetail() {
   }
 
   const tz = (r as any).locations?.timezone || undefined;
-  const linkedPetIds = new Set(((r as any).reservation_pets ?? []).map((rp: any) => rp.pet_id));
+  const linkedPetIds = new Set(toArray((r as any).reservation_pets).map((rp: any) => rp.pet_id));
   const addable = (ownerPetsForAdd ?? []).filter((p) => !linkedPetIds.has(p.id));
 
   // "Switch service" is allowed only before the pet has arrived. After
@@ -323,7 +325,7 @@ export default function ReservationDetail() {
   // a successful save.
 
   const titleService = (r as any).services?.name ?? "Reservation";
-  const reservationPets = (r as any).reservation_pets ?? [];
+  const reservationPets = toArray((r as any).reservation_pets);
   const firstPet = reservationPets[0]?.pets;
   const extraPetCount = Math.max(0, reservationPets.length - 1);
   const headerTitle = firstPet?.name
@@ -521,7 +523,7 @@ export default function ReservationDetail() {
             <div className="mt-6">
               <ReservationIncidentsSection
                 reservationId={r.id}
-                petIds={((r as any).reservation_pets ?? []).map((rp: any) => rp.pet_id)}
+                petIds={toArray((r as any).reservation_pets).map((rp: any) => rp.pet_id)}
               />
             </div>
         </div>

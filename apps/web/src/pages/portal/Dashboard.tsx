@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
+import { toArray } from "@/lib/postgrest";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toArray } from "@/lib/postgrest";
 import {
   Search,
   LogIn,
@@ -842,7 +844,7 @@ export default function Dashboard() {
 }
 
 function petNames(r: Row) {
-  return (r.reservation_pets ?? [])
+  return toArray((r as any).reservation_pets)
     .map((rp) => rp.pets?.name)
     .filter(Boolean)
     .join(", ");
@@ -853,7 +855,7 @@ function ownerName(r: Row) {
 }
 
 function PetCell({ r }: { r: Row }) {
-  const pets = (r.reservation_pets ?? [])
+  const pets = toArray((r as any).reservation_pets)
     .map((rp) => rp.pets)
     .filter(Boolean) as NonNullable<Row["reservation_pets"][number]["pets"]>[];
   const first = pets[0];

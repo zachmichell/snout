@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { toArray } from "@/lib/postgrest";
 import { useQuery } from "@tanstack/react-query";
+import { toArray } from "@/lib/postgrest";
 import { Link } from "react-router-dom";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
@@ -88,7 +90,7 @@ export default function CareLogs() {
     const out: { reservationId: string; pet: any; ownerName: string; serviceName: string; checkedInAt: string }[] = [];
     for (const r of activeVisits ?? []) {
       const ownerName = r.owners ? `${(r.owners as any).first_name} ${(r.owners as any).last_name}` : "—";
-      for (const rp of (r as any).reservation_pets ?? []) {
+      for (const rp of toArray((r as any).reservation_pets)) {
         if (!rp.pets) continue;
         out.push({
           reservationId: r.id,
