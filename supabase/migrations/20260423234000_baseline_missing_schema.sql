@@ -639,7 +639,12 @@ end $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS qbo_mappings_one_per_qbo_entity ON public.quickbooks_entity_mappings USING btree (organization_id, qbo_entity_type, qbo_id) WHERE (deleted_at IS NULL);
 CREATE INDEX IF NOT EXISTS qbo_mappings_org_state_idx ON public.quickbooks_entity_mappings USING btree (organization_id, sync_state) WHERE (deleted_at IS NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS qbo_mappings_one_per_snout_entity_qbo_type ON public.quickbooks_entity_mappings USING btree (organization_id, snout_table, snout_id, qbo_entity_type) WHERE (deleted_at IS NULL);
+-- Note: `qbo_mappings_one_per_snout_entity_qbo_type` is intentionally NOT
+-- created here. Migration 20260507060000_qbo_64b_mapping_per_entity_type.sql
+-- creates it (as a non-idempotent CREATE UNIQUE INDEX). On the live DB the
+-- index already exists; this baseline re-apply is a no-op. On a fresh CI DB,
+-- migration 20260507060000 creates it cleanly without conflicting with a
+-- baseline pre-creation.
 
 alter table public.quickbooks_entity_mappings enable row level security;
 
