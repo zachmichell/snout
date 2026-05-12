@@ -8,10 +8,14 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// `storage: localStorage` is browser-only. Guarding on `typeof window` lets
+// this module load in Node (vitest integration tests import it transitively
+// via @/lib/reports). In Node the Supabase client falls back to in-memory
+// storage, which is fine — there are no sessions to persist in tests.
+const browserAuth = typeof window !== "undefined"
+  ? { storage: localStorage, persistSession: true, autoRefreshToken: true }
+  : { persistSession: false, autoRefreshToken: false };
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
+  auth: browserAuth,
 });

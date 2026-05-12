@@ -113,7 +113,7 @@ afterAll(async () => {
 
 describe("fetchEndOfDay", () => {
   it("ties out to direct sums for Mar 10", async () => {
-    const result = await fetchEndOfDay(ORG_ID, new Date("2027-03-10T12:00:00Z"));
+    const result = await fetchEndOfDay(ORG_ID, new Date("2027-03-10T12:00:00Z"), undefined, sb);
     // Two invoices on Mar 10: 5000 + 7500 = 12500, tax 250 + 375 = 625
     expect(result.revenue).toBe(12500);
     expect(result.tax).toBe(625);
@@ -125,7 +125,7 @@ describe("fetchEndOfDay", () => {
   });
 
   it("captures a refund on Mar 11", async () => {
-    const result = await fetchEndOfDay(ORG_ID, new Date("2027-03-11T12:00:00Z"));
+    const result = await fetchEndOfDay(ORG_ID, new Date("2027-03-11T12:00:00Z"), undefined, sb);
     // Two invoices paid on Mar 11: 12000 + 3000 = 15000, tax 600 + 150 = 750
     expect(result.revenue).toBe(15000);
     expect(result.tax).toBe(750);
@@ -138,7 +138,7 @@ describe("fetchEndOfDay", () => {
   });
 
   it("returns zero on a day with no activity", async () => {
-    const result = await fetchEndOfDay(ORG_ID, new Date("2027-03-15T12:00:00Z"));
+    const result = await fetchEndOfDay(ORG_ID, new Date("2027-03-15T12:00:00Z"), undefined, sb);
     expect(result.revenue).toBe(0);
     expect(result.tax).toBe(0);
     expect(result.invoiceCount).toBe(0);
@@ -154,7 +154,7 @@ describe("fetchRevenueByDate", () => {
   };
 
   it("buckets by day and ties out per bucket", async () => {
-    const rows = await fetchRevenueByDate(ORG_ID, range, "day");
+    const rows = await fetchRevenueByDate(ORG_ID, range, "day", undefined, sb);
     const byPeriod = Object.fromEntries(rows.map((r) => [r.period, r]));
 
     // Mar 10: 5000 + 7500 = 12500, count 2
@@ -171,7 +171,7 @@ describe("fetchRevenueByDate", () => {
   });
 
   it("buckets by month and ties out to the all-fixtures total", async () => {
-    const rows = await fetchRevenueByDate(ORG_ID, range, "month");
+    const rows = await fetchRevenueByDate(ORG_ID, range, "month", undefined, sb);
     const total = rows.reduce((acc, r) => acc + r.revenue, 0);
     const directSum =
       FIXTURE_INVOICES.reduce((acc, f) => acc + f.total, 0) + 3000;
@@ -186,7 +186,7 @@ describe("fetchRevenueByDate", () => {
       from: new Date("2027-03-11T00:00:00Z"),
       to: new Date("2027-03-11T23:59:59Z"),
     };
-    const rows = await fetchRevenueByDate(ORG_ID, narrow, "day");
+    const rows = await fetchRevenueByDate(ORG_ID, narrow, "day", undefined, sb);
     expect(rows).toHaveLength(1);
     expect(rows[0].revenue).toBe(15000);
     expect(rows[0].count).toBe(2);
