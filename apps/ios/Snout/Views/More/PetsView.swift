@@ -491,13 +491,13 @@ final class PetEditViewModel: ObservableObject {
                 }
             } else if photoCleared {
                 struct ClearPayload: Encodable { let photo_url: String? }
-                try? await client
+                _ = try? await client
                     .from("pets")
                     .update(ClearPayload(photo_url: nil))
                     .eq("id", value: petId)
                     .execute()
                 if let path = existingPhotoPath {
-                    try? await client.storage
+                    _ = try? await client.storage
                         .from("pet-photos")
                         .remove(paths: [path])
                 }
@@ -534,7 +534,7 @@ final class PetEditViewModel: ObservableObject {
 
         // Best-effort: delete the previous photo file if we replaced one.
         if let oldPath = existingPhotoPath, oldPath != path {
-            try? await client.storage
+            _ = try? await client.storage
                 .from("pet-photos")
                 .remove(paths: [oldPath])
         }
