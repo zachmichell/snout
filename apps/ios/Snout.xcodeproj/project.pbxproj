@@ -810,7 +810,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.snout.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = org.snoutapp.snout;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -830,7 +830,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.snout.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = org.snoutapp.snout;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
