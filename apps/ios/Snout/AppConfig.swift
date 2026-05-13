@@ -51,4 +51,12 @@ enum AppConfig {
         }
         return key
     }
+
+    /// Production web app URL. Used as the Stripe Checkout success/cancel
+    /// redirect target so Stripe doesn't bounce users to Supabase (which
+    /// doesn't host pages, only edge functions). The in-app Safari view
+    /// closes when the redirect fires; the user only briefly glimpses the
+    /// web page if at all. If we ever introduce test/staging environments
+    /// this should move to Config.plist alongside the Supabase URL.
+    static let webAppURL = "https://snout-web.vercel.app"
 }

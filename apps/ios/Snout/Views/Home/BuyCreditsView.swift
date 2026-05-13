@@ -261,6 +261,12 @@ final class BuyCreditsCheckoutViewModel: ObservableObject {
 
         struct Payload: Encodable {
             let package_id: String
+            // Tells the edge function where Stripe should redirect after
+            // checkout. Without this, the edge function falls back to the
+            // request origin (Supabase functions URL), which doesn't host
+            // any pages — Stripe's redirect lands on a 404 and the user
+            // sees "requested path is invalid".
+            let base_url: String
         }
         struct Response: Decodable {
             let checkout_url: String?
@@ -271,7 +277,9 @@ final class BuyCreditsCheckoutViewModel: ObservableObject {
         do {
             let response: Response = try await client.functions
                 .invoke("create-package-checkout-session",
-                        options: FunctionInvokeOptions(body: Payload(package_id: packageId)))
+                        options: FunctionInvokeOptions(
+                            body: Payload(package_id: packageId, base_url: AppConfig.webAppURL)
+                        ))
             if let err = response.error {
                 checkoutError = err
                 return nil
