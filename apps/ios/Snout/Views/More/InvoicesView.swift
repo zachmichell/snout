@@ -485,12 +485,23 @@ struct InvoiceDetailView: View {
 
     @StateObject private var vm = InvoiceDetailViewModel()
     @State private var checkoutSheet: SafariURL?
+    /// Banner state after Stripe redirects. The edge function sets
+    /// `?payment=success` / `?payment=cancelled` on success_url / cancel_url.
+    @State private var lastCheckoutOutcome: CheckoutOutcome?
+
+    private enum CheckoutOutcome: Equatable {
+        case success
+        case cancelled
+    }
 
     var body: some View {
         ZStack {
             SnoutTheme.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: SnoutTheme.Spacing.lg) {
+                    if let outcome = lastCheckoutOutcome {
+                        outcomeBanner(outcome)
+                    }
                     if let inv = vm.invoice {
                         headerCard(inv)
                         if let label = vm.reservationLabel {
@@ -528,12 +539,75 @@ struct InvoiceDetailView: View {
         .task { await vm.load(invoiceId: invoiceId) }
         .sheet(item: $checkoutSheet, onDismiss: {
             // After Safari closes the user has either paid or cancelled.
-            // Either way, refresh from the wire — the webhook may have
-            // already updated the invoice status.
-            Task { await vm.load(invoiceId: invoiceId) }
+            // Poll the invoice for ~30s so it picks up the webhook-applied
+            // paid status without a manual refresh.
+            Task { await pollInvoiceForUpdate() }
         }) { item in
-            SafariSheet(url: item.url, preferredControlTintColor: UIColor(SnoutTheme.accent))
-                .ignoresSafeArea()
+            SafariSheet(
+                url: item.url,
+                preferredControlTintColor: UIColor(SnoutTheme.accent),
+                shouldAutoDismissOn: { url in
+                    detectOutcome(in: url) != nil
+                },
+                onAutoDismiss: { url in
+                    if let outcome = detectOutcome(in: url) {
+                        lastCheckoutOutcome = outcome
+                    }
+                },
+            )
+            .ignoresSafeArea()
+        }
+    }
+
+    /// `create-stripe-checkout-session` sets `?payment=success` /
+    /// `?payment=cancelled` on the success/cancel URLs. Anything else is
+    /// an intermediate Stripe page; don't dismiss early.
+    private func detectOutcome(in url: URL) -> CheckoutOutcome? {
+        let q = url.query ?? ""
+        if q.contains("payment=success") { return .success }
+        if q.contains("payment=cancelled") || q.contains("payment=canceled") { return .cancelled }
+        return nil
+    }
+
+    private func pollInvoiceForUpdate() async {
+        for _ in 0..<10 {
+            await vm.load(invoiceId: invoiceId)
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+        }
+    }
+
+    @ViewBuilder
+    private func outcomeBanner(_ outcome: CheckoutOutcome) -> some View {
+        switch outcome {
+        case .success:
+            HStack(spacing: SnoutTheme.Spacing.sm) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Payment received")
+                        .font(SnoutTheme.body(15, weight: .semibold))
+                        .foregroundStyle(SnoutTheme.onSurface)
+                    Text("Your invoice will update to Paid in a few seconds.")
+                        .font(SnoutTheme.bodySM)
+                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                }
+                Spacer()
+            }
+            .padding(SnoutTheme.Spacing.lg)
+            .background(SnoutTheme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        case .cancelled:
+            HStack(spacing: SnoutTheme.Spacing.sm) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                Text("Payment cancelled. No charge was made.")
+                    .font(SnoutTheme.bodySM)
+                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                Spacer()
+            }
+            .padding(SnoutTheme.Spacing.lg)
+            .background(SnoutTheme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
         }
     }
 
