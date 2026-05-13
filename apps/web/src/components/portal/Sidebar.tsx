@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Receipt,
   Package,
+  Ticket,
   Wrench,
   GraduationCap,
   BarChart3,
@@ -71,6 +72,7 @@ const sections: Array<{
       { to: "/agreements", icon: FileSignature, label: "Agreements" },
       { to: "/products", icon: Package, label: "Products" },
       { to: "/services", icon: Wrench, label: "Services", permission: "services.manage" as Permission },
+      { to: "/subscriptions", icon: Ticket, label: "Packages" },
     ],
   },
   {
