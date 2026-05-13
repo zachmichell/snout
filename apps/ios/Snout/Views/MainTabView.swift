@@ -78,6 +78,15 @@ struct MainTabView: View {
         }
         .task(id: currentOwner.ownerId) {
             await unread.refresh(ownerId: currentOwner.ownerId)
+            // Live updates: when staff sends a message, the DB bumps
+            // conversations.unread_owner; this subscription fires and
+            // refreshes the badge automatically. Re-subscribes if the owner
+            // identity changes (sign-out clears it; sign-in sets a new one).
+            if let ownerId = currentOwner.ownerId {
+                await unread.startRealtime(ownerId: ownerId)
+            } else {
+                await unread.stopRealtime()
+            }
         }
         .environmentObject(unread)
         .environmentObject(tabBarVisibility)
