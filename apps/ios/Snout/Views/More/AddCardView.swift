@@ -152,15 +152,22 @@ struct AddCardView: View {
                 dismiss()
             }
         }
-        // PaymentSheet's binding-driven presentation. We toggle
-        // isPresentingSheet to true once `vm.state == .ready` and the
-        // user taps the primary CTA.
-        .paymentSheet(
-            isPresented: $isPresentingSheet,
-            paymentSheet: paymentSheetIfReady,
-            onCompletion: { result in
-                vm.handle(result: result)
-            },
+        // PaymentSheet's binding-driven presentation. The .paymentSheet
+        // modifier expects a NON-optional PaymentSheet, so we only attach
+        // it when the vm has finished preparing one. Tapping the primary
+        // CTA toggles isPresentingSheet and the modifier handles the rest.
+        .background(
+            Group {
+                if case .ready(let sheet) = vm.state {
+                    Color.clear.paymentSheet(
+                        isPresented: $isPresentingSheet,
+                        paymentSheet: sheet,
+                        onCompletion: { result in
+                            vm.handle(result: result)
+                        }
+                    )
+                }
+            }
         )
     }
 
@@ -258,11 +265,6 @@ struct AddCardView: View {
     }
 
     // MARK: - Helpers
-
-    private var paymentSheetIfReady: PaymentSheet? {
-        if case .ready(let sheet) = vm.state { return sheet }
-        return nil
-    }
 
     private func prepareIfNeeded(force: Bool = false) async {
         if !force, case .ready = vm.state { return }
