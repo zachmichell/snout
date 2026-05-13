@@ -69,7 +69,12 @@ targets:
           - Montserrat-Bold.ttf
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.snout.ios
+        # Must match the App ID registered in Apple Developer Portal for the
+        # Snout iOS app — the team's profiles (Snout Development, Snout Ad Hoc)
+        # are tied to this bundle ID. Changing it requires registering a new
+        # App ID + new profiles. Tests/UI tests can use the app.snout.* prefix
+        # because they don't need their own App IDs.
+        PRODUCT_BUNDLE_IDENTIFIER: org.snoutapp.snout
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
