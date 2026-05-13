@@ -63,6 +63,7 @@ import OwnerInvoiceDetail from "./pages/portal-owner/InvoiceDetail";
 import OwnerWaivers from "./pages/portal-owner/Waivers";
 import OwnerWaiverDetail from "./pages/portal-owner/WaiverDetail";
 import OwnerPurchases from "./pages/portal-owner/Purchases";
+import OwnerBuyCredits from "./pages/portal-owner/BuyCredits";
 import OwnerServiceHistory from "./pages/portal-owner/ServiceHistory";
 import Lodging from "./pages/portal/lodging/Lodging";
 import Grooming from "./pages/portal/grooming/Grooming";
@@ -222,6 +223,10 @@ const App = () => (
             <Route path="/portal/report-cards/:id" element={customer(<OwnerReportCardDetail />)} />
             <Route path="/portal/messages" element={customer(<OwnerMessages />)} />
             <Route path="/portal/purchases" element={customer(<OwnerPurchases />)} />
+            <Route path="/portal/credits" element={customer(<OwnerBuyCredits />)} />
+            {/* Stripe Checkout redirects back to this exact path
+                (the edge function hardcodes /portal-owner/credits). */}
+            <Route path="/portal-owner/credits" element={customer(<OwnerBuyCredits />)} />
             <Route path="/portal/history" element={customer(<OwnerServiceHistory />)} />
             <Route path="/portal/classes" element={customer(<OwnerClasses />)} />
             <Route path="/portal/agreements" element={customer(<OwnerAgreements />)} />

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, PawPrint, CalendarDays, Receipt, ChevronRight, Plus, FileHeart, MessageSquare } from "lucide-react";
+import { AlertTriangle, PawPrint, CalendarDays, Receipt, ChevronRight, Plus, FileHeart, MessageSquare, Coins } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useOwnerRecord } from "@/hooks/useOwnerRecord";
@@ -276,6 +276,29 @@ export default function OwnerDashboard() {
           )}
         </Card>
 
+        <Card
+          title="Credits"
+          icon={Coins}
+          viewAllTo="/portal/credits"
+          action={
+            <Button asChild size="sm" variant="outline">
+              <Link to="/portal/credits">
+                <Plus className="mr-1 h-4 w-4" /> Buy more
+              </Link>
+            </Button>
+          }
+        >
+          {owner ? (
+            <dl className="grid grid-cols-3 gap-3 text-sm">
+              <CreditStat label="Full days" value={owner.daycare_full_day_credits ?? 0} />
+              <CreditStat label="Half days" value={owner.daycare_half_day_credits ?? 0} />
+              <CreditStat label="Nights" value={owner.boarding_night_credits ?? 0} />
+            </dl>
+          ) : (
+            <Empty text="Your credit balance will appear here." />
+          )}
+        </Card>
+
         <Card title="Outstanding invoices" icon={Receipt} viewAllTo="/portal/invoices">
           {invoices && invoices.length > 0 ? (
             <ul className="divide-y divide-border-subtle">
@@ -405,6 +428,15 @@ function Card({
       </div>
       {children}
     </section>
+  );
+}
+
+function CreditStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="mt-1 font-display text-2xl font-semibold text-foreground">{value}</dd>
+    </div>
   );
 }
 
