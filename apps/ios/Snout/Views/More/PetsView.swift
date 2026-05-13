@@ -623,7 +623,8 @@ struct PetEditView: View {
                     basicsSection
                     identitySection
                     healthSection
-                    careNotesSection
+                    feedingSection
+                    medicationSection
                     if let err = vm.saveError {
                         errorBanner(err)
                     }
@@ -915,26 +916,6 @@ struct PetEditView: View {
                     placeholder: "Food, environmental, medications…"
                 )
                 .focused($focused, equals: .allergies)
-            }
-        }
-    }
-
-    private var careNotesSection: some View {
-        sectionWithLabel("Care notes") {
-            formCard {
-                BohoMultilineField(
-                    label: "Feeding",
-                    text: $vm.feedingNotes,
-                    placeholder: "Brand, portions, schedule"
-                )
-                .focused($focused, equals: .feeding)
-
-                BohoMultilineField(
-                    label: "Medication",
-                    text: $vm.medicationNotes,
-                    placeholder: "Dose and timing"
-                )
-                .focused($focused, equals: .medication)
 
                 BohoMultilineField(
                     label: "Behavior",
@@ -942,6 +923,32 @@ struct PetEditView: View {
                     placeholder: "Anything we should know — likes, dislikes, triggers"
                 )
                 .focused($focused, equals: .behavioral)
+            }
+        }
+    }
+
+    private var feedingSection: some View {
+        sectionWithLabel("Feeding") {
+            formCard {
+                BohoMultilineField(
+                    label: "Feeding",
+                    text: $vm.feedingNotes,
+                    placeholder: "Brand, portions, schedule"
+                )
+                .focused($focused, equals: .feeding)
+            }
+        }
+    }
+
+    private var medicationSection: some View {
+        sectionWithLabel("Medication") {
+            formCard {
+                BohoMultilineField(
+                    label: "Medication",
+                    text: $vm.medicationNotes,
+                    placeholder: "Dose and timing"
+                )
+                .focused($focused, equals: .medication)
             }
         }
     }
