@@ -2,12 +2,30 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+export type MessageAttachment = {
+  /** Signed URL minted at send time (TTL is 7 days per the iOS sender). */
+  url: string;
+  /** "image" or "document" — drives the bubble rendering. */
+  kind: "image" | "document";
+  /** Original filename for download labels. */
+  name: string;
+  /** Path within the `message-attachments` storage bucket. Stable; the
+   *  `url` is signed off this path and can be re-minted if the signed URL
+   *  has expired. */
+  path: string;
+  /** Original MIME type, e.g. "image/jpeg", "application/pdf". */
+  mime_type: string;
+  /** File size in bytes; rendered in document chips. */
+  size_bytes: number;
+};
+
 export type MessageRow = {
   id: string;
   conversation_id: string;
   sender_type: "staff" | "owner";
   sender_id: string;
   body: string;
+  attachments: MessageAttachment[] | null;
   read_at: string | null;
   created_at: string;
   sender_profile?: { first_name: string | null; last_name: string | null; avatar_url: string | null } | null;
@@ -24,7 +42,7 @@ export function useMessages(conversationId?: string) {
       // renders oldest → newest. Full history paging is a follow-up.
       const { data, error } = await supabase
         .from("messages")
-        .select("id, conversation_id, sender_type, sender_id, body, read_at, created_at")
+        .select("id, conversation_id, sender_type, sender_id, body, attachments, read_at, created_at")
         .eq("conversation_id", conversationId!)
         .order("created_at", { ascending: false })
         .limit(200);

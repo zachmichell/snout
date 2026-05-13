@@ -38,6 +38,9 @@ export function useSendMessage() {
         sender_type: vars.senderType,
         sender_id: vars.senderId,
         body: vars.body,
+        // Staff-side composer doesn't support attachments yet; defaulting to
+        // null here keeps the type sound and the bubble rendering correct.
+        attachments: null,
         read_at: null,
         created_at: new Date().toISOString(),
       };
