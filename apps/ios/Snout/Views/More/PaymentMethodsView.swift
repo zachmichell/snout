@@ -284,7 +284,10 @@ struct PaymentMethodsView: View {
 
     private var addCardButton: some View {
         NavigationLink {
-            AddCardPlaceholder()
+            AddCardView(onSaved: {
+                guard let id = currentOwner.ownerId else { return }
+                Task { await vm.load(ownerId: id) }
+            })
         } label: {
             HStack(spacing: SnoutTheme.Spacing.sm) {
                 Image(systemName: "plus.circle.fill")
@@ -417,20 +420,5 @@ private struct RemoveCardDialog: View {
     }
 }
 
-// MARK: - Add-card placeholder
-//
-// Native add-card requires either a setup-mode Stripe Checkout edge
-// function (doesn't exist yet — `create-stripe-checkout-session` is
-// payment-mode only) or the Stripe iOS SDK (Package.swift change).
-// Both are deliberately deferred to a focused turn.
-
-private struct AddCardPlaceholder: View {
-    var body: some View {
-        ComingSoonPlaceholder(
-            title: "Add a card",
-            subtitle: "Saving a card from inside the app is coming soon. For now, you can add a card during checkout when paying an invoice.",
-            symbol: "creditcard.and.123"
-        )
-        .navigationTitle("Add a card")
-    }
-}
+// Note: native add-card now lives in `AddCardView.swift`. The prior
+// AddCardPlaceholder ("coming soon") has been removed.
