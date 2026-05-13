@@ -133,6 +133,39 @@ async function fetchDashboardRange(
   return (data ?? []) as unknown as Row[];
 }
 
+/**
+ * Fetches every pending booking request (status='requested') from today
+ * forward, regardless of which day the Pack View date picker is on. The
+ * Requests queue is a work-to-do list, not a today-scoped operational view:
+ * a pet parent submitting a daycare booking on Mar 1 for Mar 8 needs staff
+ * to see and confirm it on Mar 1, not only when Mar 8 arrives. Using the
+ * same select shape as fetchDashboardRange so the row type is identical.
+ */
+async function fetchPendingRequests(
+  fromDate: Date,
+  locationId: string | null | undefined,
+): Promise<Row[]> {
+  let q = supabase
+    .from("reservations")
+    .select(
+      `id, organization_id, location_id, primary_owner_id, service_id, start_at, end_at, status, checked_in_at, checked_out_at, suite_id, parent_reservation_id,
+       services:service_id(name, module),
+       owners:primary_owner_id(id, first_name, last_name, daycare_full_day_credits, daycare_half_day_credits, boarding_night_credits),
+       suites:suite_id(name),
+       reservation_pets(pets(id, name, breed, photo_url)),
+       add_ons:reservations!parent_reservation_id(id, services:service_id(name, module))`,
+    )
+    .is("deleted_at", null)
+    .is("parent_reservation_id", null)
+    .eq("status", "requested")
+    .gte("start_at", fromDate.toISOString())
+    .order("start_at", { ascending: true });
+  if (locationId) q = q.eq("location_id", locationId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as unknown as Row[];
+}
+
 export default function Dashboard() {
   const { profile, user, membership } = useAuth();
   const { activeStaff } = useActiveStaff();
@@ -167,6 +200,15 @@ export default function Dashboard() {
   const { data: todayRows = [] } = useQuery({
     queryKey: ["dashboard-day", locationId, todayStart.toISOString()],
     queryFn: () => fetchDashboardRange(todayStart, todayEnd, locationId),
+  });
+
+  // Pending request queue — every reservation in 'requested' status with
+  // start_at today or later. Not bounded by the picker because pending
+  // requests need to be seen and actioned regardless of which day staff are
+  // looking at; e.g. a request submitted today for next week must show now.
+  const { data: pendingRequestsRows = [] } = useQuery({
+    queryKey: ["dashboard-pending-requests", locationId, todayStart.toISOString()],
+    queryFn: () => fetchPendingRequests(todayStart, locationId),
   });
 
   // Apply module filter pill to both datasets (filter affects KPIs *and* tables)
@@ -225,16 +267,9 @@ export default function Dashboard() {
     [filteredRows, dayStart, dayEnd],
   );
 
-  const requestedAll = useMemo(
-    () =>
-      filteredRows.filter(
-        (r) =>
-          r.status === "requested" &&
-          new Date(r.start_at) >= dayStart &&
-          new Date(r.start_at) <= dayEnd,
-      ),
-    [filteredRows, dayStart, dayEnd],
-  );
+  // Note: there's no selected-date `requestedAll` because pending requests
+  // are always shown as a queue regardless of the date picker (see
+  // todayRequestedAll below).
 
   // Today-pinned aggregates → power the operational tables below the KPIs
   const todayExpectedAll = useMemo(
@@ -270,15 +305,17 @@ export default function Dashboard() {
     [todayFilteredRows, todayStart, todayEnd],
   );
 
+  // Pending requests are queue-of-pending-work, not date-of-arrival, so this
+  // is driven by a separate query (pendingRequestsRows) that already filters
+  // to status='requested' and start_at >= today. We only need to apply the
+  // module filter here. A request booked today for next week shows up
+  // immediately so staff can confirm/reject before the date arrives.
   const todayRequestedAll = useMemo(
-    () =>
-      todayFilteredRows.filter(
-        (r) =>
-          r.status === "requested" &&
-          new Date(r.start_at) >= todayStart &&
-          new Date(r.start_at) <= todayEnd,
-      ),
-    [todayFilteredRows, todayStart, todayEnd],
+    () => {
+      if (moduleFilter === "all") return pendingRequestsRows;
+      return pendingRequestsRows.filter((r) => r.services?.module === moduleFilter);
+    },
+    [pendingRequestsRows, moduleFilter],
   );
 
   // Search-filtered versions for the tabs (always today-based)
