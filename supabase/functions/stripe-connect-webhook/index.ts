@@ -55,6 +55,11 @@ Deno.serve(async (req) => {
         await handlePaymentIntentSucceeded(intent, event.account ?? null);
         break;
       }
+      case "setup_intent.succeeded": {
+        const setupIntent = event.data.object as Stripe.SetupIntent;
+        await handleSetupIntentSucceeded(setupIntent, event.account ?? null);
+        break;
+      }
       default:
         console.log(`Unhandled event: ${event.type}`);
     }
@@ -414,6 +419,101 @@ async function fetchPaymentEnrichment(
   } catch (err) {
     console.warn(`fetchPaymentEnrichment failed for PI ${paymentIntentId}:`, (err as Error).message);
     return empty;
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// setup_intent.succeeded — pet parent saved a card via the iOS Add Card
+// flow. Insert the payment method into our local table so it appears in
+// the Payment Methods list and can be charged in future flows.
+// ───────────────────────────────────────────────────────────────────────
+async function handleSetupIntentSucceeded(
+  setupIntent: Stripe.SetupIntent,
+  connectedAccountId: string | null,
+) {
+  if (!connectedAccountId) {
+    console.warn("setup_intent.succeeded without connectedAccountId, skipping");
+    return;
+  }
+
+  const stripeCustomerId = typeof setupIntent.customer === "string"
+    ? setupIntent.customer
+    : setupIntent.customer?.id ?? null;
+  const stripePaymentMethodId = typeof setupIntent.payment_method === "string"
+    ? setupIntent.payment_method
+    : setupIntent.payment_method?.id ?? null;
+
+  if (!stripeCustomerId || !stripePaymentMethodId) {
+    console.warn("setup_intent.succeeded missing customer or payment_method, skipping", {
+      id: setupIntent.id,
+      stripeCustomerId,
+      stripePaymentMethodId,
+    });
+    return;
+  }
+
+  // Resolve (org, owner) from the stripe_customers mapping. The setup
+  // intent metadata also has these, but trusting the local table is
+  // safer in case metadata was lost or swapped.
+  const { data: mapping, error: mappingErr } = await admin
+    .from("stripe_customers")
+    .select("organization_id, owner_id")
+    .eq("stripe_customer_id", stripeCustomerId)
+    .maybeSingle();
+  if (mappingErr || !mapping) {
+    console.warn("setup_intent.succeeded: no stripe_customers row for", stripeCustomerId, mappingErr);
+    return;
+  }
+
+  // Retrieve the PaymentMethod on the connected account so we can store
+  // brand + last4 + expiry. The SetupIntent event payload doesn't include
+  // expanded card details, so a follow-up fetch is required.
+  let card: Stripe.PaymentMethod.Card | null = null;
+  try {
+    const pm = await stripe.paymentMethods.retrieve(
+      stripePaymentMethodId,
+      { stripeAccount: connectedAccountId },
+    );
+    card = pm.card ?? null;
+  } catch (err) {
+    console.warn("setup_intent.succeeded: failed to retrieve PM", stripePaymentMethodId, (err as Error).message);
+  }
+  // If we couldn't pull card details, skip the insert — payment_methods
+  // has CHECK constraints on expiry_month/year that would reject zeroes,
+  // and a row with no brand/last4 isn't useful to render anyway. Stripe
+  // will retry the webhook on transient retrieve failures.
+  if (!card || !card.brand || !card.last4 || !card.exp_month || !card.exp_year) {
+    console.warn("setup_intent.succeeded: card details unavailable, skipping insert", stripePaymentMethodId);
+    return;
+  }
+
+  // Determine if this should be the default — first card on file gets it.
+  const { count } = await admin
+    .from("payment_methods")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", mapping.organization_id)
+    .eq("owner_id", mapping.owner_id);
+  const isFirst = (count ?? 0) === 0;
+
+  // Idempotent insert keyed on stripe_payment_method_id so retried events
+  // (or duplicate setup_intents for the same PM) don't double-insert.
+  const { error: insertErr } = await admin
+    .from("payment_methods")
+    .upsert(
+      {
+        organization_id: mapping.organization_id,
+        owner_id: mapping.owner_id,
+        card_brand: card.brand,
+        card_last_four: card.last4,
+        expiry_month: card.exp_month,
+        expiry_year: card.exp_year,
+        is_default: isFirst,
+        stripe_payment_method_id: stripePaymentMethodId,
+      },
+      { onConflict: "stripe_payment_method_id" },
+    );
+  if (insertErr) {
+    console.error("setup_intent.succeeded: failed to upsert payment_method", insertErr);
   }
 }
 
