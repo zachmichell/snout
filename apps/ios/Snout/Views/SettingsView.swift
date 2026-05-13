@@ -10,7 +10,6 @@
 //    Billing     · Invoices (paid + unpaid)
 //    Documents   · Agreements (sign on device, view signed)
 //    Library     · Report cards, Cameras
-//    App         · Version, build
 //    --          · Sign out
 //
 //  Sub-pages live in apps/ios/Snout/Views/More/:
@@ -48,11 +47,6 @@ struct MoreView: View {
                         billingSection
                         documentsSection
                         librarySection
-                        sectionCard(title: "App") {
-                            row(label: "Version", value: appVersion)
-                            Divider().background(SnoutTheme.divider)
-                            row(label: "Build", value: buildNumber)
-                        }
                         signOutCard
                         Spacer(minLength: SnoutTheme.Spacing.xxl)
                     }
@@ -258,20 +252,6 @@ struct MoreView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Plain row (label/value, no nav)
-
-    private func row(label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(SnoutTheme.bodyMD)
-                .foregroundStyle(SnoutTheme.onSurface)
-            Spacer()
-            Text(value)
-                .font(SnoutTheme.bodyMD)
-                .foregroundStyle(SnoutTheme.onSurfaceMuted)
-        }
-    }
-
     // MARK: - Sign out
 
     private var signOutCard: some View {
@@ -309,11 +289,4 @@ struct MoreView: View {
         }
     }
 
-    private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
-    }
-
-    private var buildNumber: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
-    }
 }
