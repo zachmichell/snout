@@ -21,6 +21,12 @@ packages:
   Supabase:
     url: https://github.com/supabase-community/supabase-swift
     from: 2.5.1
+  Stripe:
+    # PaymentSheet provides the native SetupIntent UI for saving cards.
+    # iOS deployment target is 17 (see options.deploymentTarget); recent
+    # Stripe SDK versions track current Apple SDKs and require iOS 13+.
+    url: https://github.com/stripe/stripe-ios
+    from: 24.0.0
 targets:
   Snout:
     type: application
@@ -34,6 +40,10 @@ targets:
       path: Snout/Resources/Info.plist
       properties:
         CFBundleDisplayName: Snout
+        # Required so App Store Connect resolves the app icon from the
+        # AppIcon asset catalog set; without it the upload validator
+        # rejects with "Missing Info.plist value CFBundleIconName".
+        CFBundleIconName: AppIcon
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen:
@@ -73,6 +83,8 @@ targets:
     dependencies:
       - package: Supabase
         product: Supabase
+      - package: Stripe
+        product: StripePaymentSheet
   SnoutTests:
     type: bundle.unit-test
     platform: iOS

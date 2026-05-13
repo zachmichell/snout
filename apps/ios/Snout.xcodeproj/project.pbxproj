@@ -80,6 +80,7 @@
 		E570A48F98BABDECA5DB52E1 /* Location.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEA7B39535EB30BD63C3629 /* Location.swift */; };
 		F09BB476089288A16E6628B2 /* ReportCardDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44EF06CCA7EB6C816C2A9F41 /* ReportCardDetailView.swift */; };
 		F22810744674D08A0FB6D182 /* BookingWizardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2807AC82DD6A7D17A440AE8 /* BookingWizardViewModel.swift */; };
+		F2315DBA648848E61BACCEDC /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = ABFD10E3A43EC19323375F3B /* StripePaymentSheet */; };
 		FA49B1D170EF0F10993222B0 /* BookingCalendarGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643CC857E7ABCD867A06282B /* BookingCalendarGrid.swift */; };
 		FF3FA268B5C27571C8F6B4FC /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F6B35B5DFBF242F688D2919 /* SupabaseClient.swift */; };
 /* End PBXBuildFile section */
@@ -126,7 +127,7 @@
 		45D71535692E2147C92526D6 /* AgreementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgreementsView.swift; sourceTree = "<group>"; };
 		471C1E6F121C2592F2E95E1E /* BookingWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookingWizardView.swift; sourceTree = "<group>"; };
 		489E8CA3A6903FF293A185CF /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
-		4D5BF0EEC0AFB216751D3ED4 /* Snout.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Snout.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D5BF0EEC0AFB216751D3ED4 /* Snout.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Snout.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5084FC94E419EEFB15C47FED /* ReviewStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStep.swift; sourceTree = "<group>"; };
 		54E114C51FDADD1185151FF3 /* WebcamPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebcamPlayerView.swift; sourceTree = "<group>"; };
 		561CF4D5362FBF69D5AC668E /* Reservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reservation.swift; sourceTree = "<group>"; };
@@ -142,7 +143,7 @@
 		6566F57E37981E92EDDB0FD7 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		6AD63E6AF045CA09BDC5A5F0 /* ReportCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportCardListView.swift; sourceTree = "<group>"; };
 		713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-SemiBold.ttf"; sourceTree = "<group>"; };
-		71603313865283C4E4A3984B /* SnoutTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SnoutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		71603313865283C4E4A3984B /* SnoutTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SnoutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7273E187B94F83178E6EF88B /* Montserrat-Italic-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-Italic-VariableFont_wght.ttf"; sourceTree = "<group>"; };
 		73503668041819BEB8C03832 /* SlotPickerStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlotPickerStep.swift; sourceTree = "<group>"; };
 		86510617A869D0A280071FBA /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -155,7 +156,7 @@
 		9CD495EF8BCE2CD7602251E4 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		9E3ACCC328ED3AD6C3444BDD /* BookingHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookingHelpers.swift; sourceTree = "<group>"; };
 		A5E65EE19A4F682DE287E2DC /* TabBarVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarVisibility.swift; sourceTree = "<group>"; };
-		A998D2825402B4B0BB55A3CD /* SnoutUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SnoutUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A998D2825402B4B0BB55A3CD /* SnoutUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SnoutUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA644024CD4165E2EC739DC2 /* PhotoLightboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLightboxView.swift; sourceTree = "<group>"; };
 		AB8E80F5405DC6C5687AD9C3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		ADD4BE3C648D77EC3CCB9F86 /* PetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetsView.swift; sourceTree = "<group>"; };
@@ -180,7 +181,7 @@
 		FB91B04834035FE119B4DD01 /* Montserrat-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-VariableFont_wght.ttf"; sourceTree = "<group>"; };
 		FC15079CB6F74B2383A2BC6D /* Config.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Config.plist; sourceTree = "<group>"; };
 		FC1D7CADB21ACF9CC8434EA3 /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
-		FD92AE80746E46C0CBF75BC0 /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
+		FD92AE80746E46C0CBF75BC0 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
 		FFAD638D6923420E3CE34F8F /* SnoutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoutApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -190,6 +191,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0E4FC85936A18B042CCBF51D /* Supabase in Frameworks */,
+				F2315DBA648848E61BACCEDC /* StripePaymentSheet in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -486,6 +488,7 @@
 			name = Snout;
 			packageProductDependencies = (
 				AE613A5D5887DB86917A3853 /* Supabase */,
+				ABFD10E3A43EC19323375F3B /* StripePaymentSheet */,
 			);
 			productName = Snout;
 			productReference = 4D5BF0EEC0AFB216751D3ED4 /* Snout.app */;
@@ -516,13 +519,19 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2640;
+				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					5FC1734B65E45422D5BABEEB = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 						TestTargetID = 88CC3B0467BD0E57BCA6A89F;
 					};
+					88CC3B0467BD0E57BCA6A89F = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
 					9E32B3268A2C75FF7C1B10B7 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -537,6 +546,7 @@
 			mainGroup = 063ECDAC97F5D9F0B3D65CD0;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				0FB1987B5794F0B6AA353500 /* XCRemoteSwiftPackageReference "stripe-ios" */,
 				CCDAB3CDB26550A9587B0B63 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -677,7 +687,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				DEVELOPMENT_TEAM = L98L7C792K;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -745,7 +754,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -756,7 +764,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				DEVELOPMENT_TEAM = L98L7C792K;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -792,19 +799,14 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = W55RNZ9Q4Q;
+				CODE_SIGN_IDENTITY = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Snout/Resources/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Snout App";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.snoutapp.snout;
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PRODUCT_BUNDLE_IDENTIFIER = app.snout.ios;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -817,19 +819,14 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = W55RNZ9Q4Q;
+				CODE_SIGN_IDENTITY = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Snout/Resources/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Snout App";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = org.snoutapp.snout;
-				PROVISIONING_PROFILE_SPECIFIER = "";
+				PRODUCT_BUNDLE_IDENTIFIER = app.snout.ios;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -839,7 +836,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				DEVELOPMENT_TEAM = L98L7C792K;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -914,7 +910,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -963,6 +958,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		0FB1987B5794F0B6AA353500 /* XCRemoteSwiftPackageReference "stripe-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stripe/stripe-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 24.0.0;
+			};
+		};
 		CCDAB3CDB26550A9587B0B63 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/supabase-community/supabase-swift";
@@ -974,6 +977,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		ABFD10E3A43EC19323375F3B /* StripePaymentSheet */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0FB1987B5794F0B6AA353500 /* XCRemoteSwiftPackageReference "stripe-ios" */;
+			productName = StripePaymentSheet;
+		};
 		AE613A5D5887DB86917A3853 /* Supabase */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CCDAB3CDB26550A9587B0B63 /* XCRemoteSwiftPackageReference "supabase-swift" */;
