@@ -197,6 +197,16 @@ struct SafariSheet: UIViewControllerRepresentable {
     let url: URL
     var preferredControlTintColor: UIColor? = nil
     var dismissButtonStyle: SFSafariViewController.DismissButtonStyle = .done
+    /// Called every time Safari follows a redirect. Return true to have the
+    /// Safari view auto-dismiss after this redirect — useful for Stripe
+    /// Checkout where we know the post-payment redirect URL is going to a
+    /// web page that requires auth (the iOS user isn't signed in on web).
+    /// Closing Safari immediately lets us show a native iOS confirmation
+    /// instead of dumping the user on a login page.
+    var shouldAutoDismissOn: ((URL) -> Bool)? = nil
+    /// Called when auto-dismiss fires; the closure receives the final URL so
+    /// the parent can decide whether the flow ended in success or cancel.
+    var onAutoDismiss: ((URL) -> Void)? = nil
 
     func makeUIViewController(context: Context) -> SFSafariViewController {
         let config = SFSafariViewController.Configuration()
@@ -207,8 +217,44 @@ struct SafariSheet: UIViewControllerRepresentable {
             vc.preferredControlTintColor = tint
         }
         vc.dismissButtonStyle = dismissButtonStyle
+        vc.delegate = context.coordinator
         return vc
     }
 
     func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, SFSafariViewControllerDelegate {
+        let parent: SafariSheet
+        init(_ parent: SafariSheet) { self.parent = parent }
+
+        // Fires for each navigation/redirect inside the Safari view. We use
+        // this instead of `initialLoadDidRedirectTo:` because Stripe Checkout
+        // does multiple redirects (3DS, success_url, etc.) and we want to
+        // catch the final one.
+        func safariViewController(
+            _ controller: SFSafariViewController,
+            didCompleteInitialLoad didLoadSuccessfully: Bool,
+        ) {
+            // No-op; we rely on activity-item-based callbacks below for redirects.
+        }
+
+        func safariViewController(
+            _ controller: SFSafariViewController,
+            initialLoadDidRedirectTo URL: URL,
+        ) {
+            handleNavigation(controller: controller, url: URL)
+        }
+
+        private func handleNavigation(controller: SFSafariViewController, url: URL) {
+            guard parent.shouldAutoDismissOn?(url) == true else { return }
+            // Capture the URL before dismissing — the parent uses it to
+            // distinguish success vs cancel paths.
+            let finalURL = url
+            controller.dismiss(animated: true) { [weak self] in
+                self?.parent.onAutoDismiss?(finalURL)
+            }
+        }
+    }
 }
