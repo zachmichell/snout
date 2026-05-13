@@ -447,6 +447,10 @@ final class InvoiceDetailViewModel: ObservableObject {
 
         struct Payload: Encodable {
             let invoice_id: String
+            // See note in BuyCreditsView: without base_url the edge function
+            // falls back to the Supabase functions URL, which doesn't host
+            // pages — Stripe's redirect 404s with "requested path is invalid".
+            let base_url: String
         }
         struct Response: Decodable {
             let checkout_url: String?
@@ -457,7 +461,9 @@ final class InvoiceDetailViewModel: ObservableObject {
         do {
             let response: Response = try await client.functions
                 .invoke("create-stripe-checkout-session",
-                        options: FunctionInvokeOptions(body: Payload(invoice_id: invoiceId)))
+                        options: FunctionInvokeOptions(
+                            body: Payload(invoice_id: invoiceId, base_url: AppConfig.webAppURL)
+                        ))
             if let err = response.error {
                 checkoutError = err
                 return nil
