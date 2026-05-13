@@ -39,6 +39,7 @@
 		70EF5B4D3796E03E32E026B6 /* PushService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0178A791BE7BEF4D22C4A855 /* PushService.swift */; };
 		716E547A9EC7362CDDE78AC2 /* ReportCardListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD63E6AF045CA09BDC5A5F0 /* ReportCardListView.swift */; };
 		724595BA44CCCE63DA01515A /* Pet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21052497D93C63199E50D8E /* Pet.swift */; };
+		7539C0655ADA03701864E643 /* AddCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C9AB4F8470E794507C7AFB2 /* AddCardView.swift */; };
 		763F0CB1C5A153C0B085E86F /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B40A367CA69CD481A21400 /* AuthService.swift */; };
 		79903EEDDF687137705EC25D /* Montserrat-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */; };
 		79DB2DE784A03CF1FCD9AE36 /* CurrentOwnerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365BBF119E0D455737AC3D48 /* CurrentOwnerService.swift */; };
@@ -142,6 +143,7 @@
 		6488B51BD6CB91E540D62E86 /* Owner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Owner.swift; sourceTree = "<group>"; };
 		6566F57E37981E92EDDB0FD7 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		6AD63E6AF045CA09BDC5A5F0 /* ReportCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportCardListView.swift; sourceTree = "<group>"; };
+		6C9AB4F8470E794507C7AFB2 /* AddCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddCardView.swift; sourceTree = "<group>"; };
 		713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-SemiBold.ttf"; sourceTree = "<group>"; };
 		71603313865283C4E4A3984B /* SnoutTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SnoutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7273E187B94F83178E6EF88B /* Montserrat-Italic-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-Italic-VariableFont_wght.ttf"; sourceTree = "<group>"; };
@@ -295,6 +297,7 @@
 		41A1945569E5B29C42958136 /* More */ = {
 			isa = PBXGroup;
 			children = (
+				6C9AB4F8470E794507C7AFB2 /* AddCardView.swift */,
 				45D71535692E2147C92526D6 /* AgreementsView.swift */,
 				F8E8B548D4270D97C997AE0D /* ClientDetailsView.swift */,
 				C2D40E026383D2D561EB5A16 /* InvoicesView.swift */,
@@ -594,6 +597,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7539C0655ADA03701864E643 /* AddCardView.swift in Sources */,
 				88FEB03EA443711D37E8392D /* AgreementsView.swift in Sources */,
 				A3B6772161AD4B75DF563970 /* AppConfig.swift in Sources */,
 				763F0CB1C5A153C0B085E86F /* AuthService.swift in Sources */,
