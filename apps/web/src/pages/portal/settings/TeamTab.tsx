@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Plus, Check, X } from "lucide-react";
 
-type Role = "owner" | "admin" | "manager" | "staff" | "customer";
+type Role = "owner" | "admin" | "manager" | "supervisor" | "staff" | "groomer" | "customer";
 type AssignableRole = Exclude<Role, "owner" | "customer">;
 
 type MemberRow = {
@@ -49,7 +49,9 @@ const ROLE_VARIANT: Record<Role, string> = {
   owner: "bg-foreground text-background",
   admin: "bg-plum-light text-plum",
   manager: "bg-teal-light text-teal",
+  supervisor: "bg-amber-100 text-amber-800",
   staff: "bg-muted text-foreground",
+  groomer: "bg-rose-100 text-rose-800",
   customer: "bg-muted text-muted-foreground",
 };
 
@@ -322,7 +324,9 @@ export default function TeamTab() {
                               <SelectItem value="owner">owner</SelectItem>
                               <SelectItem value="admin">admin</SelectItem>
                               <SelectItem value="manager">manager</SelectItem>
+                              <SelectItem value="supervisor">supervisor</SelectItem>
                               <SelectItem value="staff">staff</SelectItem>
+                              <SelectItem value="groomer">groomer</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
@@ -432,7 +436,9 @@ export default function TeamTab() {
                 <SelectContent>
                   <SelectItem value="admin">admin</SelectItem>
                   <SelectItem value="manager">manager</SelectItem>
+                  <SelectItem value="supervisor">supervisor</SelectItem>
                   <SelectItem value="staff">staff</SelectItem>
+                  <SelectItem value="groomer">groomer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -449,7 +455,7 @@ export default function TeamTab() {
   );
 }
 
-const ROLES: PermRole[] = ["owner", "admin", "manager", "staff", "customer"];
+const ROLES: PermRole[] = ["owner", "admin", "manager", "supervisor", "staff", "groomer", "customer"];
 
 const PERMISSION_GROUPS: Array<{ label: string; permissions: Permission[] }> = [
   { label: "Settings", permissions: ["settings.view", "settings.organization", "settings.locations", "settings.team", "settings.payments", "settings.billing", "settings.email", "settings.subscription"] },

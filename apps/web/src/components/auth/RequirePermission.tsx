@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
-import type { Permission } from "@/lib/permissions";
+import { defaultLandingForRole, type Permission } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -13,11 +13,12 @@ export default function RequirePermission({
   permission: Permission;
   children: ReactNode;
 }) {
-  const { can, isLoading } = usePermissions();
+  const { can, role, isLoading } = usePermissions();
 
   if (isLoading) return null;
 
   if (!can(permission)) {
+    const home = defaultLandingForRole(role);
     return (
       <div className="flex min-h-[60vh] items-center justify-center p-6">
         <Card className="max-w-md p-8 text-center">
@@ -30,7 +31,7 @@ export default function RequirePermission({
             your administrator.
           </p>
           <Button asChild>
-            <Link to="/dashboard">Back to Dashboard</Link>
+            <Link to={home}>Go back</Link>
           </Button>
         </Card>
       </div>

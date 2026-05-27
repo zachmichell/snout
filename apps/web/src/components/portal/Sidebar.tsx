@@ -45,34 +45,34 @@ const sections: Array<{
   {
     label: "Overview",
     items: [
-      { to: "/dashboard", icon: LayoutDashboard, label: "Pack View" },
-      { to: "/check-in-out", icon: LogIn, label: "Check-In / Out" },
+      { to: "/dashboard", icon: LayoutDashboard, label: "Pack View", permission: "dashboard.view" as Permission },
+      { to: "/check-in-out", icon: LogIn, label: "Check-In / Out", permission: "checkinout.perform" as Permission },
     ],
   },
   {
     label: "Operations",
     items: [
-      { to: "/calendar", icon: CalendarDays, label: "Calendar" },
-      { to: "/reservations", icon: ClipboardList, label: "Reservations" },
-      { to: "/group-classes", icon: GraduationCap, label: "Group Classes" },
-      { to: "/lodging", icon: BedDouble, label: "Lodging" },
-      { to: "/grooming", icon: Scissors, label: "Grooming" },
-      { to: "/pet-care", icon: HeartPulse, label: "Pet Care" },
-      { to: "/report-cards", icon: FileText, label: "Report Cards" },
+      { to: "/calendar", icon: CalendarDays, label: "Calendar", permission: "calendar.view" as Permission },
+      { to: "/reservations", icon: ClipboardList, label: "Reservations", permission: "reservations.create" as Permission },
+      { to: "/group-classes", icon: GraduationCap, label: "Group Classes", permission: "groupclasses.view" as Permission },
+      { to: "/lodging", icon: BedDouble, label: "Lodging", permission: "lodging.view" as Permission },
+      { to: "/grooming", icon: Scissors, label: "Grooming", permission: "grooming.view" as Permission },
+      { to: "/pet-care", icon: HeartPulse, label: "Pet Care", permission: "petcare.view" as Permission },
+      { to: "/report-cards", icon: FileText, label: "Report Cards", permission: "reportcards.create" as Permission },
       { to: "/care-logs", icon: NotebookPen, label: "Care Logs", permission: "carelogs.create" as Permission },
-      { to: "/incidents", icon: AlertTriangle, label: "Incidents" },
+      { to: "/incidents", icon: AlertTriangle, label: "Incidents", permission: "incidents.create" as Permission },
     ],
   },
   {
     label: "Billing",
     items: [
-      { to: "/pos/cart", icon: ShoppingCart, label: "POS" },
+      { to: "/pos/cart", icon: ShoppingCart, label: "POS", permission: "pos.use" as Permission },
       { to: "/invoices", icon: Receipt, label: "Invoices", permission: "invoices.view" as Permission },
-      { to: "/deposits", icon: HandCoins, label: "Deposits" },
-      { to: "/agreements", icon: FileSignature, label: "Agreements" },
-      { to: "/products", icon: Package, label: "Products" },
+      { to: "/deposits", icon: HandCoins, label: "Deposits", permission: "deposits.view" as Permission },
+      { to: "/agreements", icon: FileSignature, label: "Agreements", permission: "agreements.view" as Permission },
+      { to: "/products", icon: Package, label: "Products", permission: "products.view" as Permission },
       { to: "/services", icon: Wrench, label: "Services", permission: "services.manage" as Permission },
-      { to: "/subscriptions", icon: Ticket, label: "Packages" },
+      { to: "/subscriptions", icon: Ticket, label: "Packages", permission: "packages.view" as Permission },
     ],
   },
   {
@@ -85,9 +85,9 @@ const sections: Array<{
   {
     label: "Facility",
     items: [
-      { to: "/pets", icon: PawPrint, label: "Pets" },
-      { to: "/owners", icon: Users, label: "Owners" },
-      { to: "/messages", icon: MessageSquare, label: "Messages", badgeKey: "messages" },
+      { to: "/pets", icon: PawPrint, label: "Pets", permission: "pets.view" as Permission },
+      { to: "/owners", icon: Users, label: "Owners", permission: "owners.view" as Permission },
+      { to: "/messages", icon: MessageSquare, label: "Messages", badgeKey: "messages", permission: "messaging.send" as Permission },
     ],
   },
 ];
@@ -210,28 +210,29 @@ export default function Sidebar({ orgName }: { orgName?: string | null }) {
                 <div className="truncate text-[11px] text-sidebar-foreground/60">{profile?.email}</div>
               </div>
             )}
-            {collapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <NavLink
-                    to="/settings"
-                    className="rounded-md p-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-primary-foreground transition-colors"
-                    aria-label="Settings"
-                  >
-                    <SettingsIcon className="h-4 w-4" />
-                  </NavLink>
-                </TooltipTrigger>
-                <TooltipContent side="right">Settings</TooltipContent>
-              </Tooltip>
-            ) : (
-              <NavLink
-                to="/settings"
-                className="rounded-md p-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-primary-foreground transition-colors"
-                aria-label="Settings"
-              >
-                <SettingsIcon className="h-4 w-4" />
-              </NavLink>
-            )}
+            {can("settings.view") &&
+              (collapsed ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <NavLink
+                      to="/settings"
+                      className="rounded-md p-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-primary-foreground transition-colors"
+                      aria-label="Settings"
+                    >
+                      <SettingsIcon className="h-4 w-4" />
+                    </NavLink>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Settings</TooltipContent>
+                </Tooltip>
+              ) : (
+                <NavLink
+                  to="/settings"
+                  className="rounded-md p-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-primary-foreground transition-colors"
+                  aria-label="Settings"
+                >
+                  <SettingsIcon className="h-4 w-4" />
+                </NavLink>
+              ))}
             {collapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
