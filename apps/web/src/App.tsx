@@ -70,6 +70,7 @@ import Grooming from "./pages/portal/grooming/Grooming";
 import SuiteManagement from "./pages/portal/facility/SuiteManagement";
 import GroomerManagement from "./pages/portal/facility/GroomerManagement";
 import ReportCardsList from "./pages/portal/pet-care/ReportCardsList";
+import ReportCardTemplates from "./pages/portal/pet-care/ReportCardTemplates";
 import Traits from "./pages/portal/pet-care/Traits";
 import PetCare from "./pages/portal/pet-care/PetCare";
 import UserManagement from "./pages/portal/management/UserManagement";
@@ -151,6 +152,7 @@ const App = () => (
             <Route path="/suite-management" element={<Navigate to="/settings?tab=suites" replace />} />
             <Route path="/groomer-management" element={<Navigate to="/settings?tab=groomers" replace />} />
             <Route path="/report-cards" element={staff(<ReportCardsList />, "reportcards.create")} />
+            <Route path="/report-card-templates" element={staff(<ReportCardTemplates />, "reportcards.publish")} />
             <Route path="/traits" element={staff(<Traits />, "petcare.view")} />
             <Route path="/pet-care" element={staff(<PetCare />, "petcare.view")} />
             <Route path="/user-management" element={staff(<UserManagement />, "settings.team")} />
