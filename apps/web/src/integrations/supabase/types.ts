@@ -7173,7 +7173,7 @@ export type Database = {
         | "banned"
       invoice_status: "draft" | "sent" | "paid" | "partial" | "overdue" | "void"
       kennel_run_type: "standard" | "large" | "suite" | "indoor" | "outdoor"
-      membership_role: "owner" | "admin" | "manager" | "staff" | "customer"
+      membership_role: "owner" | "admin" | "manager" | "supervisor" | "staff" | "groomer" | "customer"
       message_sender_type: "staff" | "owner"
       module_enum:
         | "daycare"
@@ -7376,7 +7376,7 @@ export const Constants = {
       ],
       invoice_status: ["draft", "sent", "paid", "partial", "overdue", "void"],
       kennel_run_type: ["standard", "large", "suite", "indoor", "outdoor"],
-      membership_role: ["owner", "admin", "manager", "staff", "customer"],
+      membership_role: ["owner", "admin", "manager", "supervisor", "staff", "groomer", "customer"],
       message_sender_type: ["staff", "owner"],
       module_enum: [
         "daycare",
@@ -7432,5 +7432,3 @@ export const Constants = {
     },
   },
 } as const
-A new version of Supabase CLI is available: v2.98.2 (currently installed v2.90.0)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

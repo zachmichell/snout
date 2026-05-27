@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { defaultLandingForRole, type Role } from "@/lib/permissions";
 
 export default function Index() {
   const { user, membership, loading } = useAuth();
@@ -12,6 +13,5 @@ export default function Index() {
   }
   if (!user) return <Navigate to="/login" replace />;
   if (!membership) return <Navigate to="/onboarding" replace />;
-  if (membership.role === "customer") return <Navigate to="/portal/dashboard" replace />;
-  return <Navigate to="/dashboard" replace />;
+  return <Navigate to={defaultLandingForRole(membership.role as Role)} replace />;
 }

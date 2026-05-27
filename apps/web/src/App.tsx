@@ -143,53 +143,53 @@ const App = () => (
             />
 
             {/* Staff portal */}
-            <Route path="/dashboard" element={staff(<Dashboard />)} />
-            <Route path="/calendar" element={staff(<Schedule />)} />
+            <Route path="/dashboard" element={staff(<Dashboard />, "dashboard.view")} />
+            <Route path="/calendar" element={staff(<Schedule />, "calendar.view")} />
             <Route path="/schedule" element={<Navigate to="/calendar" replace />} />
-            <Route path="/lodging" element={staff(<Lodging />)} />
-            <Route path="/grooming" element={staff(<Grooming />)} />
+            <Route path="/lodging" element={staff(<Lodging />, "lodging.view")} />
+            <Route path="/grooming" element={staff(<Grooming />, "grooming.view")} />
             <Route path="/suite-management" element={<Navigate to="/settings?tab=suites" replace />} />
             <Route path="/groomer-management" element={<Navigate to="/settings?tab=groomers" replace />} />
-            <Route path="/report-cards" element={staff(<ReportCardsList />)} />
-            <Route path="/traits" element={staff(<Traits />)} />
-            <Route path="/pet-care" element={staff(<PetCare />)} />
-            <Route path="/user-management" element={staff(<UserManagement />)} />
+            <Route path="/report-cards" element={staff(<ReportCardsList />, "reportcards.create")} />
+            <Route path="/traits" element={staff(<Traits />, "petcare.view")} />
+            <Route path="/pet-care" element={staff(<PetCare />, "petcare.view")} />
+            <Route path="/user-management" element={staff(<UserManagement />, "settings.team")} />
             <Route path="/staff-codes" element={<Navigate to="/settings?tab=staff-codes" replace />} />
-            <Route path="/service-types" element={staff(<ServiceTypes />)} />
-            <Route path="/subscriptions" element={staff(<Subscriptions />)} />
-            <Route path="/marketing" element={staff(<Marketing />)} />
-            <Route path="/sms-comms" element={staff(<SmsComms />)} />
-            <Route path="/pets" element={staff(<PetsList />)} />
-            <Route path="/pets/new" element={staff(<PetForm />)} />
-            <Route path="/pets/:id" element={staff(<PetDetail />)} />
-            <Route path="/pets/:id/edit" element={staff(<PetForm />)} />
-            <Route path="/owners" element={staff(<OwnersList />)} />
-            <Route path="/owners/new" element={staff(<OwnerForm />)} />
-            <Route path="/owners/:id" element={staff(<OwnerDetail />)} />
-            <Route path="/owners/:id/edit" element={staff(<OwnerForm />)} />
+            <Route path="/service-types" element={staff(<ServiceTypes />, "services.manage")} />
+            <Route path="/subscriptions" element={staff(<Subscriptions />, "packages.view")} />
+            <Route path="/marketing" element={staff(<Marketing />, "analytics.view")} />
+            <Route path="/sms-comms" element={staff(<SmsComms />, "analytics.view")} />
+            <Route path="/pets" element={staff(<PetsList />, "pets.view")} />
+            <Route path="/pets/new" element={staff(<PetForm />, "pets.create")} />
+            <Route path="/pets/:id" element={staff(<PetDetail />, "pets.view")} />
+            <Route path="/pets/:id/edit" element={staff(<PetForm />, "pets.edit")} />
+            <Route path="/owners" element={staff(<OwnersList />, "owners.view")} />
+            <Route path="/owners/new" element={staff(<OwnerForm />, "owners.create")} />
+            <Route path="/owners/:id" element={staff(<OwnerDetail />, "owners.view")} />
+            <Route path="/owners/:id/edit" element={staff(<OwnerForm />, "owners.edit")} />
             <Route path="/services" element={staff(<ServicesList />, "services.manage")} />
             <Route path="/services/new" element={staff(<ServiceForm />, "services.manage")} />
             <Route path="/services/:id" element={staff(<ServiceDetail />, "services.manage")} />
             <Route path="/services/:id/edit" element={staff(<ServiceForm />, "services.manage")} />
-            <Route path="/reservations" element={staff(<Reservations />)} />
+            <Route path="/reservations" element={staff(<Reservations />, "reservations.create")} />
             <Route path="/reservations/new" element={staff(<ReservationForm />, "reservations.create")} />
-            <Route path="/reservations/:id" element={staff(<ReservationDetail />)} />
+            <Route path="/reservations/:id" element={staff(<ReservationDetail />, "reservations.create")} />
             <Route path="/reservations/:id/edit" element={staff(<ReservationEdit />, "reservations.edit")} />
             <Route path="/standing-reservations" element={<Navigate to="/reservations?tab=standing" replace />} />
-            <Route path="/group-classes" element={staff(<GroupClasses />)} />
+            <Route path="/group-classes" element={staff(<GroupClasses />, "groupclasses.view")} />
             <Route path="/invoices" element={staff(<Invoices />, "invoices.view")} />
             <Route path="/invoices/list" element={staff(<InvoicesList />, "invoices.view")} />
             <Route path="/invoices/:id" element={staff(<InvoiceDetail />, "invoices.view")} />
-            <Route path="/check-in-out" element={staff(<CheckInOut />)} />
+            <Route path="/check-in-out" element={staff(<CheckInOut />, "checkinout.perform")} />
             <Route path="/dashboard/check-in-out" element={<Navigate to="/check-in-out" replace />} />
             <Route path="/dashboard/analytics" element={<Navigate to="/analytics" replace />} />
             <Route path="/analytics" element={staff(<Analytics />, "revenue.view")} />
             <Route path="/reports" element={staff(<Reports />, "analytics.view")} />
             <Route path="/care-logs" element={staff(<CareLogs />, "carelogs.create")} />
             <Route path="/messages" element={staff(<StaffMessages />, "messaging.send")} />
-            <Route path="/incidents" element={staff(<IncidentsList />)} />
+            <Route path="/incidents" element={staff(<IncidentsList />, "incidents.create")} />
             <Route path="/incidents/new" element={staff(<IncidentForm />, "incidents.create")} />
-            <Route path="/incidents/:id" element={staff(<IncidentDetail />)} />
+            <Route path="/incidents/:id" element={staff(<IncidentDetail />, "incidents.create")} />
             <Route path="/incidents/:id/edit" element={staff(<IncidentForm />, "incidents.edit")} />
             <Route path="/playgroups" element={<Navigate to="/settings?tab=playgroups" replace />} />
             <Route path="/kennel-runs" element={<Navigate to="/settings?tab=kennel-runs" replace />} />
@@ -197,17 +197,17 @@ const App = () => (
             <Route path="/settings/data-import" element={staff(<DataImport />, "data.import")} />
             <Route path="/settings/data-merge" element={staff(<DataMerge />, "data.merge")} />
             <Route path="/settings/audit-log" element={staff(<AuditLog />, "audit.view")} />
-            <Route path="/pos/cart" element={staff(<PosCart />)} />
-            <Route path="/products" element={staff(<Products />)} />
+            <Route path="/pos/cart" element={staff(<PosCart />, "pos.use")} />
+            <Route path="/products" element={staff(<Products />, "products.view")} />
             <Route path="/pos/products" element={<Navigate to="/products" replace />} />
             <Route path="/pos/packages" element={<Navigate to="/products?tab=packages" replace />} />
             <Route path="/pos/promotions" element={<Navigate to="/products?tab=promotions" replace />} />
             <Route path="/pos/open-invoices" element={<Navigate to="/invoices" replace />} />
             <Route path="/pos/closed-invoices" element={<Navigate to="/invoices?tab=closed" replace />} />
             <Route path="/settings" element={staff(<Settings />, "settings.view")} />
-            <Route path="/deposits" element={staff(<Deposits />)} />
-            <Route path="/agreements" element={staff(<AgreementTracking />)} />
-            <Route path="/agreements/templates" element={staff(<AgreementTemplates />)} />
+            <Route path="/deposits" element={staff(<Deposits />, "deposits.view")} />
+            <Route path="/agreements" element={staff(<AgreementTracking />, "agreements.view")} />
+            <Route path="/agreements/templates" element={staff(<AgreementTemplates />, "agreements.view")} />
 
             {/* Owner portal */}
             <Route path="/portal/dashboard" element={customer(<OwnerDashboard />)} />

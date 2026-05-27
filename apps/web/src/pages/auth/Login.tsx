@@ -7,8 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import Logo from "@/components/portal/Logo";
 import { useAuth } from "@/hooks/useAuth";
-
-const STAFF_ROLES = ["owner", "admin", "manager", "staff"];
+import { defaultLandingForRole, type Role } from "@/lib/permissions";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -30,9 +29,7 @@ export default function Login() {
     if (!user) return;
     if (!membership) return;
     if (!submitted && !user) return; // belt-and-suspenders
-    const target = STAFF_ROLES.includes(membership.role)
-      ? "/dashboard"
-      : "/portal/dashboard";
+    const target = defaultLandingForRole(membership.role as Role);
     navigate(target, { replace: true });
   }, [authLoading, user, membership, submitted, navigate]);
 
