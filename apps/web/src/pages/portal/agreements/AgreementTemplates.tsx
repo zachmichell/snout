@@ -65,7 +65,7 @@ export default function AgreementTemplates() {
           : data instanceof ArrayBuffer
             ? new Blob([data], { type: "application/pdf" })
             : data instanceof Uint8Array
-              ? new Blob([data], { type: "application/pdf" })
+              ? new Blob([data as BlobPart], { type: "application/pdf" })
               : null;
       if (!blob) {
         throw new Error("Could not read PDF response");
