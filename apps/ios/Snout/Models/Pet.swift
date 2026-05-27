@@ -61,3 +61,53 @@ struct Pet: Codable, Identifiable, Hashable {
         case deletedAt         = "deleted_at"
     }
 }
+
+// MARK: - Structured care entries
+//
+// Mirrors `pet_feeding_schedules` / `pet_medications`. These are the
+// multi-entry, structured counterpart to the pet's freeform
+// feeding_notes / medication_notes (which the web app still keeps as
+// general notes). A pet can have any number of feeding schedules and
+// medications; both are scoped by organization + pet and soft-toggled
+// via `is_active`.
+
+struct PetFeedingSchedule: Codable, Identifiable, Hashable {
+    let id: String
+    let organizationId: String
+    let petId: String
+    let foodType: String
+    let amount: String?
+    let frequency: String?
+    let timing: String?
+    let instructions: String?
+    let isActive: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case organizationId = "organization_id"
+        case petId          = "pet_id"
+        case foodType       = "food_type"
+        case amount, frequency, timing, instructions
+        case isActive       = "is_active"
+    }
+}
+
+struct PetMedication: Codable, Identifiable, Hashable {
+    let id: String
+    let organizationId: String
+    let petId: String
+    let name: String
+    let dosage: String?
+    let frequency: String?
+    let timing: String?
+    let instructions: String?
+    let isActive: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case organizationId = "organization_id"
+        case petId          = "pet_id"
+        case name, dosage, frequency, timing, instructions
+        case isActive       = "is_active"
+    }
+}
