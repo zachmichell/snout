@@ -19,6 +19,60 @@ import UIKit
 import PhotosUI
 import Supabase
 
+// MARK: - Editable care drafts
+//
+// Local, mutable mirrors of a `pet_feeding_schedules` / `pet_medications`
+// row. `id` is a stable local identity for ForEach + `.sheet(item:)`;
+// `rowId` is the Postgres row id (nil = not yet persisted). On save the
+// view-model diffs these against what was loaded: rows with a nil rowId are
+// inserted, rows with a rowId are updated, and any loaded rowId no longer
+// present is deactivated.
+
+struct FeedingDraft: Identifiable, Equatable {
+    var id = UUID()
+    var rowId: String? = nil
+    var foodType: String = ""
+    var amount: String = ""
+    var frequency: String = ""
+    var timing: String = ""
+    var instructions: String = ""
+
+    /// Food type is the one required field (matches the web form).
+    var isValid: Bool { !foodType.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// One-line summary for the collapsed list row.
+    var summary: String {
+        var parts: [String] = []
+        let amt = amount.trimmingCharacters(in: .whitespaces)
+        let tim = timing.trimmingCharacters(in: .whitespaces)
+        if !amt.isEmpty { parts.append(amt) }
+        if !tim.isEmpty { parts.append(tim) }
+        return parts.joined(separator: " · ")
+    }
+}
+
+struct MedicationDraft: Identifiable, Equatable {
+    var id = UUID()
+    var rowId: String? = nil
+    var name: String = ""
+    var dosage: String = ""
+    var frequency: String = ""
+    var timing: String = ""
+    var instructions: String = ""
+
+    /// Name is the one required field (matches the web form).
+    var isValid: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    var summary: String {
+        var parts: [String] = []
+        let dose = dosage.trimmingCharacters(in: .whitespaces)
+        let tim = timing.trimmingCharacters(in: .whitespaces)
+        if !dose.isEmpty { parts.append(dose) }
+        if !tim.isEmpty { parts.append(tim) }
+        return parts.joined(separator: " · ")
+    }
+}
+
 // MARK: - Pets list
 
 @MainActor
@@ -202,6 +256,15 @@ final class PetEditViewModel: ObservableObject {
     @Published var medicationNotes: String = ""
     @Published var behavioralNotes: String = ""
 
+    // Structured, multi-entry care lists (backed by pet_feeding_schedules /
+    // pet_medications). These coexist with the freeform *Notes fields above.
+    @Published var feedings: [FeedingDraft] = []
+    @Published var medications: [MedicationDraft] = []
+    /// Row ids that existed when we loaded but were removed in the UI; these
+    /// are deactivated on save.
+    private var removedFeedingRowIds: Set<String> = []
+    private var removedMedicationRowIds: Set<String> = []
+
     @Published var isSaving: Bool = false
     @Published var isDeleting: Bool = false
     @Published var saveError: String?
@@ -266,6 +329,178 @@ final class PetEditViewModel: ObservableObject {
         if let urlString = pet.photoURL, let url = URL(string: urlString) {
             existingPhotoURL = url
             existingPhotoPath = Self.extractPetPhotosPath(from: url)
+        }
+    }
+
+    // MARK: - Care entries (feeding schedules + medications)
+
+    /// Load the active structured feeding/medication rows for an existing
+    /// pet and map them into editable drafts. Best-effort: a failure leaves
+    /// the lists empty rather than blocking the form.
+    func loadCareEntries(petId: String) async {
+        async let feedingRows: [PetFeedingSchedule] = (try? await client
+            .from("pet_feeding_schedules")
+            .select()
+            .eq("pet_id", value: petId)
+            .eq("is_active", value: true)
+            .order("created_at", ascending: true)
+            .execute()
+            .value) ?? []
+        async let medRows: [PetMedication] = (try? await client
+            .from("pet_medications")
+            .select()
+            .eq("pet_id", value: petId)
+            .eq("is_active", value: true)
+            .order("created_at", ascending: true)
+            .execute()
+            .value) ?? []
+
+        let (f, m) = await (feedingRows, medRows)
+        feedings = f.map {
+            FeedingDraft(
+                rowId: $0.id,
+                foodType: $0.foodType,
+                amount: $0.amount ?? "",
+                frequency: $0.frequency ?? "",
+                timing: $0.timing ?? "",
+                instructions: $0.instructions ?? ""
+            )
+        }
+        medications = m.map {
+            MedicationDraft(
+                rowId: $0.id,
+                name: $0.name,
+                dosage: $0.dosage ?? "",
+                frequency: $0.frequency ?? "",
+                timing: $0.timing ?? "",
+                instructions: $0.instructions ?? ""
+            )
+        }
+        // Reset removal tracking — we just freshly loaded the truth.
+        removedFeedingRowIds = []
+        removedMedicationRowIds = []
+    }
+
+    /// Insert/update/replace a feeding draft in the list.
+    func upsertFeeding(_ draft: FeedingDraft) {
+        if let idx = feedings.firstIndex(where: { $0.id == draft.id }) {
+            feedings[idx] = draft
+        } else {
+            feedings.append(draft)
+        }
+    }
+
+    func upsertMedication(_ draft: MedicationDraft) {
+        if let idx = medications.firstIndex(where: { $0.id == draft.id }) {
+            medications[idx] = draft
+        } else {
+            medications.append(draft)
+        }
+    }
+
+    /// Remove a draft from the list; if it was persisted, remember its row
+    /// id so save() can deactivate it.
+    func removeFeeding(_ draft: FeedingDraft) {
+        if let rowId = draft.rowId { removedFeedingRowIds.insert(rowId) }
+        feedings.removeAll { $0.id == draft.id }
+    }
+
+    func removeMedication(_ draft: MedicationDraft) {
+        if let rowId = draft.rowId { removedMedicationRowIds.insert(rowId) }
+        medications.removeAll { $0.id == draft.id }
+    }
+
+    /// Persist the structured care drafts for a pet: insert new rows, update
+    /// edited ones, deactivate removed ones. Empty/invalid drafts (missing
+    /// the required field) are skipped. Runs after the pet row itself is
+    /// saved, so failures here don't lose the parent's other edits — they're
+    /// surfaced as a non-fatal note on saveError.
+    private func syncCareEntries(petId: String, organizationId: String) async {
+        struct FeedingPayload: Encodable {
+            let organization_id: String
+            let pet_id: String
+            let food_type: String
+            let amount: String?
+            let frequency: String?
+            let timing: String?
+            let instructions: String?
+        }
+        struct MedicationPayload: Encodable {
+            let organization_id: String
+            let pet_id: String
+            let name: String
+            let dosage: String?
+            let frequency: String?
+            let timing: String?
+            let instructions: String?
+        }
+        struct DeactivatePayload: Encodable { let is_active: Bool }
+
+        var careError: String?
+
+        do {
+            // Feeding: upserts
+            for draft in feedings where draft.isValid {
+                let payload = FeedingPayload(
+                    organization_id: organizationId,
+                    pet_id: petId,
+                    food_type: draft.foodType.trimmingCharacters(in: .whitespaces),
+                    amount: nilIfBlank(draft.amount),
+                    frequency: nilIfBlank(draft.frequency),
+                    timing: nilIfBlank(draft.timing),
+                    instructions: nilIfBlank(draft.instructions)
+                )
+                if let rowId = draft.rowId {
+                    try await client.from("pet_feeding_schedules")
+                        .update(payload).eq("id", value: rowId).execute()
+                } else {
+                    try await client.from("pet_feeding_schedules")
+                        .insert(payload).execute()
+                }
+            }
+            // Medication: upserts
+            for draft in medications where draft.isValid {
+                let payload = MedicationPayload(
+                    organization_id: organizationId,
+                    pet_id: petId,
+                    name: draft.name.trimmingCharacters(in: .whitespaces),
+                    dosage: nilIfBlank(draft.dosage),
+                    frequency: nilIfBlank(draft.frequency),
+                    timing: nilIfBlank(draft.timing),
+                    instructions: nilIfBlank(draft.instructions)
+                )
+                if let rowId = draft.rowId {
+                    try await client.from("pet_medications")
+                        .update(payload).eq("id", value: rowId).execute()
+                } else {
+                    try await client.from("pet_medications")
+                        .insert(payload).execute()
+                }
+            }
+            // Deactivations (soft-remove)
+            for rowId in removedFeedingRowIds {
+                try await client.from("pet_feeding_schedules")
+                    .update(DeactivatePayload(is_active: false))
+                    .eq("id", value: rowId).execute()
+            }
+            for rowId in removedMedicationRowIds {
+                try await client.from("pet_medications")
+                    .update(DeactivatePayload(is_active: false))
+                    .eq("id", value: rowId).execute()
+            }
+            removedFeedingRowIds = []
+            removedMedicationRowIds = []
+        } catch {
+            careError = error.localizedDescription
+        }
+
+        if let careError {
+            // Append rather than overwrite so a prior photo note survives.
+            if let existing = saveError, !existing.isEmpty {
+                saveError = existing + "\n" + "Feeding/medication didn't fully save: \(careError)"
+            } else {
+                saveError = "Saved, but feeding/medication didn't fully save: \(careError)"
+            }
         }
     }
 
@@ -418,6 +653,10 @@ final class PetEditViewModel: ObservableObject {
                 }
             }
 
+            // Now that the pet exists, flush any staged feeding/medication
+            // drafts. Non-fatal: failures are appended to saveError.
+            await syncCareEntries(petId: petId, organizationId: organizationId)
+
             didFinish = true
         } catch {
             saveError = error.localizedDescription
@@ -469,20 +708,23 @@ final class PetEditViewModel: ObservableObject {
                 .eq("id", value: petId)
                 .execute()
 
+            // Need org id for the storage path AND for the care-entry sync.
+            // Fetch it once from the row we just updated — cheap RTT and
+            // avoids passing it as a param.
+            struct OrgRow: Decodable { let organization_id: String }
+            let orgRows: [OrgRow] = try await client
+                .from("pets")
+                .select("organization_id")
+                .eq("id", value: petId)
+                .limit(1)
+                .execute()
+                .value
+            let orgId = orgRows.first?.organization_id
+
             // Photo updates after the row update so a partial photo failure
             // doesn't lose the parent's text edits.
             if let jpeg = pendingPhotoJPEG {
-                // Need org id for the storage path. Fetch from the row we
-                // just updated — cheap RTT and avoids passing it as a param.
-                struct OrgRow: Decodable { let organization_id: String }
-                let rows: [OrgRow] = try await client
-                    .from("pets")
-                    .select("organization_id")
-                    .eq("id", value: petId)
-                    .limit(1)
-                    .execute()
-                    .value
-                if let org = rows.first?.organization_id {
+                if let org = orgId {
                     do {
                         try await uploadPhoto(jpeg, organizationId: org, petId: petId)
                     } catch {
@@ -501,6 +743,11 @@ final class PetEditViewModel: ObservableObject {
                         .from("pet-photos")
                         .remove(paths: [path])
                 }
+            }
+
+            // Sync structured feeding/medication drafts. Non-fatal.
+            if let org = orgId {
+                await syncCareEntries(petId: petId, organizationId: org)
             }
 
             didFinish = true
@@ -608,6 +855,10 @@ struct PetEditView: View {
     @FocusState private var focused: Field?
     @State private var showDeleteConfirm: Bool = false
     @State private var photoPickerItem: PhotosPickerItem?
+    /// Non-nil while the feeding/medication editor sheet is open. The draft
+    /// carries either a fresh blank row or a copy of an existing one.
+    @State private var editingFeeding: FeedingDraft?
+    @State private var editingMedication: MedicationDraft?
 
     enum Field { case name, breed, weight, color, microchip, allergies, feeding, medication, behavioral }
 
@@ -648,7 +899,20 @@ struct PetEditView: View {
             }
         }
         .task {
-            if let pet { vm.hydrate(from: pet) }
+            if let pet {
+                vm.hydrate(from: pet)
+                await vm.loadCareEntries(petId: pet.id)
+            }
+        }
+        .sheet(item: $editingFeeding) { draft in
+            FeedingEditorSheet(draft: draft) { updated in
+                vm.upsertFeeding(updated)
+            }
+        }
+        .sheet(item: $editingMedication) { draft in
+            MedicationEditorSheet(draft: draft) { updated in
+                vm.upsertMedication(updated)
+            }
         }
         .onChange(of: vm.didFinish) { _, new in
             if new {
@@ -929,28 +1193,116 @@ struct PetEditView: View {
 
     private var feedingSection: some View {
         sectionWithLabel("Feeding") {
-            formCard {
-                BohoMultilineField(
-                    label: "Feeding",
-                    text: $vm.feedingNotes,
-                    placeholder: "Brand, portions, schedule"
-                )
-                .focused($focused, equals: .feeding)
+            VStack(spacing: SnoutTheme.Spacing.md) {
+                formCard {
+                    BohoMultilineField(
+                        label: "General notes",
+                        text: $vm.feedingNotes,
+                        placeholder: "Brand, portions, schedule"
+                    )
+                    .focused($focused, equals: .feeding)
+                }
+                ForEach(vm.feedings) { draft in
+                    careEntryRow(
+                        title: draft.foodType.isEmpty ? "Feeding" : draft.foodType,
+                        subtitle: draft.summary,
+                        onEdit: { editingFeeding = draft },
+                        onRemove: { vm.removeFeeding(draft) }
+                    )
+                }
+                addEntryButton(title: "Add feeding schedule") {
+                    editingFeeding = FeedingDraft()
+                }
             }
         }
     }
 
     private var medicationSection: some View {
         sectionWithLabel("Medication") {
-            formCard {
-                BohoMultilineField(
-                    label: "Medication",
-                    text: $vm.medicationNotes,
-                    placeholder: "Dose and timing"
-                )
-                .focused($focused, equals: .medication)
+            VStack(spacing: SnoutTheme.Spacing.md) {
+                formCard {
+                    BohoMultilineField(
+                        label: "General notes",
+                        text: $vm.medicationNotes,
+                        placeholder: "Dose and timing"
+                    )
+                    .focused($focused, equals: .medication)
+                }
+                ForEach(vm.medications) { draft in
+                    careEntryRow(
+                        title: draft.name.isEmpty ? "Medication" : draft.name,
+                        subtitle: draft.summary,
+                        onEdit: { editingMedication = draft },
+                        onRemove: { vm.removeMedication(draft) }
+                    )
+                }
+                addEntryButton(title: "Add medication") {
+                    editingMedication = MedicationDraft()
+                }
             }
         }
+    }
+
+    // MARK: - Care entry row + add button
+
+    private func careEntryRow(
+        title: String,
+        subtitle: String,
+        onEdit: @escaping () -> Void,
+        onRemove: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: SnoutTheme.Spacing.md) {
+            Button(action: onEdit) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(SnoutTheme.body(15, weight: .semibold))
+                        .foregroundStyle(SnoutTheme.onSurface)
+                    if !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(SnoutTheme.bodySM)
+                            .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onEdit) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onRemove) {
+                Image(systemName: "trash")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SnoutTheme.destructive)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(SnoutTheme.Spacing.lg)
+        .background(SnoutTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+    }
+
+    private func addEntryButton(title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: SnoutTheme.Spacing.sm) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                Text(title)
+                    .font(SnoutTheme.body(14, weight: .semibold))
+            }
+            .foregroundStyle(SnoutTheme.onSurface)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, SnoutTheme.Spacing.md)
+            .background(SnoutTheme.surface)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(SnoutTheme.divider, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Actions
@@ -1096,6 +1448,107 @@ private struct DeletePetDialog: View {
                     x: 0, y: SnoutTheme.heroShadowY)
             .padding(.horizontal, SnoutTheme.Spacing.xl)
             .frame(maxWidth: 420)
+        }
+    }
+}
+
+// MARK: - Feeding / medication editor sheets
+//
+// Modal editors for a single structured care entry. Each keeps a local
+// editable copy of the draft and hands it back via onSave only when the
+// user confirms — cancelling discards changes. Field set + the single
+// required field mirror the web pet-care dialogs so staff and parents see
+// the same shape of data.
+
+private struct FeedingEditorSheet: View {
+    @State var draft: FeedingDraft
+    let onSave: (FeedingDraft) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var focused: Bool
+
+    private var isEditing: Bool { draft.rowId != nil }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                SnoutTheme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: SnoutTheme.Spacing.md) {
+                        BohoFormField(label: "Food type", text: $draft.foodType,
+                                      placeholder: "Royal Canin Large Breed",
+                                      capitalization: .sentences)
+                        BohoFormField(label: "Amount", text: $draft.amount,
+                                      placeholder: "1 cup")
+                        BohoFormField(label: "Frequency", text: $draft.frequency,
+                                      placeholder: "Twice daily")
+                        BohoFormField(label: "Timing", text: $draft.timing,
+                                      placeholder: "Morning and evening")
+                        BohoMultilineField(label: "Instructions", text: $draft.instructions,
+                                           placeholder: "Soak kibble in warm water")
+                    }
+                    .padding(SnoutTheme.Spacing.xl)
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle(isEditing ? "Edit feeding" : "Add feeding")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { onSave(draft); dismiss() }
+                        .foregroundStyle(draft.isValid ? SnoutTheme.accent : SnoutTheme.onSurfaceFaint)
+                        .disabled(!draft.isValid)
+                }
+            }
+        }
+    }
+}
+
+private struct MedicationEditorSheet: View {
+    @State var draft: MedicationDraft
+    let onSave: (MedicationDraft) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var isEditing: Bool { draft.rowId != nil }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                SnoutTheme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: SnoutTheme.Spacing.md) {
+                        BohoFormField(label: "Name", text: $draft.name,
+                                      placeholder: "Apoquel",
+                                      capitalization: .sentences)
+                        BohoFormField(label: "Dosage", text: $draft.dosage,
+                                      placeholder: "50mg")
+                        BohoFormField(label: "Frequency", text: $draft.frequency,
+                                      placeholder: "Twice daily")
+                        BohoFormField(label: "Timing", text: $draft.timing,
+                                      placeholder: "Morning and evening, with food")
+                        BohoMultilineField(label: "Instructions", text: $draft.instructions,
+                                           placeholder: "Special instructions")
+                    }
+                    .padding(SnoutTheme.Spacing.xl)
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle(isEditing ? "Edit medication" : "Add medication")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { onSave(draft); dismiss() }
+                        .foregroundStyle(draft.isValid ? SnoutTheme.accent : SnoutTheme.onSurfaceFaint)
+                        .disabled(!draft.isValid)
+                }
+            }
         }
     }
 }
