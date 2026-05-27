@@ -53,6 +53,10 @@ final class BookingWizardViewModel: ObservableObject {
 
     // MARK: - Wizard state
     @Published var currentStep: Step = .service
+    /// The service *type* (module) the parent picked first — e.g. "daycare",
+    /// "boarding", "grooming", "training". The Service step is category-first:
+    /// pick a type, then a specific service within it. nil = no type chosen yet.
+    @Published var selectedModule: String?
     @Published var selectedService: Service?
     @Published var selectedPets: [Pet] = []
     @Published var selectedLocationId: String?
@@ -128,6 +132,7 @@ final class BookingWizardViewModel: ObservableObject {
 
     func reset() {
         currentStep = .service
+        selectedModule = nil
         selectedService = nil
         selectedPets = []
         date = ""
@@ -172,6 +177,10 @@ final class BookingWizardViewModel: ObservableObject {
         if locations.count == 1 {
             selectedLocationId = locations.first?.id
         }
+
+        // Auto-select the service type when the facility only offers one,
+        // so a single-module facility skips straight to its service list.
+        syncModuleSelection()
 
         // Auto-select pet when there's only one — matches web's autoSelected ref.
         if pts.count == 1, !hasAutoSelectedPet, selectedPets.isEmpty {
@@ -342,6 +351,55 @@ final class BookingWizardViewModel: ObservableObject {
             // location_id null on the service = available everywhere.
             guard let locId = selectedLocationId else { return svc.locationId == nil }
             return svc.locationId == nil || svc.locationId == locId
+        }
+    }
+
+    /// Canonical display order for the service-type chooser. Modules not in
+    /// this list fall to the end, alphabetically.
+    private static let moduleOrder: [String] = ["daycare", "boarding", "grooming", "training"]
+
+    /// Distinct service types present in the currently-visible services, in a
+    /// stable, sensible order. Drives the category grid on the Service step.
+    var availableModules: [String] {
+        let present = Set(visibleServices.map(\.module))
+        let ranked = Self.moduleOrder.filter(present.contains)
+        let extras = present.subtracting(Self.moduleOrder).sorted()
+        return ranked + extras
+    }
+
+    /// Services within the chosen service type. Empty until a type is picked.
+    var servicesForSelectedModule: [Service] {
+        guard let module = selectedModule else { return [] }
+        return visibleServices.filter { $0.module == module }
+    }
+
+    /// Pick a service type. Clears the chosen service if it no longer belongs
+    /// to the selected type (so the downstream flow stays consistent).
+    func selectModule(_ module: String) {
+        selectedModule = module
+        if let svc = selectedService, svc.module != module {
+            selectedService = nil
+            selectedPets = []
+        }
+    }
+
+    /// Drop back to the service-type chooser.
+    func clearModuleSelection() {
+        selectedModule = nil
+        selectedService = nil
+    }
+
+    /// Keep `selectedModule` consistent with the visible services after a
+    /// location change or initial load. Auto-selects the only type when there's
+    /// exactly one, and clears a stale type that has no services here.
+    func syncModuleSelection() {
+        let modules = availableModules
+        if let svc = selectedService {
+            selectedModule = svc.module
+        } else if let current = selectedModule, !modules.contains(current) {
+            selectedModule = modules.count == 1 ? modules.first : nil
+        } else if selectedModule == nil, modules.count == 1 {
+            selectedModule = modules.first
         }
     }
 
