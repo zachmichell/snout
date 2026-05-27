@@ -4959,11 +4959,62 @@ export type Database = {
           },
         ]
       }
+      report_card_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          description: string | null
+          id: string
+          is_default: boolean
+          name: string
+          organization_id: string
+          sections: Json
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          organization_id: string
+          sections?: Json
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          organization_id?: string
+          sections?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_card_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       report_cards: {
         Row: {
           appetite: string | null
           created_at: string
           created_by: string | null
+          custom_sections: Json | null
           energy_level: string | null
           id: string
           mood: string | null
@@ -4976,12 +5027,14 @@ export type Database = {
           reservation_id: string
           sociability: string | null
           summary: string | null
+          template_id: string | null
           updated_at: string
         }
         Insert: {
           appetite?: string | null
           created_at?: string
           created_by?: string | null
+          custom_sections?: Json | null
           energy_level?: string | null
           id?: string
           mood?: string | null
@@ -4994,12 +5047,14 @@ export type Database = {
           reservation_id: string
           sociability?: string | null
           summary?: string | null
+          template_id?: string | null
           updated_at?: string
         }
         Update: {
           appetite?: string | null
           created_at?: string
           created_by?: string | null
+          custom_sections?: Json | null
           energy_level?: string | null
           id?: string
           mood?: string | null
@@ -5012,6 +5067,7 @@ export type Database = {
           reservation_id?: string
           sociability?: string | null
           summary?: string | null
+          template_id?: string | null
           updated_at?: string
         }
         Relationships: [

@@ -53,7 +53,11 @@ struct ReportCardDetailView: View {
                     if let summary = card.summary, !summary.isEmpty {
                         summaryCard(summary)
                     }
-                    ratingsRow
+                    if let sections = card.customSections, !sections.isEmpty {
+                        customSectionsView(sections)
+                    } else {
+                        ratingsRow
+                    }
                     Spacer(minLength: SnoutTheme.Spacing.xxl)
                 }
                 .padding(.horizontal, SnoutTheme.Spacing.xl)
@@ -148,6 +152,41 @@ struct ReportCardDetailView: View {
                 .lineSpacing(4)
         }
         .snoutTinted(SnoutTheme.cotton, padding: SnoutTheme.Spacing.xl)
+    }
+
+    @ViewBuilder
+    private func customSectionsView(_ sections: [ReportCardSection]) -> some View {
+        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.lg) {
+            ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
+                VStack(alignment: .leading, spacing: SnoutTheme.Spacing.sm) {
+                    if !section.title.isEmpty {
+                        Text(section.title.uppercased())
+                            .font(SnoutTheme.labelSM)
+                            .tracking(0.8)
+                            .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                    }
+                    VStack(spacing: 0) {
+                        ForEach(Array(section.fields.enumerated()), id: \.offset) { idx, field in
+                            HStack(alignment: .top, spacing: SnoutTheme.Spacing.md) {
+                                Text(field.label)
+                                    .font(SnoutTheme.bodyMD)
+                                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                                Spacer(minLength: SnoutTheme.Spacing.md)
+                                Text(field.displayValue)
+                                    .font(SnoutTheme.body(15, weight: .semibold))
+                                    .foregroundStyle(SnoutTheme.onSurface)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                            .padding(.vertical, SnoutTheme.Spacing.sm)
+                            if idx < section.fields.count - 1 {
+                                Divider().overlay(SnoutTheme.divider)
+                            }
+                        }
+                    }
+                    .snoutTinted(SnoutTheme.cotton, padding: SnoutTheme.Spacing.lg)
+                }
+            }
+        }
     }
 
     private var ratingsRow: some View {

@@ -27,6 +27,7 @@ import {
   HandCoins,
   NotebookPen,
   LineChart,
+  LayoutTemplate,
 } from "lucide-react";
 import Logo from "./Logo";
 import StaffCodeSwitcher from "./StaffCodeSwitcher";
@@ -59,6 +60,7 @@ const sections: Array<{
       { to: "/grooming", icon: Scissors, label: "Grooming", permission: "grooming.view" as Permission },
       { to: "/pet-care", icon: HeartPulse, label: "Pet Care", permission: "petcare.view" as Permission },
       { to: "/report-cards", icon: FileText, label: "Report Cards", permission: "reportcards.create" as Permission },
+      { to: "/report-card-templates", icon: LayoutTemplate, label: "Report Templates", permission: "reportcards.publish" as Permission },
       { to: "/care-logs", icon: NotebookPen, label: "Care Logs", permission: "carelogs.create" as Permission },
       { to: "/incidents", icon: AlertTriangle, label: "Incidents", permission: "incidents.create" as Permission },
     ],

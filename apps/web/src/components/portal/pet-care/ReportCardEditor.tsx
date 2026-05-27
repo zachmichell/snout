@@ -10,13 +10,21 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   APPETITE_OPTIONS, ENERGY_OPTIONS, MOOD_OPTIONS, RATING_OPTIONS,
   SOCIABILITY_OPTIONS, buildSummary, inferAppetite,
 } from "@/lib/care";
 import { sendReportCardPublished } from "@/lib/email";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useReportCardTemplates } from "@/hooks/useReportCardTemplates";
+import {
+  blankFilledSections, parseFilledSections, type RCFilledSection,
+} from "@/lib/reportCardTemplates";
 
 type Props = {
   open: boolean;
@@ -33,6 +41,7 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
   const { can } = usePermissions();
   const canPublish = can("reportcards.publish");
   const qc = useQueryClient();
+  const { data: templates = [] } = useReportCardTemplates();
 
   const { data: card } = useQuery({
     queryKey: ["report-card", reservationId, petId, open],
@@ -57,6 +66,8 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
   const [appetite, setAppetite] = useState<string>("");
   const [sociability, setSociability] = useState<string>("");
   const [summary, setSummary] = useState<string>("");
+  const [templateId, setTemplateId] = useState<string | null>(null);
+  const [customSections, setCustomSections] = useState<RCFilledSection[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [photoSignedUrls, setPhotoSignedUrls] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
@@ -97,6 +108,8 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
       setSociability(card.sociability ?? "");
       setSummary(card.summary ?? "");
       setPhotos(card.photo_urls ?? []);
+      setTemplateId((card as any).template_id ?? null);
+      setCustomSections(parseFilledSections((card as any).custom_sections));
     } else {
       // Auto-populate from logs
       setRating("");
@@ -107,8 +120,41 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
       setAppetite(inferAppetite(feedingLogs) ?? "");
       setSummary(buildSummary(petName, petLogs as any));
       setPhotos([]);
+      // Pre-select the org's default template (if any) for new cards.
+      const def = templates.find((t) => t.is_default);
+      if (def) {
+        setTemplateId(def.id);
+        setCustomSections(blankFilledSections(def.sections));
+      } else {
+        setTemplateId(null);
+        setCustomSections([]);
+      }
     }
-  }, [open, card, logs, petId, petName]);
+  }, [open, card, logs, petId, petName, templates]);
+
+  // Switch the active template: instantiate its blank sections. "" = classic.
+  const applyTemplate = (id: string) => {
+    if (id === "__classic__") {
+      setTemplateId(null);
+      setCustomSections([]);
+      return;
+    }
+    const tpl = templates.find((t) => t.id === id);
+    setTemplateId(id);
+    setCustomSections(tpl ? blankFilledSections(tpl.sections) : []);
+  };
+
+  // Update one field's value within the filled custom sections.
+  const setFieldValue = (si: number, fi: number, value: string | number | boolean) =>
+    setCustomSections((prev) =>
+      prev.map((s, i) =>
+        i !== si
+          ? s
+          : { ...s, fields: s.fields.map((f, j) => (j === fi ? { ...f, value } : f)) },
+      ),
+    );
+
+  const usingTemplate = templateId != null && customSections.length > 0;
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || !files.length) return;
@@ -139,13 +185,16 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
       organization_id: membership.organization_id,
       pet_id: petId,
       reservation_id: reservationId,
-      overall_rating: rating || null,
-      mood: mood || null,
-      energy_level: energy || null,
-      appetite: appetite || null,
-      sociability: sociability || null,
+      // Classic structured fields are only kept when NOT using a template.
+      overall_rating: usingTemplate ? null : rating || null,
+      mood: usingTemplate ? null : mood || null,
+      energy_level: usingTemplate ? null : energy || null,
+      appetite: usingTemplate ? null : appetite || null,
+      sociability: usingTemplate ? null : sociability || null,
       summary: summary || null,
       photo_urls: photos,
+      template_id: usingTemplate ? templateId : null,
+      custom_sections: usingTemplate ? customSections : null,
       created_by: user?.id ?? null,
     };
     if (publish) {
@@ -240,29 +289,62 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
         </DialogHeader>
 
         <div className="space-y-5">
-          <Section label="Overall rating">
-            <div className="flex flex-wrap gap-2">
-              {RATING_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setRating(opt.value)}
-                  className={`rounded-md border px-3 py-2 text-sm transition ${
-                    rating === opt.value ? `${opt.tone} border-transparent` : "border-border bg-background hover:bg-surface"
-                  }`}
-                >
-                  {opt.emoji} {opt.label}
-                </button>
-              ))}
-            </div>
-          </Section>
+          {templates.length > 0 && (
+            <Section label="Template">
+              <Select value={templateId ?? "__classic__"} onValueChange={applyTemplate}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__classic__">Classic (rating, mood, energy…)</SelectItem>
+                  {templates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Section>
+          )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <PillGroup label="Mood" value={mood} onChange={setMood} options={MOOD_OPTIONS.map((m) => ({ value: m.value, label: `${m.emoji} ${m.label}` }))} />
-            <PillGroup label="Energy" value={energy} onChange={setEnergy} options={ENERGY_OPTIONS} />
-            <PillGroup label="Appetite" value={appetite} onChange={setAppetite} options={APPETITE_OPTIONS} />
-            <PillGroup label="Sociability" value={sociability} onChange={setSociability} options={SOCIABILITY_OPTIONS} />
-          </div>
+          {!usingTemplate && (
+            <>
+              <Section label="Overall rating">
+                <div className="flex flex-wrap gap-2">
+                  {RATING_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setRating(opt.value)}
+                      className={`rounded-md border px-3 py-2 text-sm transition ${
+                        rating === opt.value ? `${opt.tone} border-transparent` : "border-border bg-background hover:bg-surface"
+                      }`}
+                    >
+                      {opt.emoji} {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </Section>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <PillGroup label="Mood" value={mood} onChange={setMood} options={MOOD_OPTIONS.map((m) => ({ value: m.value, label: `${m.emoji} ${m.label}` }))} />
+                <PillGroup label="Energy" value={energy} onChange={setEnergy} options={ENERGY_OPTIONS} />
+                <PillGroup label="Appetite" value={appetite} onChange={setAppetite} options={APPETITE_OPTIONS} />
+                <PillGroup label="Sociability" value={sociability} onChange={setSociability} options={SOCIABILITY_OPTIONS} />
+              </div>
+            </>
+          )}
+
+          {usingTemplate &&
+            customSections.map((section, si) => (
+              <div key={si} className="space-y-3 rounded-lg border border-border p-3">
+                {section.title && <p className="text-sm font-semibold text-foreground">{section.title}</p>}
+                {section.fields.map((field, fi) => (
+                  <div key={fi} className="space-y-1.5">
+                    <Label>{field.label}</Label>
+                    <DynamicFieldInput field={field} onChange={(v) => setFieldValue(si, fi, v)} />
+                  </div>
+                ))}
+              </div>
+            ))}
 
           <Section label="Summary">
             <Textarea rows={4} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={`How was ${petName}'s day?`} />
@@ -317,6 +399,88 @@ export default function ReportCardEditor({ open, onOpenChange, reservationId, pe
       </DialogContent>
     </Dialog>
   );
+}
+
+// Renders the right input for a templated custom field.
+function DynamicFieldInput({
+  field,
+  onChange,
+}: {
+  field: RCFilledSection["fields"][number];
+  onChange: (v: string | number | boolean) => void;
+}) {
+  switch (field.type) {
+    case "textarea":
+      return (
+        <Textarea
+          rows={3}
+          value={typeof field.value === "string" ? field.value : ""}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      );
+    case "select":
+      return (
+        <Select
+          value={typeof field.value === "string" && field.value ? field.value : undefined}
+          onValueChange={onChange}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose…" />
+          </SelectTrigger>
+          <SelectContent>
+            {(field.options ?? []).map((opt) => (
+              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    case "rating": {
+      const current = typeof field.value === "number" ? field.value : 0;
+      return (
+        <div className="flex gap-1.5">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(current === n ? 0 : n)}
+              className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm transition ${
+                current >= n ? "border-primary bg-primary-light text-primary-hover" : "border-border bg-background hover:bg-surface"
+              }`}
+            >
+              ★
+            </button>
+          ))}
+        </div>
+      );
+    }
+    case "boolean":
+      return (
+        <div className="flex gap-2">
+          {[
+            { v: true, label: "Yes" },
+            { v: false, label: "No" },
+          ].map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              onClick={() => onChange(o.v)}
+              className={`rounded-pill border px-4 py-1.5 text-sm transition ${
+                field.value === o.v ? "border-primary bg-primary-light text-primary-hover" : "border-border bg-background hover:bg-surface text-text-secondary"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      );
+    default:
+      return (
+        <Input
+          value={typeof field.value === "string" ? field.value : ""}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      );
+  }
 }
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {

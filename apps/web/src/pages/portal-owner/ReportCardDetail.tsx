@@ -15,6 +15,7 @@ import {
   slugifyForFilename,
   withDownloadFilename,
 } from "@/lib/storage-download";
+import { parseFilledSections, formatFieldValue } from "@/lib/reportCardTemplates";
 
 function findLabel(opts: { value: string; label: string }[], v?: string | null) {
   if (!v) return null;
@@ -81,6 +82,7 @@ export default function OwnerReportCardDetail() {
   const r = ratingMeta(c.overall_rating);
   const m = moodMeta(c.mood);
   const tz = c.reservations?.locations?.timezone || undefined;
+  const customSections = parseFilledSections(c.custom_sections);
 
   return (
     <div className="space-y-6">
@@ -165,12 +167,34 @@ export default function OwnerReportCardDetail() {
       {/* Vibes */}
       <section className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <h2 className="font-display text-xl font-semibold text-foreground">How {c.pets?.name} did</h2>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {m && <Pill>{m.emoji} {m.label}</Pill>}
-          {findLabel(ENERGY_OPTIONS, c.energy_level) && <Pill>Energy: {findLabel(ENERGY_OPTIONS, c.energy_level)}</Pill>}
-          {findLabel(APPETITE_OPTIONS, c.appetite) && <Pill>Appetite: {findLabel(APPETITE_OPTIONS, c.appetite)}</Pill>}
-          {findLabel(SOCIABILITY_OPTIONS, c.sociability) && <Pill>Social: {findLabel(SOCIABILITY_OPTIONS, c.sociability)}</Pill>}
-        </div>
+        {customSections.length > 0 ? (
+          <div className="mt-4 space-y-5">
+            {customSections.map((section, si) => (
+              <div key={si}>
+                {section.title && (
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    {section.title}
+                  </h3>
+                )}
+                <dl className="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-2">
+                  {section.fields.map((field, fi) => (
+                    <div key={fi} className="flex justify-between gap-3 border-b border-border-subtle py-1.5">
+                      <dt className="text-sm text-muted-foreground">{field.label}</dt>
+                      <dd className="text-right text-sm font-medium text-foreground">{formatFieldValue(field)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {m && <Pill>{m.emoji} {m.label}</Pill>}
+            {findLabel(ENERGY_OPTIONS, c.energy_level) && <Pill>Energy: {findLabel(ENERGY_OPTIONS, c.energy_level)}</Pill>}
+            {findLabel(APPETITE_OPTIONS, c.appetite) && <Pill>Appetite: {findLabel(APPETITE_OPTIONS, c.appetite)}</Pill>}
+            {findLabel(SOCIABILITY_OPTIONS, c.sociability) && <Pill>Social: {findLabel(SOCIABILITY_OPTIONS, c.sociability)}</Pill>}
+          </div>
+        )}
         {c.summary && (
           <p className="mt-5 whitespace-pre-wrap text-base leading-relaxed text-foreground">{c.summary}</p>
         )}
