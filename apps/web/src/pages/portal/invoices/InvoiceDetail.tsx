@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { toArray } from "@/lib/postgrest";
 import { Link, useParams } from "react-router-dom";
-import { toArray } from "@/lib/postgrest";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Send, CheckCircle2, Ban, Link2, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "sonner";

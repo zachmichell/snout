@@ -46,6 +46,7 @@ export type Permission =
   | "invoices.create"
   | "invoices.edit"
   | "invoices.send"
+  | "invoices.refund"
   | "pets.create"
   | "pets.edit"
   | "owners.create"
@@ -96,6 +97,7 @@ const ALL: Permission[] = [
   "invoices.create",
   "invoices.edit",
   "invoices.send",
+  "invoices.refund",
   "pets.create",
   "pets.edit",
   "owners.create",
@@ -168,6 +170,7 @@ const MANAGER: Permission[] = uniq([
   "invoices.create",
   "invoices.edit",
   "invoices.send",
+  "invoices.refund",
   "pets.create",
   "owners.create",
   "playgroups.manage",

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { toArray } from "@/lib/postgrest";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { toArray } from "@/lib/postgrest";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, CheckCircle2, LogIn, LogOut, XCircle, AlertTriangle, Plus, Trash2, FileHeart, Repeat } from "lucide-react";
 import PortalLayout from "@/components/portal/PortalLayout";
@@ -380,7 +379,7 @@ export default function ReservationDetail() {
                 </Button>
               )}
               {canEdit && canSwitchService && (
-                <Button variant="outline" onClick={() => { setSwitchServiceId(r.service_id ?? ""); setSwitchOpen(true); }}>
+                <Button variant="outline" onClick={() => setSwitchOpen(true)}>
                   <Repeat className="h-4 w-4" /> Switch service
                 </Button>
               )}

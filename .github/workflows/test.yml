@@ -6,6 +6,23 @@ on:
     branches: [main]
 
 jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: bun install --frozen-lockfile
+      # Fails the build on any TypeScript error. `bun run build` uses
+      # esbuild and does NOT type-check, so this is the gate that keeps
+      # type regressions out of main.
+      - run: bun run typecheck
+
   unit:
     name: Unit tests
     runs-on: ubuntu-latest

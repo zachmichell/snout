@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { toArray } from "@/lib/postgrest";
 import PortalLayout from "@/components/portal/PortalLayout";
-import { toArray } from "@/lib/postgrest";
 import PageHeader from "@/components/portal/PageHeader";
 // PlaygroupsSection: body-only (no PortalLayout) for embedding inside Settings tabs.
 import ModuleGate from "@/components/portal/facility/ModuleGate";

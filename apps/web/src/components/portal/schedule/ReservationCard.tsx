@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { toArray } from "@/lib/postgrest";
 import { StickyNote } from "lucide-react";
-import { toArray } from "@/lib/postgrest";
 import { Button } from "@/components/ui/button";
 import ModuleBadge from "@/components/portal/ModuleBadge";
 import { formatTime } from "@/lib/money";
