@@ -17,21 +17,27 @@ struct ClassInstanceRow: Codable, Identifiable, Hashable {
     let endAt: Date
     let status: String?
     let notes: String?
+    let seriesId: String?
+    let sessionNumber: Int?
     let classType: NamedRef?
 
     enum CodingKeys: String, CodingKey {
         case id, status, notes
         case startAt = "start_at"
         case endAt = "end_at"
+        case seriesId = "series_id"
+        case sessionNumber = "session_number"
         case classType = "class_type"
     }
     struct NamedRef: Codable, Hashable { let id: String; let name: String }
 
     var title: String { classType?.name ?? "Class" }
+    var isSeries: Bool { seriesId != nil }
     var timeLabel: String {
         let f = Date.FormatStyle.dateTime.hour().minute()
         return "\(startAt.formatted(f)) – \(endAt.formatted(f))"
     }
+    var dayLabel: String { startAt.formatted(.dateTime.weekday(.abbreviated).month().day()) }
 }
 
 struct EnrollmentRow: Decodable, Identifiable, Hashable {
@@ -57,7 +63,7 @@ final class StaffTrainingViewModel: ObservableObject {
     @Published var loadError: String?
 
     private let client = SupabaseClientProvider.shared
-    private static let graph = "id, start_at, end_at, status, notes, class_type:class_types(id, name)"
+    private static let graph = "id, start_at, end_at, status, notes, series_id, session_number, class_type:class_types(id, name)"
 
     func load(organizationId: String, role: StaffRole, profileId: String?) async {
         isLoading = true
@@ -144,7 +150,7 @@ struct StaffTrainingView: View {
                         emptyState
                     } else {
                         ForEach(vm.classes) { c in
-                            NavigationLink { ClassRosterView(classInstance: c) } label: { card(c) }
+                            NavigationLink { classDestination(c) } label: { card(c) }
                                 .buttonStyle(.plain)
                         }
                         .padding(.horizontal, SnoutTheme.Spacing.xl)
@@ -164,11 +170,26 @@ struct StaffTrainingView: View {
         await vm.load(organizationId: org, role: role, profileId: staff.profileId)
     }
 
+    // A series-backed class opens its full session list; a standalone class
+    // opens its roster directly.
+    @ViewBuilder
+    private func classDestination(_ c: ClassInstanceRow) -> some View {
+        if c.isSeries {
+            ClassSeriesView(seriesClass: c)
+        } else {
+            ClassRosterView(classInstance: c)
+        }
+    }
+
     private func card(_ c: ClassInstanceRow) -> some View {
         HStack(spacing: SnoutTheme.Spacing.md) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(c.title).font(SnoutTheme.body(16, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
                 Text(c.timeLabel).font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted)
+                if c.isSeries {
+                    Text(c.sessionNumber.map { "Series · Session \($0)" } ?? "Series")
+                        .font(SnoutTheme.labelSM).tracking(0.4).foregroundStyle(SnoutTheme.accent)
+                }
             }
             Spacer()
             SnoutGlyphChevron()
@@ -262,5 +283,109 @@ struct ClassRosterView: View {
         .padding(SnoutTheme.Spacing.lg)
         .background(SnoutTheme.surface)
         .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+    }
+}
+
+// MARK: - Series: all session dates, each opening its roster/attendance
+
+@MainActor
+final class ClassSeriesViewModel: ObservableObject {
+    @Published var sessions: [ClassInstanceRow] = []
+    @Published var isLoading = false
+    @Published var loadError: String?
+
+    private let client = SupabaseClientProvider.shared
+    private static let graph = "id, start_at, end_at, status, notes, series_id, session_number, class_type:class_types(id, name)"
+
+    func load(seriesId: String) async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            // RLS scopes this to the staff member's org; series_id is org-unique.
+            sessions = try await client.from("class_instances")
+                .select(Self.graph)
+                .eq("series_id", value: seriesId)
+                .is("deleted_at", value: nil)
+                .order("start_at", ascending: true)
+                .execute().value
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+}
+
+struct ClassSeriesView: View {
+    let seriesClass: ClassInstanceRow
+    @StateObject private var vm = ClassSeriesViewModel()
+
+    var body: some View {
+        ZStack {
+            SnoutTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: SnoutTheme.Spacing.md) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(seriesClass.title).font(SnoutTheme.titleMD).foregroundStyle(SnoutTheme.onSurface)
+                        Text(vm.sessions.isEmpty ? "Class series" : "\(vm.sessions.count) sessions")
+                            .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted)
+                    }
+                    .padding(.horizontal, SnoutTheme.Spacing.xl)
+
+                    Text("SESSIONS").font(SnoutTheme.labelSM).tracking(0.8).foregroundStyle(SnoutTheme.onSurfaceMuted)
+                        .padding(.horizontal, SnoutTheme.Spacing.xl)
+
+                    if vm.isLoading && vm.sessions.isEmpty {
+                        ProgressView().tint(SnoutTheme.accent).frame(maxWidth: .infinity).padding(.top, SnoutTheme.Spacing.lg)
+                    } else if vm.sessions.isEmpty {
+                        Text("No sessions in this series.").font(SnoutTheme.bodyMD).foregroundStyle(SnoutTheme.onSurfaceMuted)
+                            .padding(.horizontal, SnoutTheme.Spacing.xl)
+                    } else {
+                        ForEach(vm.sessions) { s in
+                            NavigationLink { ClassRosterView(classInstance: s) } label: { sessionRow(s) }
+                                .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, SnoutTheme.Spacing.xl)
+                    }
+                    Spacer(minLength: SnoutTheme.Spacing.xxl)
+                }
+                .padding(.top, SnoutTheme.Spacing.sm)
+            }
+            .scrollContentBackground(.hidden)
+        }
+        .navigationTitle("Series").navigationBarTitleDisplayMode(.inline)
+        .task { if let sid = seriesClass.seriesId { await vm.load(seriesId: sid) } }
+    }
+
+    private func sessionRow(_ s: ClassInstanceRow) -> some View {
+        HStack(spacing: SnoutTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(s.sessionNumber.map { "Session \($0)" } ?? "Session")
+                    .font(SnoutTheme.body(15, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
+                Text("\(s.dayLabel) · \(s.timeLabel)")
+                    .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted)
+            }
+            Spacer()
+            if let status = s.status { ClassSessionStatusPill(status: status) }
+            SnoutGlyphChevron()
+        }
+        .padding(SnoutTheme.Spacing.lg)
+        .background(SnoutTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+    }
+}
+
+private struct ClassSessionStatusPill: View {
+    let status: String
+    var body: some View {
+        Text(status.replacingOccurrences(of: "_", with: " ").capitalized)
+            .font(SnoutTheme.labelSM).tracking(0.4).foregroundStyle(SnoutTheme.onSurface)
+            .padding(.horizontal, SnoutTheme.Spacing.sm).padding(.vertical, 3)
+            .background(tint).clipShape(Capsule())
+    }
+    private var tint: Color {
+        switch status {
+        case "completed": return SnoutTheme.cotton
+        case "cancelled": return SnoutTheme.divider
+        default: return SnoutTheme.frost
+        }
     }
 }
