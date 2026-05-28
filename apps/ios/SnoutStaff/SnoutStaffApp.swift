@@ -13,9 +13,24 @@ import SwiftUI
 
 @main
 struct SnoutStaffApp: App {
+    @StateObject private var auth = AuthService()
+    @StateObject private var staff = CurrentStaffService()
+    @StateObject private var lock = AppLockService()
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             StaffRootView()
+                .environmentObject(auth)
+                .environmentObject(staff)
+                .environmentObject(lock)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Re-lock whenever the app leaves the foreground so returning
+            // to it requires Face ID again.
+            if phase == .background {
+                lock.lock()
+            }
         }
     }
 }

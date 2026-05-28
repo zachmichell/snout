@@ -102,6 +102,7 @@ targets:
       - path: Snout/AppConfig.swift
       - path: Snout/SnoutTheme.swift
       - path: Snout/Services/SupabaseClient.swift
+      - path: Snout/Services/AuthService.swift
       - path: Snout/Models
       - path: Snout/Utilities
     resources:
