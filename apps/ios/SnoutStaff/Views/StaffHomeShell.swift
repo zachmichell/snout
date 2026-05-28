@@ -28,7 +28,7 @@ struct StaffHomeShell: View {
         TabView(selection: $selection) {
             ForEach(lanes, id: \.self) { lane in
                 NavigationStack {
-                    LanePlaceholderView(lane: lane)
+                    laneContent(lane)
                         .navigationTitle(laneTitle(lane))
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
@@ -51,6 +51,17 @@ struct StaffHomeShell: View {
         .tint(SnoutTheme.accent)
         .sheet(isPresented: $showAccount) {
             AccountSheet()
+        }
+    }
+
+    /// Real screen for lanes that are built; placeholder for the rest.
+    @ViewBuilder
+    private func laneContent(_ lane: StaffCapability) -> some View {
+        switch lane {
+        case .schedule:
+            StaffScheduleView()
+        default:
+            LanePlaceholderView(lane: lane)
         }
     }
 
