@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Plus, Check, X } from "lucide-react";
 
-type Role = "owner" | "admin" | "manager" | "supervisor" | "staff" | "groomer" | "customer";
+type Role = "owner" | "admin" | "manager" | "supervisor" | "staff" | "groomer" | "trainer" | "customer";
 type AssignableRole = Exclude<Role, "owner" | "customer">;
 
 type MemberRow = {
@@ -52,6 +52,7 @@ const ROLE_VARIANT: Record<Role, string> = {
   supervisor: "bg-amber-100 text-amber-800",
   staff: "bg-muted text-foreground",
   groomer: "bg-rose-100 text-rose-800",
+  trainer: "bg-sky-100 text-sky-800",
   customer: "bg-muted text-muted-foreground",
 };
 
@@ -327,6 +328,7 @@ export default function TeamTab() {
                               <SelectItem value="supervisor">supervisor</SelectItem>
                               <SelectItem value="staff">staff</SelectItem>
                               <SelectItem value="groomer">groomer</SelectItem>
+                              <SelectItem value="trainer">trainer</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
@@ -439,6 +441,7 @@ export default function TeamTab() {
                   <SelectItem value="supervisor">supervisor</SelectItem>
                   <SelectItem value="staff">staff</SelectItem>
                   <SelectItem value="groomer">groomer</SelectItem>
+                  <SelectItem value="trainer">trainer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -455,7 +458,7 @@ export default function TeamTab() {
   );
 }
 
-const ROLES: PermRole[] = ["owner", "admin", "manager", "supervisor", "staff", "groomer", "customer"];
+const ROLES: PermRole[] = ["owner", "admin", "manager", "supervisor", "staff", "groomer", "trainer", "customer"];
 
 const PERMISSION_GROUPS: Array<{ label: string; permissions: Permission[] }> = [
   { label: "Settings", permissions: ["settings.view", "settings.organization", "settings.locations", "settings.team", "settings.payments", "settings.billing", "settings.email", "settings.subscription"] },

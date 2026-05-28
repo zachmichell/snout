@@ -7229,7 +7229,7 @@ export type Database = {
         | "banned"
       invoice_status: "draft" | "sent" | "paid" | "partial" | "overdue" | "void"
       kennel_run_type: "standard" | "large" | "suite" | "indoor" | "outdoor"
-      membership_role: "owner" | "admin" | "manager" | "supervisor" | "staff" | "groomer" | "customer"
+      membership_role: "owner" | "admin" | "manager" | "supervisor" | "staff" | "groomer" | "trainer" | "customer"
       message_sender_type: "staff" | "owner"
       module_enum:
         | "daycare"
@@ -7432,7 +7432,7 @@ export const Constants = {
       ],
       invoice_status: ["draft", "sent", "paid", "partial", "overdue", "void"],
       kennel_run_type: ["standard", "large", "suite", "indoor", "outdoor"],
-      membership_role: ["owner", "admin", "manager", "supervisor", "staff", "groomer", "customer"],
+      membership_role: ["owner", "admin", "manager", "supervisor", "staff", "groomer", "trainer", "customer"],
       message_sender_type: ["staff", "owner"],
       module_enum: [
         "daycare",
