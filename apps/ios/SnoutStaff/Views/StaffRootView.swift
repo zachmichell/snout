@@ -48,8 +48,13 @@ struct StaffRootView: View {
         case .idle, .loading:
             LoadingScreen(message: "Signing you in…")
                 .task { await staff.loadIfNeeded(userId: userId) }
-        case .staff(let role, _):
+        case .staff(let role, let org):
             StaffHomeShell(role: role)
+                .task {
+                    if let pid = staff.profileId {
+                        StaffPushService.shared.start(profileId: pid, organizationId: org)
+                    }
+                }
         case .notStaff:
             NotStaffGate()
         case .error(let message):

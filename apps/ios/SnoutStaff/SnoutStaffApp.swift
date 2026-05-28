@@ -10,9 +10,27 @@
 //
 
 import SwiftUI
+import UIKit
+
+/// Bridges UIKit's APNs token callback into StaffPushService. SwiftUI's
+/// App lifecycle doesn't surface didRegisterForRemoteNotifications, so we
+/// install a thin app delegate.
+final class StaffAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        Task { @MainActor in StaffPushService.shared.didRegister(deviceToken: deviceToken) }
+    }
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        #if DEBUG
+        print("[StaffAppDelegate] APNs registration failed: \(error.localizedDescription)")
+        #endif
+    }
+}
 
 @main
 struct SnoutStaffApp: App {
+    @UIApplicationDelegateAdaptor(StaffAppDelegate.self) private var appDelegate
     @StateObject private var auth = AuthService()
     @StateObject private var staff = CurrentStaffService()
     @StateObject private var lock = AppLockService()

@@ -23,6 +23,7 @@
 		15EC18CA6B611439618A84DA /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25140E42F0D40D3CCC63B87F /* Money.swift */; };
 		18CF661A700F5FCB0694E68F /* Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 616B72B147362A8C4C901679 /* Service.swift */; };
 		1A8EEFD70312B9731977F992 /* ClientDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E8B548D4270D97C997AE0D /* ClientDetailsView.swift */; };
+		1AB882FC73B640ECEEBD40D4 /* StaffPushService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CFB54EA70D501337BB26DA1 /* StaffPushService.swift */; };
 		1BE473E076A361EDC4D1A002 /* TabBarVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E65EE19A4F682DE287E2DC /* TabBarVisibility.swift */; };
 		1E4CA75DCC8FD98D864804F5 /* Groomer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E89365A033EB0D5A210084AF /* Groomer.swift */; };
 		2185CC8AA04AD5B6C2B4F752 /* Groomer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E89365A033EB0D5A210084AF /* Groomer.swift */; };
@@ -157,6 +158,7 @@
 		25140E42F0D40D3CCC63B87F /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Money.swift; sourceTree = "<group>"; };
 		27C4E70C08C0D7CE9120CEA7 /* StaffRole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffRole.swift; sourceTree = "<group>"; };
 		2B363070496D8A809BA06184 /* BookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookView.swift; sourceTree = "<group>"; };
+		2CFB54EA70D501337BB26DA1 /* StaffPushService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffPushService.swift; sourceTree = "<group>"; };
 		2FEA7B39535EB30BD63C3629 /* Location.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Location.swift; sourceTree = "<group>"; };
 		3402645D368940D1AE0246FB /* GroomerStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroomerStep.swift; sourceTree = "<group>"; };
 		362CDF5FEDDD5590EC3A5625 /* ReservationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReservationListView.swift; sourceTree = "<group>"; };
@@ -188,6 +190,7 @@
 		6AD63E6AF045CA09BDC5A5F0 /* ReportCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportCardListView.swift; sourceTree = "<group>"; };
 		6BD803D891BBED72B2BDE1BA /* StaffGroomingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffGroomingView.swift; sourceTree = "<group>"; };
 		6C9AB4F8470E794507C7AFB2 /* AddCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddCardView.swift; sourceTree = "<group>"; };
+		6D1BF94E3130C8EAA507A0B0 /* SnoutStaff.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SnoutStaff.entitlements; sourceTree = "<group>"; };
 		713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-SemiBold.ttf"; sourceTree = "<group>"; };
 		71603313865283C4E4A3984B /* SnoutTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SnoutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		71A2CD6751788F4B56C263E4 /* SnoutStaffApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoutStaffApp.swift; sourceTree = "<group>"; };
@@ -317,6 +320,7 @@
 				F5362CAC8318571CB9028D3F /* AppLockService.swift */,
 				AFD349468A27B705631FB5FE /* CurrentStaffService.swift */,
 				D6989AC5E57C4E374D8E0375 /* StaffCache.swift */,
+				2CFB54EA70D501337BB26DA1 /* StaffPushService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -325,6 +329,7 @@
 			isa = PBXGroup;
 			children = (
 				5639E91D9AD1D9F1CD3585E7 /* Info.plist */,
+				6D1BF94E3130C8EAA507A0B0 /* SnoutStaff.entitlements */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -887,6 +892,7 @@
 				5441B038AD6AEEBBEF08BC65 /* StaffLoginView.swift in Sources */,
 				4A97D9FCB14D94945E14538D /* StaffLookupView.swift in Sources */,
 				72C1FABF06A98FB0D0FAF820 /* StaffMessagingView.swift in Sources */,
+				1AB882FC73B640ECEEBD40D4 /* StaffPushService.swift in Sources */,
 				F2750ED22BD71CDF69546994 /* StaffReportCardEditor.swift in Sources */,
 				A72A2571AEC03F8D00D5C584 /* StaffReportsView.swift in Sources */,
 				E07F3FA9B8E4C03036EA7A2F /* StaffRole.swift in Sources */,
