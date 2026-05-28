@@ -25,6 +25,12 @@ final class AppLockService: ObservableObject {
 
     private static let enabledKey = "snoutstaff.applock.enabled"
 
+    /// How long the app may sit in the background before it re-challenges.
+    /// Returning within this window clears the lock without a biometric prompt
+    /// (so locking your phone and coming right back doesn't re-ask for Face ID).
+    private let graceInterval: TimeInterval = 120
+    private var lastBackgrounded: Date?
+
     init() {
         let on = UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true
         enabled = on
@@ -38,9 +44,21 @@ final class AppLockService: ObservableObject {
     }
 
     /// Engage the lock (e.g. when entering the background). No-op if disabled.
+    /// Records when we backgrounded so a quick return can skip the prompt.
     func lock() {
         guard enabled else { return }
+        lastBackgrounded = Date()
         isLocked = true
+    }
+
+    /// Called when the app returns to the foreground: if we were only
+    /// backgrounded briefly, clear the lock silently (no Face ID prompt).
+    func resumeIfWithinGrace() {
+        guard enabled, isLocked, let since = lastBackgrounded else { return }
+        if Date().timeIntervalSince(since) <= graceInterval {
+            lastBackgrounded = nil
+            isLocked = false
+        }
     }
 
     /// Prompt for Face ID / Touch ID (falling back to passcode). On success,
@@ -48,6 +66,15 @@ final class AppLockService: ObservableObject {
     /// the app stays usable rather than bricking.
     func authenticate() async {
         guard enabled else { isLocked = false; return }
+
+        // Brief background → skip the biometric challenge (grace window). Acts
+        // as a fallback in case the lock screen's auto-prompt fires before the
+        // foreground resume handler.
+        if let since = lastBackgrounded, Date().timeIntervalSince(since) <= graceInterval {
+            lastBackgrounded = nil
+            isLocked = false
+            return
+        }
 
         let context = LAContext()
         context.localizedFallbackTitle = "Use passcode"

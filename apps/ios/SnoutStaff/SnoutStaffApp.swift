@@ -44,10 +44,17 @@ struct SnoutStaffApp: App {
                 .environmentObject(lock)
         }
         .onChange(of: scenePhase) { _, phase in
-            // Re-lock whenever the app leaves the foreground so returning
-            // to it requires Face ID again.
-            if phase == .background {
+            switch phase {
+            case .background:
+                // Lock on background so the app-switcher snapshot hides client
+                // data; records the time for the grace window.
                 lock.lock()
+            case .active:
+                // Returning within the grace window clears the lock silently;
+                // a longer absence still requires Face ID.
+                lock.resumeIfWithinGrace()
+            default:
+                break
             }
         }
     }
