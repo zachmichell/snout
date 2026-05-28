@@ -13,7 +13,7 @@ import Supabase
 
 // MARK: - Decoded row (reservation + embedded pet/owner/service)
 
-struct ScheduleReservation: Decodable, Identifiable, Hashable {
+struct ScheduleReservation: Codable, Identifiable, Hashable {
     let id: String
     let status: ReservationStatus
     let startAt: Date
@@ -30,15 +30,15 @@ struct ScheduleReservation: Decodable, Identifiable, Hashable {
         case reservationPets = "reservation_pets"
     }
 
-    struct NamedRef: Decodable, Hashable { let id: String; let name: String }
-    struct OwnerRef: Decodable, Hashable {
+    struct NamedRef: Codable, Hashable { let id: String; let name: String }
+    struct OwnerRef: Codable, Hashable {
         let id: String
         let firstName: String?
         let lastName: String?
         enum CodingKeys: String, CodingKey { case id; case firstName = "first_name"; case lastName = "last_name" }
     }
-    struct PetJoin: Decodable, Hashable { let pet: PetRef? }
-    struct PetRef: Decodable, Hashable { let id: String; let name: String; let species: String? }
+    struct PetJoin: Codable, Hashable { let pet: PetRef? }
+    struct PetRef: Codable, Hashable { let id: String; let name: String; let species: String? }
 
     var petNames: String {
         let names = reservationPets.compactMap { $0.pet?.name }
@@ -64,10 +64,17 @@ final class StaffScheduleViewModel: ObservableObject {
     private static let selectGraph =
         "id, status, start_at, end_at, notes, service:services(id, name), owner:owners!primary_owner_id(id, first_name, last_name), reservation_pets(pet:pets(id, name, species))"
 
+    private func cacheKey(_ org: String) -> String { "schedule_\(org)_\(StaffCache.todayKey())" }
+
     func load(organizationId: String) async {
         isLoading = true
         defer { isLoading = false }
         loadError = nil
+
+        // Show cached data instantly (offline-friendly) while we refresh.
+        if rows.isEmpty, let cached = StaffCache.load([ScheduleReservation].self, key: cacheKey(organizationId)) {
+            rows = cached
+        }
 
         let cal = Calendar.current
         let startOfToday = cal.startOfDay(for: Date())
@@ -88,7 +95,9 @@ final class StaffScheduleViewModel: ObservableObject {
                 .execute()
                 .value
             rows = result
+            StaffCache.save(result, key: cacheKey(organizationId))
         } catch {
+            // Offline / failure: keep whatever cached rows we already showed.
             loadError = error.localizedDescription
         }
     }

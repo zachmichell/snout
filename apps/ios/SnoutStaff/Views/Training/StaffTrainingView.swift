@@ -11,7 +11,7 @@
 import SwiftUI
 import Supabase
 
-struct ClassInstanceRow: Decodable, Identifiable, Hashable {
+struct ClassInstanceRow: Codable, Identifiable, Hashable {
     let id: String
     let startAt: Date
     let endAt: Date
@@ -25,7 +25,7 @@ struct ClassInstanceRow: Decodable, Identifiable, Hashable {
         case endAt = "end_at"
         case classType = "class_type"
     }
-    struct NamedRef: Decodable, Hashable { let id: String; let name: String }
+    struct NamedRef: Codable, Hashable { let id: String; let name: String }
 
     var title: String { classType?.name ?? "Class" }
     var timeLabel: String {
@@ -64,6 +64,11 @@ final class StaffTrainingViewModel: ObservableObject {
         defer { isLoading = false }
         loadError = nil
 
+        let cacheKey = "training_\(organizationId)_\(role.rawValue)_\(StaffCache.todayKey())"
+        if classes.isEmpty, let cached = StaffCache.load([ClassInstanceRow].self, key: cacheKey) {
+            classes = cached
+        }
+
         let cal = Calendar.current
         let start = cal.startOfDay(for: Date())
         guard let end = cal.date(byAdding: DateComponents(day: 1, second: -1), to: start) else { return }
@@ -78,7 +83,9 @@ final class StaffTrainingViewModel: ObservableObject {
             if role == .trainer, let pid = profileId {
                 query = query.eq("instructor_user_id", value: pid)
             }
-            classes = try await query.order("start_at", ascending: true).execute().value
+            let result: [ClassInstanceRow] = try await query.order("start_at", ascending: true).execute().value
+            classes = result
+            StaffCache.save(result, key: cacheKey)
         } catch {
             loadError = error.localizedDescription
         }
