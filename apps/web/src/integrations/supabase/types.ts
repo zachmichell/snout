@@ -622,6 +622,7 @@ export type Database = {
           owner_id: string
           payment_status: string
           pet_id: string
+          series_id: string | null
           status: string
           updated_at: string
         }
@@ -638,6 +639,7 @@ export type Database = {
           owner_id: string
           payment_status?: string
           pet_id: string
+          series_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -654,6 +656,7 @@ export type Database = {
           owner_id?: string
           payment_status?: string
           pet_id?: string
+          series_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -686,6 +689,13 @@ export type Database = {
             referencedRelation: "pets"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "class_enrollments_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "class_series"
+            referencedColumns: ["id"]
+          },
         ]
       }
       class_instances: {
@@ -700,6 +710,8 @@ export type Database = {
           location_id: string | null
           notes: string | null
           organization_id: string
+          series_id: string | null
+          session_number: number | null
           start_at: string
           status: string
           updated_at: string
@@ -715,6 +727,8 @@ export type Database = {
           location_id?: string | null
           notes?: string | null
           organization_id: string
+          series_id?: string | null
+          session_number?: number | null
           start_at: string
           status?: string
           updated_at?: string
@@ -730,6 +744,8 @@ export type Database = {
           location_id?: string | null
           notes?: string | null
           organization_id?: string
+          series_id?: string | null
+          session_number?: number | null
           start_at?: string
           status?: string
           updated_at?: string
@@ -744,6 +760,79 @@ export type Database = {
           },
           {
             foreignKeyName: "class_instances_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_instances_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "class_series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_series: {
+        Row: {
+          class_type_id: string
+          created_at: string
+          id: string
+          instructor_user_id: string | null
+          location_id: string | null
+          notes: string | null
+          organization_id: string
+          session_count: number
+          start_date: string
+          start_time: string
+          status: string
+          title: string | null
+          updated_at: string
+          weekday: number | null
+        }
+        Insert: {
+          class_type_id: string
+          created_at?: string
+          id?: string
+          instructor_user_id?: string | null
+          location_id?: string | null
+          notes?: string | null
+          organization_id: string
+          session_count: number
+          start_date: string
+          start_time: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          weekday?: number | null
+        }
+        Update: {
+          class_type_id?: string
+          created_at?: string
+          id?: string
+          instructor_user_id?: string | null
+          location_id?: string | null
+          notes?: string | null
+          organization_id?: string
+          session_count?: number
+          start_date?: string
+          start_time?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          weekday?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_series_class_type_id_fkey"
+            columns: ["class_type_id"]
+            isOneToOne: false
+            referencedRelation: "class_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_series_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
