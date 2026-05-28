@@ -235,6 +235,18 @@ struct StaffPetVisitView: View {
                         }
                     }
 
+                    NavigationLink {
+                        StaffReportCardEditor(visit: visit)
+                    } label: {
+                        HStack(spacing: SnoutTheme.Spacing.sm) {
+                            Image(systemName: "doc.text.fill").font(.system(size: 16, weight: .semibold))
+                            Text("Report card").font(SnoutTheme.body(15, weight: .semibold))
+                        }
+                        .foregroundStyle(SnoutTheme.onAccent).frame(maxWidth: .infinity)
+                        .padding(.vertical, SnoutTheme.Spacing.md).background(SnoutTheme.accent).clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
                     Button {
                         showLogSheet = true
                     } label: {
@@ -242,8 +254,9 @@ struct StaffPetVisitView: View {
                             Image(systemName: "plus.circle.fill").font(.system(size: 16, weight: .semibold))
                             Text("Add care log").font(SnoutTheme.body(15, weight: .semibold))
                         }
-                        .foregroundStyle(SnoutTheme.onAccent).frame(maxWidth: .infinity)
-                        .padding(.vertical, SnoutTheme.Spacing.md).background(SnoutTheme.accent).clipShape(Capsule())
+                        .foregroundStyle(SnoutTheme.onSurface).frame(maxWidth: .infinity)
+                        .padding(.vertical, SnoutTheme.Spacing.md).background(SnoutTheme.surface).clipShape(Capsule())
+                        .overlay(Capsule().stroke(SnoutTheme.divider, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
 

@@ -114,6 +114,7 @@
 		F09BB476089288A16E6628B2 /* ReportCardDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44EF06CCA7EB6C816C2A9F41 /* ReportCardDetailView.swift */; };
 		F22810744674D08A0FB6D182 /* BookingWizardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2807AC82DD6A7D17A440AE8 /* BookingWizardViewModel.swift */; };
 		F2315DBA648848E61BACCEDC /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = ABFD10E3A43EC19323375F3B /* StripePaymentSheet */; };
+		F2750ED22BD71CDF69546994 /* StaffReportCardEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01DEC50DEB9D89E4AFEE3A9 /* StaffReportCardEditor.swift */; };
 		FA49B1D170EF0F10993222B0 /* BookingCalendarGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643CC857E7ABCD867A06282B /* BookingCalendarGrid.swift */; };
 		FF3FA268B5C27571C8F6B4FC /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F6B35B5DFBF242F688D2919 /* SupabaseClient.swift */; };
 /* End PBXBuildFile section */
@@ -210,6 +211,7 @@
 		B4DD5F6F717F3C192D60555A /* Snout.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Snout.entitlements; sourceTree = "<group>"; };
 		BD24E49994534BA5FE289161 /* Config.example.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Config.example.plist; sourceTree = "<group>"; };
 		BFD4CBB507BD7C7A2E4FE692 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		C01DEC50DEB9D89E4AFEE3A9 /* StaffReportCardEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffReportCardEditor.swift; sourceTree = "<group>"; };
 		C2D40E026383D2D561EB5A16 /* InvoicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvoicesView.swift; sourceTree = "<group>"; };
 		C70949BE448EC661E53E0047 /* GrandifloraOne-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GrandifloraOne-Regular.ttf"; sourceTree = "<group>"; };
 		CAE319EB2102236C2C68D35F /* ReportCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportCard.swift; sourceTree = "<group>"; };
@@ -287,6 +289,7 @@
 		0B76B564F7C133FFD94AA960 /* Reports */ = {
 			isa = PBXGroup;
 			children = (
+				C01DEC50DEB9D89E4AFEE3A9 /* StaffReportCardEditor.swift */,
 				5402D1B5C81DA947C7020289 /* StaffReportsView.swift */,
 			);
 			path = Reports;
@@ -844,6 +847,7 @@
 				3FD0D30E838DAE87DB207186 /* StaffGroomingView.swift in Sources */,
 				0EFD1A785C3D4E36D6DBB5A8 /* StaffHomeShell.swift in Sources */,
 				5441B038AD6AEEBBEF08BC65 /* StaffLoginView.swift in Sources */,
+				F2750ED22BD71CDF69546994 /* StaffReportCardEditor.swift in Sources */,
 				A72A2571AEC03F8D00D5C584 /* StaffReportsView.swift in Sources */,
 				E07F3FA9B8E4C03036EA7A2F /* StaffRole.swift in Sources */,
 				92CB993FCFC68486A081C00E /* StaffRootView.swift in Sources */,
