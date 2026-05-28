@@ -65,6 +65,17 @@ final class StaffDashboardViewModel: ObservableObject {
     var departuresCount: Int { departures.count }
 }
 
+private func dashStatusLabel(_ status: ReservationStatus) -> String {
+    switch status {
+    case .requested:  return "Requested"
+    case .confirmed:  return "Confirmed"
+    case .checkedIn:  return "Checked in"
+    case .checkedOut: return "Checked out"
+    case .cancelled:  return "Cancelled"
+    case .noShow:     return "No-show"
+    }
+}
+
 struct StaffDashboardView: View {
     @EnvironmentObject private var staff: CurrentStaffService
     @StateObject private var vm = StaffDashboardViewModel()
@@ -98,7 +109,15 @@ struct StaffDashboardView: View {
                 .font(SnoutTheme.labelSM).tracking(0.6).foregroundStyle(SnoutTheme.onSurfaceMuted)
             Text(staff.displayName.isEmpty ? "Welcome back" : "Hi, \(firstName)")
                 .font(SnoutTheme.titleLG).foregroundStyle(SnoutTheme.onSurface)
+            if let role = staff.role {
+                SnoutBadge(text: role.label,
+                           background: SnoutTheme.accent.opacity(0.18),
+                           foreground: SnoutTheme.onSurface)
+                    .padding(.top, SnoutTheme.Spacing.xxs)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .snoutHeroCard()
     }
 
     private var firstName: String { staff.displayName.split(separator: " ").first.map(String.init) ?? staff.displayName }
@@ -125,14 +144,15 @@ struct StaffDashboardView: View {
 
     private func statTile(_ label: String, _ value: Int, _ symbol: String, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: SnoutTheme.Spacing.sm) {
-            Image(systemName: symbol).font(.system(size: 22)).foregroundStyle(SnoutTheme.onSurface)
-            Text("\(value)").font(SnoutTheme.display(34, weight: .bold)).foregroundStyle(SnoutTheme.onSurface)
+            ZStack {
+                Circle().fill(tint.opacity(0.55)).frame(width: 38, height: 38)
+                Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
+            }
+            Text("\(value)").font(SnoutTheme.display(32, weight: .bold)).foregroundStyle(SnoutTheme.onSurface)
             Text(label.uppercased()).font(SnoutTheme.labelSM).tracking(0.6).foregroundStyle(SnoutTheme.onSurfaceMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(SnoutTheme.Spacing.lg)
-        .background(tint.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 
     @ViewBuilder
@@ -148,12 +168,15 @@ struct StaffDashboardView: View {
                                 .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted).lineLimit(1)
                         }
                         Spacer()
-                        Text(row.startAt.formatted(.dateTime.hour().minute()))
-                            .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceFaint)
+                        VStack(alignment: .trailing, spacing: SnoutTheme.Spacing.xs) {
+                            SnoutBadge(text: dashStatusLabel(row.status),
+                                       background: SnoutTheme.statusBackground(for: row.status),
+                                       foreground: SnoutTheme.statusForeground(for: row.status))
+                            Text(row.startAt.formatted(.dateTime.hour().minute()))
+                                .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceFaint)
+                        }
                     }
-                    .padding(SnoutTheme.Spacing.lg)
-                    .background(SnoutTheme.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+                    .snoutCard()
                 }
                 Text("Open the Today tab to confirm and check pets in.")
                     .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted)
@@ -217,10 +240,10 @@ private struct DashboardReservationListView: View {
                     .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted)
             }
             Spacer()
-            StatusPill(status: row.status)
+            SnoutBadge(text: dashStatusLabel(row.status),
+                       background: SnoutTheme.statusBackground(for: row.status),
+                       foreground: SnoutTheme.statusForeground(for: row.status))
         }
-        .padding(SnoutTheme.Spacing.lg)
-        .background(SnoutTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 }
