@@ -55,7 +55,11 @@ enum SupabaseClientProvider {
 /// values appear in the app's `Library/Preferences` plist. The whole struct compiles
 /// out of release builds via `#if DEBUG`.
 private struct UserDefaultsAuthStorage: AuthLocalStorage {
-    private let defaults: UserDefaults = {
+    // `AuthLocalStorage` is `Sendable`, but `UserDefaults` isn't formally `Sendable`
+    // (it predates the concurrency model). Apple documents `UserDefaults` as
+    // thread-safe, so `nonisolated(unsafe)` vouches for the cross-isolation access
+    // and silences Swift 6's "non-Sendable stored property" error.
+    nonisolated(unsafe) private let defaults: UserDefaults = {
         // Use a dedicated suite so dev session blobs don't pollute the standard
         // UserDefaults that the rest of the app might use for preferences.
         UserDefaults(suiteName: "app.snout.ios.auth-debug") ?? .standard
