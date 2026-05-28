@@ -30,8 +30,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatDate } from "@/lib/format";
 import { PERMISSIONS_BY_ROLE, type Role, type Permission } from "@/lib/permissions";
 
-type StaffRole = "owner" | "admin" | "manager" | "supervisor" | "staff" | "groomer";
-const ASSIGNABLE_ROLES: StaffRole[] = ["admin", "manager", "supervisor", "staff", "groomer"];
+type StaffRole = "owner" | "admin" | "manager" | "supervisor" | "staff" | "groomer" | "trainer";
+const ASSIGNABLE_ROLES: StaffRole[] = ["admin", "manager", "supervisor", "staff", "groomer", "trainer"];
 
 const ROLE_BADGE: Record<StaffRole, string> = {
   owner: "bg-foreground text-background",
@@ -40,6 +40,7 @@ const ROLE_BADGE: Record<StaffRole, string> = {
   supervisor: "bg-amber-100 text-amber-800",
   staff: "bg-muted text-foreground",
   groomer: "bg-rose-100 text-rose-800",
+  trainer: "bg-sky-100 text-sky-800",
 };
 
 type Member = {
@@ -435,7 +436,7 @@ export default function UserManagement() {
 }
 
 function PermissionMatrix() {
-  const roles: Role[] = ["owner", "admin", "manager", "supervisor", "staff", "groomer"];
+  const roles: Role[] = ["owner", "admin", "manager", "supervisor", "staff", "groomer", "trainer"];
   const allPerms = Array.from(
     new Set(roles.flatMap((r) => PERMISSIONS_BY_ROLE[r])),
   ).sort() as Permission[];

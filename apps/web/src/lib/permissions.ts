@@ -5,6 +5,7 @@ export type Role =
   | "supervisor"
   | "staff"
   | "groomer"
+  | "trainer"
   | "customer";
 
 export type Permission =
@@ -118,6 +119,10 @@ const uniq = (xs: Permission[]): Permission[] => Array.from(new Set(xs));
 // team and owners.
 const GROOMER: Permission[] = ["grooming.view", "messaging.send"];
 
+// Trainer is the grooming analogue for the training module: the Group Classes
+// area (rosters / schedule) plus Messages.
+const TRAINER: Permission[] = ["groupclasses.view", "messaging.send"];
+
 // Front-line staff: day-to-day floor operations. No billing management,
 // analytics, settings, lodging assignment, or grooming.
 const STAFF: Permission[] = [
@@ -194,6 +199,7 @@ export const PERMISSIONS_BY_ROLE: Record<Role, Permission[]> = {
   supervisor: SUPERVISOR,
   staff: STAFF,
   groomer: GROOMER,
+  trainer: TRAINER,
   customer: CUSTOMER,
 };
 
@@ -214,6 +220,8 @@ export function defaultLandingForRole(role: Role | null | undefined): string {
       return "/portal/dashboard";
     case "groomer":
       return "/grooming";
+    case "trainer":
+      return "/group-classes";
     default:
       return "/dashboard";
   }

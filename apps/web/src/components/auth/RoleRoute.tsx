@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 type Allow = "staff" | "customer";
 
-const STAFF_ROLES = ["owner", "admin", "manager", "supervisor", "staff", "groomer"];
+const STAFF_ROLES = ["owner", "admin", "manager", "supervisor", "staff", "groomer", "trainer"];
 
 export default function RoleRoute({
   allow,
