@@ -136,6 +136,8 @@ targets:
         NSPhotoLibraryUsageDescription: "Snout Staff attaches photos from your library to report cards and records."
         NSFaceIDUsageDescription: "Snout Staff uses Face ID to lock the app, since it shows client information."
         NSUserNotificationsUsageDescription: "Snout Staff notifies you about new bookings, messages, assignments, and incidents."
+        UIBackgroundModes:
+          - remote-notification
         UIAppFonts:
           - GrandifloraOne-Regular.ttf
           - Montserrat-Regular.ttf
