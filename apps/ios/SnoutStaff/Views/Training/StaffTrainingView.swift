@@ -231,6 +231,9 @@ struct ClassRosterView: View {
                     }
                     .padding(.horizontal, SnoutTheme.Spacing.xl)
 
+                    ClassBroadcastButton(classInstanceId: classInstance.id, label: "Message participants")
+                        .padding(.horizontal, SnoutTheme.Spacing.xl)
+
                     Text("ROSTER").font(SnoutTheme.labelSM).tracking(0.8).foregroundStyle(SnoutTheme.onSurfaceMuted)
                         .padding(.horizontal, SnoutTheme.Spacing.xl)
 
@@ -330,6 +333,11 @@ struct ClassSeriesView: View {
                     }
                     .padding(.horizontal, SnoutTheme.Spacing.xl)
 
+                    if let sid = seriesClass.seriesId {
+                        ClassBroadcastButton(seriesId: sid, label: "Message all participants")
+                            .padding(.horizontal, SnoutTheme.Spacing.xl)
+                    }
+
                     Text("SESSIONS").font(SnoutTheme.labelSM).tracking(0.8).foregroundStyle(SnoutTheme.onSurfaceMuted)
                         .padding(.horizontal, SnoutTheme.Spacing.xl)
 
@@ -386,6 +394,123 @@ private struct ClassSessionStatusPill: View {
         case "completed": return SnoutTheme.cotton
         case "cancelled": return SnoutTheme.divider
         default: return SnoutTheme.frost
+        }
+    }
+}
+
+// MARK: - Broadcast (announcement) to all enrolled owners of a class / series
+
+@MainActor
+final class ClassBroadcastViewModel: ObservableObject {
+    @Published var isSending = false
+    @Published var error: String?
+
+    private let client = SupabaseClientProvider.shared
+
+    /// Calls the broadcast_class_message RPC. Returns the recipient count, or nil on error.
+    func send(body: String, classInstanceId: String?, seriesId: String?) async -> Int? {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        isSending = true
+        defer { isSending = false }
+        error = nil
+        struct Params: Encodable {
+            let p_body: String
+            let p_class_instance_id: String?
+            let p_series_id: String?
+        }
+        do {
+            let count: Int = try await client
+                .rpc("broadcast_class_message",
+                     params: Params(p_body: trimmed, p_class_instance_id: classInstanceId, p_series_id: seriesId))
+                .execute().value
+            return count
+        } catch {
+            self.error = error.localizedDescription
+            return nil
+        }
+    }
+}
+
+/// Outlined button that opens the broadcast composer. Provide exactly one of
+/// classInstanceId / seriesId.
+struct ClassBroadcastButton: View {
+    var classInstanceId: String? = nil
+    var seriesId: String? = nil
+    let label: String
+
+    @State private var showSheet = false
+
+    var body: some View {
+        Button { showSheet = true } label: {
+            HStack(spacing: SnoutTheme.Spacing.sm) {
+                Image(systemName: "megaphone.fill")
+                Text(label).font(SnoutTheme.body(15, weight: .semibold))
+            }
+            .foregroundStyle(SnoutTheme.onSurface)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, SnoutTheme.Spacing.md)
+            .background(SnoutTheme.surface)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(SnoutTheme.divider, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showSheet) {
+            ClassBroadcastSheet(classInstanceId: classInstanceId, seriesId: seriesId)
+        }
+    }
+}
+
+private struct ClassBroadcastSheet: View {
+    let classInstanceId: String?
+    let seriesId: String?
+
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var vm = ClassBroadcastViewModel()
+    @State private var draft = ""
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                SnoutTheme.background.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: SnoutTheme.Spacing.md) {
+                    Text("Sends a private message to each enrolled owner. Replies come back to you — owners don't see each other.")
+                        .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted)
+                    TextEditor(text: $draft)
+                        .font(SnoutTheme.bodyMD)
+                        .frame(minHeight: 140)
+                        .padding(SnoutTheme.Spacing.sm)
+                        .scrollContentBackground(.hidden)
+                        .background(SnoutTheme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous).stroke(SnoutTheme.divider, lineWidth: 1))
+                    if let e = vm.error {
+                        Text(e).font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.destructive)
+                    }
+                    Spacer()
+                }
+                .padding(SnoutTheme.Spacing.xl)
+            }
+            .navigationTitle("Message participants")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }.foregroundStyle(SnoutTheme.onSurfaceMuted)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task {
+                            if (await vm.send(body: draft, classInstanceId: classInstanceId, seriesId: seriesId)) != nil {
+                                dismiss()
+                            }
+                        }
+                    } label: {
+                        Text(vm.isSending ? "Sending…" : "Send").fontWeight(.semibold)
+                    }
+                    .foregroundStyle(SnoutTheme.accent)
+                    .disabled(vm.isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
         }
     }
 }
