@@ -36,6 +36,7 @@ import {
 import ClassTypeFormDialog from "./ClassTypeFormDialog";
 import ClassInstanceFormDialog from "./ClassInstanceFormDialog";
 import ClassSeriesFormDialog from "./ClassSeriesFormDialog";
+import BroadcastMessageDialog from "./BroadcastMessageDialog";
 import EnrollmentDialog from "./EnrollmentDialog";
 
 function money(cents: number, currency = "USD") {
@@ -52,6 +53,7 @@ export default function GroupClasses() {
   const [editingType, setEditingType] = useState<any>(null);
   const [instanceDialog, setInstanceDialog] = useState(false);
   const [seriesDialog, setSeriesDialog] = useState(false);
+  const [msgInstance, setMsgInstance] = useState<any>(null);
   const [enrollDialog, setEnrollDialog] = useState(false);
   const [enrollDefaultInstance, setEnrollDefaultInstance] = useState<string | undefined>();
   const [expandedInstance, setExpandedInstance] = useState<string | null>(null);
@@ -361,6 +363,13 @@ export default function GroupClasses() {
                               >
                                 Enroll
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setMsgInstance(i)}
+                              >
+                                Message
+                              </Button>
                               {i.status === "scheduled" && (
                                 <>
                                   <Button
@@ -520,6 +529,12 @@ export default function GroupClasses() {
       <ClassTypeFormDialog open={typeDialog} onOpenChange={setTypeDialog} classType={editingType} />
       <ClassInstanceFormDialog open={instanceDialog} onOpenChange={setInstanceDialog} />
       <ClassSeriesFormDialog open={seriesDialog} onOpenChange={setSeriesDialog} />
+      <BroadcastMessageDialog
+        open={!!msgInstance}
+        onOpenChange={(v) => { if (!v) setMsgInstance(null); }}
+        classInstanceId={msgInstance?.id}
+        title={msgInstance?.class_type?.name}
+      />
       <EnrollmentDialog open={enrollDialog} onOpenChange={setEnrollDialog} defaultInstanceId={enrollDefaultInstance} />
     </PortalLayout>
   );

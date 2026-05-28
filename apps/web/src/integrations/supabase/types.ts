@@ -6917,6 +6917,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      broadcast_class_message: {
+        Args: {
+          p_body: string
+          p_class_instance_id?: string
+          p_series_id?: string
+        }
+        Returns: number
+      }
       acknowledge_pricing_change_notice: {
         Args: { _notice_id: string }
         Returns: undefined
