@@ -66,6 +66,10 @@ struct StaffHomeShell: View {
             StaffTrainingView()
         case .reportCards:
             StaffReportsView()
+        case .messaging:
+            StaffMessagingView()
+        case .petsOwners:
+            StaffLookupView()
         default:
             LanePlaceholderView(lane: lane)
         }
