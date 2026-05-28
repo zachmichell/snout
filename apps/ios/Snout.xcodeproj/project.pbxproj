@@ -88,6 +88,7 @@
 		C3BE5B104DAE6FC7CC554CD3 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0033A8FE50318339C4802FBE /* AppConfig.swift */; };
 		C4A42AB45C2E71F26FCDB7E8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBBABB053024509A3594B7B3 /* SettingsView.swift */; };
 		CA48E70B94141C8D6E9B7B96 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489E8CA3A6903FF293A185CF /* Profile.swift */; };
+		CB1C31C4A560AC5F3529F429 /* StaffScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA0AFE8B4CC73AAFEA79047 /* StaffScheduleView.swift */; };
 		CB920838EA5950BBDFDACB5F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AB8E80F5405DC6C5687AD9C3 /* Assets.xcassets */; };
 		CCD864FB19409A8A1A5FE616 /* Config.example.plist in Resources */ = {isa = PBXBuildFile; fileRef = BD24E49994534BA5FE289161 /* Config.example.plist */; };
 		CEFB64418C392CCB5DBA524D /* BookingHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E3ACCC328ED3AD6C3444BDD /* BookingHelpers.swift */; };
@@ -196,6 +197,7 @@
 		A998D2825402B4B0BB55A3CD /* SnoutUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SnoutUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA644024CD4165E2EC739DC2 /* PhotoLightboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLightboxView.swift; sourceTree = "<group>"; };
 		AB8E80F5405DC6C5687AD9C3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		ADA0AFE8B4CC73AAFEA79047 /* StaffScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffScheduleView.swift; sourceTree = "<group>"; };
 		ADD4BE3C648D77EC3CCB9F86 /* PetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetsView.swift; sourceTree = "<group>"; };
 		AFD349468A27B705631FB5FE /* CurrentStaffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrentStaffService.swift; sourceTree = "<group>"; };
 		B2807AC82DD6A7D17A440AE8 /* BookingWizardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookingWizardViewModel.swift; sourceTree = "<group>"; };
@@ -342,6 +344,7 @@
 		34C1B4A2EEF28B19D83B2CBB /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				BA22826FAB5326DD00C87AEC /* Schedule */,
 				582C0772157CF7894486501F /* StaffComponents.swift */,
 				E2C5F9FB813577D014CC24A7 /* StaffHomeShell.swift */,
 				1B98052BFB9203374F6E5C15 /* StaffLoginView.swift */,
@@ -488,6 +491,14 @@
 				1C0838E23E300C1F88A7E171 /* SnoutGlyph.swift */,
 			);
 			path = Components;
+			sourceTree = "<group>";
+		};
+		BA22826FAB5326DD00C87AEC /* Schedule */ = {
+			isa = PBXGroup;
+			children = (
+				ADA0AFE8B4CC73AAFEA79047 /* StaffScheduleView.swift */,
+			);
+			path = Schedule;
 			sourceTree = "<group>";
 		};
 		BDB4AB3495DBD62920E6899F /* SnoutStaff */ = {
@@ -801,6 +812,7 @@
 				5441B038AD6AEEBBEF08BC65 /* StaffLoginView.swift in Sources */,
 				E07F3FA9B8E4C03036EA7A2F /* StaffRole.swift in Sources */,
 				92CB993FCFC68486A081C00E /* StaffRootView.swift in Sources */,
+				CB1C31C4A560AC5F3529F429 /* StaffScheduleView.swift in Sources */,
 				0E2267269962E491974BE29F /* StorageDownload.swift in Sources */,
 				2470168CAEF2F9A724AEF7C1 /* SupabaseClient.swift in Sources */,
 				D2B3926D38577B06D801C0C5 /* Webcam.swift in Sources */,
