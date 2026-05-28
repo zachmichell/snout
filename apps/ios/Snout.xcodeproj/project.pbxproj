@@ -7,23 +7,31 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		028DA53E4F0A9720A457ABD2 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F5A279A825B442007855F1 /* Format.swift */; };
 		04058123421BC2A5BAA372CC /* MoreShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F018C04AECF12952F7FB042 /* MoreShared.swift */; };
 		07C1DFBF2BCAD08EC3F03863 /* ConversationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 160E1DC45286237BCCFAE248 /* ConversationListView.swift */; };
 		0A0209A515ADE84A418C83EF /* PhotoLightboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA644024CD4165E2EC739DC2 /* PhotoLightboxView.swift */; };
+		0A49AE911AD2FFCC493E17BD /* Owner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6488B51BD6CB91E540D62E86 /* Owner.swift */; };
 		0A9C36D254F3C7457AD757F8 /* BookingWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 471C1E6F121C2592F2E95E1E /* BookingWizardView.swift */; };
 		0D3FD1846AD890BE1FFC8274 /* Montserrat-Italic-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7273E187B94F83178E6EF88B /* Montserrat-Italic-VariableFont_wght.ttf */; };
+		0E2267269962E491974BE29F /* StorageDownload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9ADE80E2335314B7BCB01A /* StorageDownload.swift */; };
 		0E4FC85936A18B042CCBF51D /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = AE613A5D5887DB86917A3853 /* Supabase */; };
 		1290337E98AA0BFBD2425D79 /* PetAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6931DE85CCC444D50B8172 /* PetAvatar.swift */; };
 		13516631DD5294B50B5C30FA /* InvoicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2D40E026383D2D561EB5A16 /* InvoicesView.swift */; };
 		13ED736B8CD71216BAE2490F /* DateTimeStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930229CDBA1EF94B5A5D7612 /* DateTimeStep.swift */; };
+		15EC18CA6B611439618A84DA /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25140E42F0D40D3CCC63B87F /* Money.swift */; };
 		18CF661A700F5FCB0694E68F /* Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 616B72B147362A8C4C901679 /* Service.swift */; };
 		1A8EEFD70312B9731977F992 /* ClientDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E8B548D4270D97C997AE0D /* ClientDetailsView.swift */; };
 		1BE473E076A361EDC4D1A002 /* TabBarVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E65EE19A4F682DE287E2DC /* TabBarVisibility.swift */; };
+		1E4CA75DCC8FD98D864804F5 /* Groomer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E89365A033EB0D5A210084AF /* Groomer.swift */; };
 		2185CC8AA04AD5B6C2B4F752 /* Groomer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E89365A033EB0D5A210084AF /* Groomer.swift */; };
 		227FBDB083FFCB203B789421 /* SlotPickerStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73503668041819BEB8C03832 /* SlotPickerStep.swift */; };
+		2470168CAEF2F9A724AEF7C1 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F6B35B5DFBF242F688D2919 /* SupabaseClient.swift */; };
 		27D413AC6466A57BD58571AD /* VisitDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C184406EC41E908339F754 /* VisitDetailView.swift */; };
 		27F23542A02B876A027EB51B /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CD495EF8BCE2CD7602251E4 /* SignInView.swift */; };
+		2D1FB062625F1B0994424D35 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489E8CA3A6903FF293A185CF /* Profile.swift */; };
 		2D7DB67B82D053B5B01B4036 /* PetsStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C245448E38C2E663F38AED4 /* PetsStep.swift */; };
+		2DC06B4B4492CA0EE3EA605C /* Reservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561CF4D5362FBF69D5AC668E /* Reservation.swift */; };
 		3AE17A5AAFDBDA1BC47F020C /* ReviewStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5084FC94E419EEFB15C47FED /* ReviewStep.swift */; };
 		41AF63DBCD2772378B3B4C79 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6566F57E37981E92EDDB0FD7 /* MainTabView.swift */; };
 		4551D068BA3198CAAA690D63 /* PaymentMethodsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3246EDE8E699B5A8B85FA58 /* PaymentMethodsView.swift */; };
@@ -31,6 +39,7 @@
 		48392160F76F1E452FFA1BB0 /* Reservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561CF4D5362FBF69D5AC668E /* Reservation.swift */; };
 		4A2745F8C121208E41ABF47E /* UnreadMessagesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234EC242A4BD96B1FAE25D71 /* UnreadMessagesService.swift */; };
 		4A7E2C09E22F97868E1D708F /* Montserrat-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9529ABDF697FAD5652D9B264 /* Montserrat-Medium.ttf */; };
+		4E9CB0AE51BB893E2E2E4189 /* SnoutStaffApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A2CD6751788F4B56C263E4 /* SnoutStaffApp.swift */; };
 		5E616BEE967C0B1AE7089549 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25140E42F0D40D3CCC63B87F /* Money.swift */; };
 		5F0E91B8ADEF6D709DF4BB1C /* SnoutUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E4034F5632E3A03B400C9B /* SnoutUITestsLaunchTests.swift */; };
 		60B8516AD076A6F5BD875FA7 /* ReservationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 362CDF5FEDDD5590EC3A5625 /* ReservationListView.swift */; };
@@ -43,12 +52,17 @@
 		763F0CB1C5A153C0B085E86F /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B40A367CA69CD481A21400 /* AuthService.swift */; };
 		79903EEDDF687137705EC25D /* Montserrat-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */; };
 		79DB2DE784A03CF1FCD9AE36 /* CurrentOwnerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365BBF119E0D455737AC3D48 /* CurrentOwnerService.swift */; };
+		7CB33A6383BB546DDF95C057 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF2C63E9AEFE4928E3670D6D /* Conversation.swift */; };
 		7D9B0B40C015B948CE35FF69 /* GrandifloraOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C70949BE448EC661E53E0047 /* GrandifloraOne-Regular.ttf */; };
+		820CDE5879D268FD1C49B60B /* Pet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21052497D93C63199E50D8E /* Pet.swift */; };
 		82A9D1BC74FB77A6366B1D4E /* PetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADD4BE3C648D77EC3CCB9F86 /* PetsView.swift */; };
 		88FEB03EA443711D37E8392D /* AgreementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45D71535692E2147C92526D6 /* AgreementsView.swift */; };
 		8983C3F970CC7BBED3DEB80A /* BuyCreditsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD09A9C25B5F21CE3F09BD6B /* BuyCreditsView.swift */; };
 		8AA8957DAC06646D290ED059 /* StorageDownloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04FA2E9482420226195959A2 /* StorageDownloadTests.swift */; };
+		8E8E00001762EAE0250ABA34 /* Location.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEA7B39535EB30BD63C3629 /* Location.swift */; };
+		92CB993FCFC68486A081C00E /* StaffRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7996AE790E3262A46B7FB36D /* StaffRootView.swift */; };
 		94675F7EFE18426FEAD1EEF6 /* WebcamPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54E114C51FDADD1185151FF3 /* WebcamPlayerView.swift */; };
+		96EF6CC01DE761B1C043E8B6 /* ReportCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE319EB2102236C2C68D35F /* ReportCard.swift */; };
 		9CCC704FEF6F6E77488DD467 /* CustomTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6255C7047A847BF4366279C9 /* CustomTabBar.swift */; };
 		9E7C6A8617F1D109B599CE6E /* SnoutTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC59E49D7967A4D071DEC62A /* SnoutTheme.swift */; };
 		9F456E8F6BC6175A99A510A1 /* SnoutGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0838E23E300C1F88A7E171 /* SnoutGlyph.swift */; };
@@ -62,23 +76,30 @@
 		A951F7CD1D5EF6F5A609B1B7 /* SnoutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAD638D6923420E3CE34F8F /* SnoutApp.swift */; };
 		B2CF6DDA71CEB060A5A05B16 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9514D919EF95322F6BD880B6 /* HomeView.swift */; };
 		B3A1D3C0F106397C0762AB4E /* WebcamListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59441346B40044DEE6A626FC /* WebcamListView.swift */; };
+		B4106D31CF9D9F99F6744F3E /* SnoutTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC59E49D7967A4D071DEC62A /* SnoutTheme.swift */; };
 		B502FEA0DA2E6CC19F8D557A /* Montserrat-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5E8E754B62B4ED5F854C5263 /* Montserrat-Bold.ttf */; };
 		B868217DCF63B014B83FEA6A /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F5A279A825B442007855F1 /* Format.swift */; };
 		C179E26E86BDD23579F2BC01 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E445263623AE34747FDB5F2 /* CalendarView.swift */; };
 		C33C444ED28379A5027C5B93 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86510617A869D0A280071FBA /* RootView.swift */; };
+		C3BE5B104DAE6FC7CC554CD3 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0033A8FE50318339C4802FBE /* AppConfig.swift */; };
 		C4A42AB45C2E71F26FCDB7E8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBBABB053024509A3594B7B3 /* SettingsView.swift */; };
 		CA48E70B94141C8D6E9B7B96 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489E8CA3A6903FF293A185CF /* Profile.swift */; };
 		CB920838EA5950BBDFDACB5F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AB8E80F5405DC6C5687AD9C3 /* Assets.xcassets */; };
 		CCD864FB19409A8A1A5FE616 /* Config.example.plist in Resources */ = {isa = PBXBuildFile; fileRef = BD24E49994534BA5FE289161 /* Config.example.plist */; };
+		CEFB64418C392CCB5DBA524D /* BookingHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E3ACCC328ED3AD6C3444BDD /* BookingHelpers.swift */; };
 		CFF6143EF2666FE280E30021 /* StorageDownload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9ADE80E2335314B7BCB01A /* StorageDownload.swift */; };
 		D030CB7C2AE65237A14470DF /* MoneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37395971423D4790AF352C5C /* MoneyTests.swift */; };
 		D246AC674E854C4615B8A770 /* GroomerStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3402645D368940D1AE0246FB /* GroomerStep.swift */; };
+		D2B3926D38577B06D801C0C5 /* Webcam.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F01F7B155B930058452221A /* Webcam.swift */; };
+		D34EB37728B03439E189D02E /* Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 616B72B147362A8C4C901679 /* Service.swift */; };
 		D5F5CC8F1D2602FCC714F593 /* Montserrat-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FAFCC8BF123999927A4F93A3 /* Montserrat-Regular.ttf */; };
 		DAC1D614844611AC486268C0 /* Webcam.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F01F7B155B930058452221A /* Webcam.swift */; };
+		DE8FA36336CCB150EB87E57D /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1D7CADB21ACF9CC8434EA3 /* Message.swift */; };
 		E1335942E7C2246F55612C7C /* BookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B363070496D8A809BA06184 /* BookView.swift */; };
 		E3727EC992C431E5BC821B2E /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A6CF1FBAD8985204CE1553 /* ConversationView.swift */; };
 		E4D706BD356D7B12C4D8BC17 /* FormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1707792E682BE2F5F6D425D9 /* FormatTests.swift */; };
 		E570A48F98BABDECA5DB52E1 /* Location.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEA7B39535EB30BD63C3629 /* Location.swift */; };
+		EAA56C09F5023D40B16370BE /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 271E0147003FE94B4ED70269 /* Supabase */; };
 		F09BB476089288A16E6628B2 /* ReportCardDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44EF06CCA7EB6C816C2A9F41 /* ReportCardDetailView.swift */; };
 		F22810744674D08A0FB6D182 /* BookingWizardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2807AC82DD6A7D17A440AE8 /* BookingWizardViewModel.swift */; };
 		F2315DBA648848E61BACCEDC /* StripePaymentSheet in Frameworks */ = {isa = PBXBuildFile; productRef = ABFD10E3A43EC19323375F3B /* StripePaymentSheet */; };
@@ -129,9 +150,11 @@
 		471C1E6F121C2592F2E95E1E /* BookingWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookingWizardView.swift; sourceTree = "<group>"; };
 		489E8CA3A6903FF293A185CF /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
 		4D5BF0EEC0AFB216751D3ED4 /* Snout.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Snout.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4EA285850DED96AF0D0EC6AA /* SnoutStaff.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SnoutStaff.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5084FC94E419EEFB15C47FED /* ReviewStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStep.swift; sourceTree = "<group>"; };
 		54E114C51FDADD1185151FF3 /* WebcamPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebcamPlayerView.swift; sourceTree = "<group>"; };
 		561CF4D5362FBF69D5AC668E /* Reservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reservation.swift; sourceTree = "<group>"; };
+		5639E91D9AD1D9F1CD3585E7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5718ED3941AFC5BA90FA5BD9 /* ReservationDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReservationDetailView.swift; sourceTree = "<group>"; };
 		59441346B40044DEE6A626FC /* WebcamListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebcamListView.swift; sourceTree = "<group>"; };
 		5C245448E38C2E663F38AED4 /* PetsStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetsStep.swift; sourceTree = "<group>"; };
@@ -146,8 +169,10 @@
 		6C9AB4F8470E794507C7AFB2 /* AddCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddCardView.swift; sourceTree = "<group>"; };
 		713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-SemiBold.ttf"; sourceTree = "<group>"; };
 		71603313865283C4E4A3984B /* SnoutTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SnoutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		71A2CD6751788F4B56C263E4 /* SnoutStaffApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoutStaffApp.swift; sourceTree = "<group>"; };
 		7273E187B94F83178E6EF88B /* Montserrat-Italic-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-Italic-VariableFont_wght.ttf"; sourceTree = "<group>"; };
 		73503668041819BEB8C03832 /* SlotPickerStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlotPickerStep.swift; sourceTree = "<group>"; };
+		7996AE790E3262A46B7FB36D /* StaffRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffRootView.swift; sourceTree = "<group>"; };
 		86510617A869D0A280071FBA /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		8B6931DE85CCC444D50B8172 /* PetAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetAvatar.swift; sourceTree = "<group>"; };
 		8E445263623AE34747FDB5F2 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
@@ -188,6 +213,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		0C202983BB73F316228BEF5A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EAA56C09F5023D40B16370BE /* Supabase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		646E03D1CAD5E19414D17144 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -223,10 +256,19 @@
 			isa = PBXGroup;
 			children = (
 				9655B38710455227EF7ABA4A /* Snout */,
+				BDB4AB3495DBD62920E6899F /* SnoutStaff */,
 				D79A1424741D8FCDDA53536F /* SnoutTests */,
 				78C77BAA8783F575111FEBBB /* SnoutUITests */,
 				3EADB822246DF6A0FE88B992 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		194A4C159C8D823D9140678C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				5639E91D9AD1D9F1CD3585E7 /* Info.plist */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		1CD75AE5B35D5B8190F9EFD6 /* Fonts */ = {
@@ -275,6 +317,14 @@
 			path = Book;
 			sourceTree = "<group>";
 		};
+		34C1B4A2EEF28B19D83B2CBB /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				7996AE790E3262A46B7FB36D /* StaffRootView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		361F8CC2B19278E9F615C457 /* Reservations */ = {
 			isa = PBXGroup;
 			children = (
@@ -288,6 +338,7 @@
 			isa = PBXGroup;
 			children = (
 				4D5BF0EEC0AFB216751D3ED4 /* Snout.app */,
+				4EA285850DED96AF0D0EC6AA /* SnoutStaff.app */,
 				71603313865283C4E4A3984B /* SnoutTests.xctest */,
 				A998D2825402B4B0BB55A3CD /* SnoutUITests.xctest */,
 			);
@@ -414,6 +465,16 @@
 			path = Components;
 			sourceTree = "<group>";
 		};
+		BDB4AB3495DBD62920E6899F /* SnoutStaff */ = {
+			isa = PBXGroup;
+			children = (
+				194A4C159C8D823D9140678C /* Resources */,
+				34C1B4A2EEF28B19D83B2CBB /* Views */,
+				71A2CD6751788F4B56C263E4 /* SnoutStaffApp.swift */,
+			);
+			path = SnoutStaff;
+			sourceTree = "<group>";
+		};
 		D72BBF10DCD6427127750264 /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -515,6 +576,25 @@
 			productReference = 71603313865283C4E4A3984B /* SnoutTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		F8B06972AAA1D90130BFF494 /* SnoutStaff */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0DF08F6992DF1188456755CD /* Build configuration list for PBXNativeTarget "SnoutStaff" */;
+			buildPhases = (
+				B9CBF49613613292A0D69D22 /* Sources */,
+				0C202983BB73F316228BEF5A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SnoutStaff;
+			packageProductDependencies = (
+				271E0147003FE94B4ED70269 /* Supabase */,
+			);
+			productName = SnoutStaff;
+			productReference = 4EA285850DED96AF0D0EC6AA /* SnoutStaff.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -534,6 +614,10 @@
 						ProvisioningStyle = Automatic;
 					};
 					9E32B3268A2C75FF7C1B10B7 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					F8B06972AAA1D90130BFF494 = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
@@ -558,6 +642,7 @@
 			projectRoot = "";
 			targets = (
 				88CC3B0467BD0E57BCA6A89F /* Snout */,
+				F8B06972AAA1D90130BFF494 /* SnoutStaff */,
 				9E32B3268A2C75FF7C1B10B7 /* SnoutTests */,
 				5FC1734B65E45422D5BABEEB /* SnoutUITests */,
 			);
@@ -661,6 +746,33 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B9CBF49613613292A0D69D22 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C3BE5B104DAE6FC7CC554CD3 /* AppConfig.swift in Sources */,
+				CEFB64418C392CCB5DBA524D /* BookingHelpers.swift in Sources */,
+				7CB33A6383BB546DDF95C057 /* Conversation.swift in Sources */,
+				028DA53E4F0A9720A457ABD2 /* Format.swift in Sources */,
+				1E4CA75DCC8FD98D864804F5 /* Groomer.swift in Sources */,
+				8E8E00001762EAE0250ABA34 /* Location.swift in Sources */,
+				DE8FA36336CCB150EB87E57D /* Message.swift in Sources */,
+				15EC18CA6B611439618A84DA /* Money.swift in Sources */,
+				0A49AE911AD2FFCC493E17BD /* Owner.swift in Sources */,
+				820CDE5879D268FD1C49B60B /* Pet.swift in Sources */,
+				2D1FB062625F1B0994424D35 /* Profile.swift in Sources */,
+				96EF6CC01DE761B1C043E8B6 /* ReportCard.swift in Sources */,
+				2DC06B4B4492CA0EE3EA605C /* Reservation.swift in Sources */,
+				D34EB37728B03439E189D02E /* Service.swift in Sources */,
+				4E9CB0AE51BB893E2E2E4189 /* SnoutStaffApp.swift in Sources */,
+				B4106D31CF9D9F99F6744F3E /* SnoutTheme.swift in Sources */,
+				92CB993FCFC68486A081C00E /* StaffRootView.swift in Sources */,
+				0E2267269962E491974BE29F /* StorageDownload.swift in Sources */,
+				2470168CAEF2F9A724AEF7C1 /* SupabaseClient.swift in Sources */,
+				D2B3926D38577B06D801C0C5 /* Webcam.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DA6B6CD056C7BBA98F25E784 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -700,6 +812,26 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Snout.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Snout";
+			};
+			name = Debug;
+		};
+		34C86F5B45A2DA0DAAAAED91 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SnoutStaff/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.snoutapp.snoutstaff;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -920,9 +1052,38 @@
 			};
 			name = Debug;
 		};
+		F1984E35659016EC03E98C3E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SnoutStaff/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.snoutapp.snoutstaff;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		0DF08F6992DF1188456755CD /* Build configuration list for PBXNativeTarget "SnoutStaff" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				34C86F5B45A2DA0DAAAAED91 /* Debug */,
+				F1984E35659016EC03E98C3E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		1E345CBB86441C949BD77919 /* Build configuration list for PBXNativeTarget "SnoutUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -981,6 +1142,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		271E0147003FE94B4ED70269 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCDAB3CDB26550A9587B0B63 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
 		ABFD10E3A43EC19323375F3B /* StripePaymentSheet */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0FB1987B5794F0B6AA353500 /* XCRemoteSwiftPackageReference "stripe-ios" */;
