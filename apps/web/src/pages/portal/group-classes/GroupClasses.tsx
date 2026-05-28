@@ -35,6 +35,7 @@ import {
 } from "@/lib/classes";
 import ClassTypeFormDialog from "./ClassTypeFormDialog";
 import ClassInstanceFormDialog from "./ClassInstanceFormDialog";
+import ClassSeriesFormDialog from "./ClassSeriesFormDialog";
 import EnrollmentDialog from "./EnrollmentDialog";
 
 function money(cents: number, currency = "USD") {
@@ -50,6 +51,7 @@ export default function GroupClasses() {
   const [typeDialog, setTypeDialog] = useState(false);
   const [editingType, setEditingType] = useState<any>(null);
   const [instanceDialog, setInstanceDialog] = useState(false);
+  const [seriesDialog, setSeriesDialog] = useState(false);
   const [enrollDialog, setEnrollDialog] = useState(false);
   const [enrollDefaultInstance, setEnrollDefaultInstance] = useState<string | undefined>();
   const [expandedInstance, setExpandedInstance] = useState<string | null>(null);
@@ -78,7 +80,7 @@ export default function GroupClasses() {
       const { data, error } = await supabase
         .from("class_instances")
         .select(
-          `id, start_at, end_at, status, notes, instructor_user_id,
+          `id, start_at, end_at, status, notes, instructor_user_id, series_id, session_number,
            class_type:class_type_id(id, name, max_enrollment, category)`,
         )
         .eq("organization_id", orgId)
@@ -290,7 +292,10 @@ export default function GroupClasses() {
 
           {/* UPCOMING TAB */}
           <TabsContent value="upcoming" className="mt-6">
-            <div className="mb-4 flex justify-end">
+            <div className="mb-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setSeriesDialog(true)}>
+                <Plus className="h-4 w-4 mr-1.5" /> Create Series
+              </Button>
               <Button onClick={() => setInstanceDialog(true)}>
                 <Plus className="h-4 w-4 mr-1.5" /> Schedule a Class
               </Button>
@@ -321,7 +326,12 @@ export default function GroupClasses() {
                       return (
                         <>
                           <TableRow key={i.id}>
-                            <TableCell className="font-medium">{i.class_type?.name ?? "—"}</TableCell>
+                            <TableCell className="font-medium">
+                              {i.class_type?.name ?? "—"}
+                              {i.series_id && i.session_number != null && (
+                                <Badge variant="secondary" className="ml-2">Session {i.session_number}</Badge>
+                              )}
+                            </TableCell>
                             <TableCell>{formatInstanceDateTime(i.start_at)}</TableCell>
                             <TableCell className="text-right">
                               <span className={enrolled >= max ? "text-warning font-semibold" : ""}>
@@ -509,6 +519,7 @@ export default function GroupClasses() {
 
       <ClassTypeFormDialog open={typeDialog} onOpenChange={setTypeDialog} classType={editingType} />
       <ClassInstanceFormDialog open={instanceDialog} onOpenChange={setInstanceDialog} />
+      <ClassSeriesFormDialog open={seriesDialog} onOpenChange={setSeriesDialog} />
       <EnrollmentDialog open={enrollDialog} onOpenChange={setEnrollDialog} defaultInstanceId={enrollDefaultInstance} />
     </PortalLayout>
   );
