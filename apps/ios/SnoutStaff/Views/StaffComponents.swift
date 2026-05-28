@@ -43,6 +43,33 @@ struct StaffFormField: View {
     }
 }
 
+struct StaffMultilineField: View {
+    let label: String
+    @Binding var text: String
+    var placeholder: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.xs) {
+            Text(label)
+                .font(SnoutTheme.labelSM)
+                .tracking(0.4)
+                .foregroundStyle(SnoutTheme.onSurfaceMuted)
+            TextField(placeholder, text: $text, axis: .vertical)
+                .lineLimit(2...6)
+                .font(SnoutTheme.bodyMD)
+                .foregroundStyle(SnoutTheme.onSurface)
+                .padding(.horizontal, SnoutTheme.Spacing.md)
+                .padding(.vertical, SnoutTheme.Spacing.sm)
+                .background(SnoutTheme.background)
+                .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusSM, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: SnoutTheme.radiusSM, style: .continuous)
+                        .stroke(SnoutTheme.divider, lineWidth: 1)
+                )
+        }
+    }
+}
+
 struct StaffSecureField: View {
     let label: String
     @Binding var text: String
