@@ -35,6 +35,7 @@
 		2D7DB67B82D053B5B01B4036 /* PetsStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C245448E38C2E663F38AED4 /* PetsStep.swift */; };
 		2DC06B4B4492CA0EE3EA605C /* Reservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561CF4D5362FBF69D5AC668E /* Reservation.swift */; };
 		3AE17A5AAFDBDA1BC47F020C /* ReviewStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5084FC94E419EEFB15C47FED /* ReviewStep.swift */; };
+		3FD0D30E838DAE87DB207186 /* StaffGroomingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BD803D891BBED72B2BDE1BA /* StaffGroomingView.swift */; };
 		41AF63DBCD2772378B3B4C79 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6566F57E37981E92EDDB0FD7 /* MainTabView.swift */; };
 		4551D068BA3198CAAA690D63 /* PaymentMethodsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3246EDE8E699B5A8B85FA58 /* PaymentMethodsView.swift */; };
 		47442157A4644A9301789BB3 /* Config.plist in Resources */ = {isa = PBXBuildFile; fileRef = FC15079CB6F74B2383A2BC6D /* Config.plist */; };
@@ -98,6 +99,7 @@
 		D2B3926D38577B06D801C0C5 /* Webcam.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F01F7B155B930058452221A /* Webcam.swift */; };
 		D34EB37728B03439E189D02E /* Service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 616B72B147362A8C4C901679 /* Service.swift */; };
 		D5F5CC8F1D2602FCC714F593 /* Montserrat-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FAFCC8BF123999927A4F93A3 /* Montserrat-Regular.ttf */; };
+		D793CD9B976D89DDE870DBE6 /* StaffTrainingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7475C7805C44C2CA2BE866A2 /* StaffTrainingView.swift */; };
 		DAC1D614844611AC486268C0 /* Webcam.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F01F7B155B930058452221A /* Webcam.swift */; };
 		DB3945A06D561BA9BFD0C7BF /* CurrentStaffService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFD349468A27B705631FB5FE /* CurrentStaffService.swift */; };
 		DE8FA36336CCB150EB87E57D /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1D7CADB21ACF9CC8434EA3 /* Message.swift */; };
@@ -177,12 +179,14 @@
 		6488B51BD6CB91E540D62E86 /* Owner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Owner.swift; sourceTree = "<group>"; };
 		6566F57E37981E92EDDB0FD7 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		6AD63E6AF045CA09BDC5A5F0 /* ReportCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportCardListView.swift; sourceTree = "<group>"; };
+		6BD803D891BBED72B2BDE1BA /* StaffGroomingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffGroomingView.swift; sourceTree = "<group>"; };
 		6C9AB4F8470E794507C7AFB2 /* AddCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddCardView.swift; sourceTree = "<group>"; };
 		713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-SemiBold.ttf"; sourceTree = "<group>"; };
 		71603313865283C4E4A3984B /* SnoutTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SnoutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		71A2CD6751788F4B56C263E4 /* SnoutStaffApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoutStaffApp.swift; sourceTree = "<group>"; };
 		7273E187B94F83178E6EF88B /* Montserrat-Italic-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-Italic-VariableFont_wght.ttf"; sourceTree = "<group>"; };
 		73503668041819BEB8C03832 /* SlotPickerStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlotPickerStep.swift; sourceTree = "<group>"; };
+		7475C7805C44C2CA2BE866A2 /* StaffTrainingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffTrainingView.swift; sourceTree = "<group>"; };
 		7996AE790E3262A46B7FB36D /* StaffRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffRootView.swift; sourceTree = "<group>"; };
 		86510617A869D0A280071FBA /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		8B6931DE85CCC444D50B8172 /* PetAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetAvatar.swift; sourceTree = "<group>"; };
@@ -341,10 +345,20 @@
 			path = Book;
 			sourceTree = "<group>";
 		};
+		2DB434149B5B34E2542AA810 /* Training */ = {
+			isa = PBXGroup;
+			children = (
+				7475C7805C44C2CA2BE866A2 /* StaffTrainingView.swift */,
+			);
+			path = Training;
+			sourceTree = "<group>";
+		};
 		34C1B4A2EEF28B19D83B2CBB /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				FC597EB1A03E5FDD4028F313 /* Grooming */,
 				BA22826FAB5326DD00C87AEC /* Schedule */,
+				2DB434149B5B34E2542AA810 /* Training */,
 				582C0772157CF7894486501F /* StaffComponents.swift */,
 				E2C5F9FB813577D014CC24A7 /* StaffHomeShell.swift */,
 				1B98052BFB9203374F6E5C15 /* StaffLoginView.swift */,
@@ -552,6 +566,14 @@
 				9514D919EF95322F6BD880B6 /* HomeView.swift */,
 			);
 			path = Home;
+			sourceTree = "<group>";
+		};
+		FC597EB1A03E5FDD4028F313 /* Grooming */ = {
+			isa = PBXGroup;
+			children = (
+				6BD803D891BBED72B2BDE1BA /* StaffGroomingView.swift */,
+			);
+			path = Grooming;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -808,11 +830,13 @@
 				4E9CB0AE51BB893E2E2E4189 /* SnoutStaffApp.swift in Sources */,
 				B4106D31CF9D9F99F6744F3E /* SnoutTheme.swift in Sources */,
 				E77FA9BD205D5ED63DD375AE /* StaffComponents.swift in Sources */,
+				3FD0D30E838DAE87DB207186 /* StaffGroomingView.swift in Sources */,
 				0EFD1A785C3D4E36D6DBB5A8 /* StaffHomeShell.swift in Sources */,
 				5441B038AD6AEEBBEF08BC65 /* StaffLoginView.swift in Sources */,
 				E07F3FA9B8E4C03036EA7A2F /* StaffRole.swift in Sources */,
 				92CB993FCFC68486A081C00E /* StaffRootView.swift in Sources */,
 				CB1C31C4A560AC5F3529F429 /* StaffScheduleView.swift in Sources */,
+				D793CD9B976D89DDE870DBE6 /* StaffTrainingView.swift in Sources */,
 				0E2267269962E491974BE29F /* StorageDownload.swift in Sources */,
 				2470168CAEF2F9A724AEF7C1 /* SupabaseClient.swift in Sources */,
 				D2B3926D38577B06D801C0C5 /* Webcam.swift in Sources */,

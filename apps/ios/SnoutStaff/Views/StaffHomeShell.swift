@@ -60,6 +60,10 @@ struct StaffHomeShell: View {
         switch lane {
         case .schedule:
             StaffScheduleView()
+        case .grooming:
+            StaffGroomingView()
+        case .training:
+            StaffTrainingView()
         default:
             LanePlaceholderView(lane: lane)
         }
