@@ -16,8 +16,12 @@ struct GroomingAppt: Codable, Identifiable, Hashable {
     let appointmentDate: String
     let startTime: String?
     let estimatedDurationMinutes: Int?
+    let priceCents: Int?
+    let servicesRequested: [String]?
     let status: String
     let notes: String?
+    let checkInTime: Date?
+    let completedTime: Date?
     let pet: PetRef?
     let owner: OwnerRef?
     let groomer: GroomerRef?
@@ -27,13 +31,24 @@ struct GroomingAppt: Codable, Identifiable, Hashable {
         case appointmentDate = "appointment_date"
         case startTime = "start_time"
         case estimatedDurationMinutes = "estimated_duration_minutes"
+        case priceCents = "price_cents"
+        case servicesRequested = "services_requested"
+        case checkInTime = "check_in_time"
+        case completedTime = "completed_time"
     }
-    struct PetRef: Codable, Hashable { let id: String; let name: String }
+    struct PetRef: Codable, Hashable { let id: String; let name: String; let species: String?; let breed: String? }
     struct OwnerRef: Codable, Hashable {
-        let id: String; let firstName: String?; let lastName: String?
-        enum CodingKeys: String, CodingKey { case id; case firstName = "first_name"; case lastName = "last_name" }
+        let id: String; let firstName: String?; let lastName: String?; let phone: String?; let email: String?
+        enum CodingKeys: String, CodingKey {
+            case id, phone, email
+            case firstName = "first_name"
+            case lastName = "last_name"
+        }
     }
-    struct GroomerRef: Codable, Hashable { let id: String; let displayName: String? }
+    struct GroomerRef: Codable, Hashable {
+        let id: String; let displayName: String?
+        enum CodingKeys: String, CodingKey { case id; case displayName = "display_name" }
+    }
 
     var petName: String { pet?.name ?? "Pet" }
     var ownerName: String { [owner?.firstName, owner?.lastName].compactMap { $0 }.joined(separator: " ") }
@@ -56,7 +71,7 @@ final class StaffGroomingViewModel: ObservableObject {
     @Published var busyId: String?
 
     private let client = SupabaseClientProvider.shared
-    private static let graph = "id, appointment_date, start_time, estimated_duration_minutes, status, notes, pet:pets(id, name), owner:owners(id, first_name, last_name), groomer:groomers(id, display_name)"
+    private static let graph = "id, appointment_date, start_time, estimated_duration_minutes, price_cents, services_requested, status, notes, check_in_time, completed_time, pet:pets(id, name, species, breed), owner:owners(id, first_name, last_name, phone, email), groomer:groomers(id, display_name)"
 
     func load(organizationId: String, role: StaffRole, profileId: String?) async {
         isLoading = true
@@ -149,7 +164,7 @@ struct StaffGroomingView: View {
             .scrollContentBackground(.hidden)
             .refreshable { await reload() }
         }
-        .task { await reload() }
+        .onAppear { Task { await reload() } }
     }
 
     private func reload() async {
@@ -212,43 +227,12 @@ struct StaffGroomingDetailView: View {
             SnoutTheme.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: SnoutTheme.Spacing.lg) {
-                    VStack(alignment: .leading, spacing: SnoutTheme.Spacing.xs) {
-                        Text(current.petName).font(SnoutTheme.titleLG).foregroundStyle(SnoutTheme.onSurface)
-                        if !current.ownerName.isEmpty {
-                            Text(current.ownerName).font(SnoutTheme.bodyMD).foregroundStyle(SnoutTheme.onSurfaceMuted)
-                        }
-                        GroomingStatusPill(status: current.status)
-                    }
-                    VStack(alignment: .leading, spacing: SnoutTheme.Spacing.sm) {
-                        row("Time", current.timeLabel.isEmpty ? "—" : current.timeLabel)
-                        row("Duration", current.estimatedDurationMinutes.map { "\($0) min" } ?? "—")
-                        if let g = current.groomer?.displayName { row("Groomer", g) }
-                    }
-                    .padding(SnoutTheme.Spacing.lg).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(SnoutTheme.surface).clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
-
-                    if let notes = current.notes, !notes.isEmpty {
-                        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.xs) {
-                            Text("NOTES").font(SnoutTheme.labelSM).tracking(0.6).foregroundStyle(SnoutTheme.onSurfaceMuted)
-                            Text(notes).font(SnoutTheme.bodyMD).foregroundStyle(SnoutTheme.onSurface)
-                        }
-                        .padding(SnoutTheme.Spacing.lg).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(SnoutTheme.surface).clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
-                    }
-
-                    if let next = nextStep {
-                        Button {
-                            Task { await vm.advance(current, to: next.status, organizationId: staff.organizationId ?? "", role: staff.role ?? .staff, profileId: staff.profileId) }
-                        } label: {
-                            HStack(spacing: SnoutTheme.Spacing.sm) {
-                                if vm.busyId == current.id { ProgressView().tint(SnoutTheme.onAccent) }
-                                Text(next.label).font(SnoutTheme.body(16, weight: .semibold))
-                            }
-                            .foregroundStyle(SnoutTheme.onAccent).frame(maxWidth: .infinity)
-                            .padding(.vertical, SnoutTheme.Spacing.md).background(SnoutTheme.accent).clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain).disabled(vm.busyId == current.id)
-                    }
+                    header
+                    appointmentCard
+                    petCard
+                    ownerCard
+                    notesCard
+                    if let next = nextStep { advanceButton(next) }
                     Spacer(minLength: SnoutTheme.Spacing.xxl)
                 }
                 .padding(SnoutTheme.Spacing.xl)
@@ -258,12 +242,114 @@ struct StaffGroomingDetailView: View {
         .navigationTitle("Appointment").navigationBarTitleDisplayMode(.inline)
     }
 
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.xs) {
+            Text(current.petName).font(SnoutTheme.titleLG).foregroundStyle(SnoutTheme.onSurface)
+            if !current.ownerName.isEmpty {
+                Text(current.ownerName).font(SnoutTheme.bodyMD).foregroundStyle(SnoutTheme.onSurfaceMuted)
+            }
+            GroomingStatusPill(status: current.status)
+        }
+    }
+
+    private var appointmentCard: some View {
+        card("APPOINTMENT") {
+            row("Time", current.timeLabel.isEmpty ? "—" : current.timeLabel)
+            row("Duration", current.estimatedDurationMinutes.map { "\($0) min" } ?? "—")
+            if let s = servicesText { row("Services", s) }
+            if let p = priceLabel { row("Price", p) }
+            if let g = current.groomer?.displayName, !g.isEmpty { row("Groomer", g) }
+            if let t = timeString(current.checkInTime) { row("Checked in", t) }
+            if let t = timeString(current.completedTime) { row("Completed", t) }
+        }
+    }
+
+    @ViewBuilder
+    private var petCard: some View {
+        let species = current.pet?.species.map { $0.capitalized }
+        let breed = current.pet?.breed
+        if (species?.isEmpty == false) || (breed?.isEmpty == false) {
+            card("PET") {
+                if let species, !species.isEmpty { row("Species", species) }
+                if let breed, !breed.isEmpty { row("Breed", breed) }
+            }
+        }
+    }
+
+    private var ownerCard: some View {
+        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.sm) {
+            Text("OWNER").font(SnoutTheme.labelSM).tracking(0.6).foregroundStyle(SnoutTheme.onSurfaceMuted)
+            if let phone = current.owner?.phone, !phone.isEmpty { row("Phone", phone) }
+            if let email = current.owner?.email, !email.isEmpty { row("Email", email) }
+            if let ownerId = current.owner?.id {
+                MessageOwnerButton(
+                    organizationId: staff.organizationId ?? "",
+                    ownerId: ownerId,
+                    firstName: current.owner?.firstName,
+                    lastName: current.owner?.lastName
+                )
+                .padding(.top, SnoutTheme.Spacing.xs)
+            }
+        }
+        .padding(SnoutTheme.Spacing.lg).frame(maxWidth: .infinity, alignment: .leading)
+        .background(SnoutTheme.surface).clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var notesCard: some View {
+        if let notes = current.notes, !notes.isEmpty {
+            VStack(alignment: .leading, spacing: SnoutTheme.Spacing.xs) {
+                Text("NOTES").font(SnoutTheme.labelSM).tracking(0.6).foregroundStyle(SnoutTheme.onSurfaceMuted)
+                Text(notes).font(SnoutTheme.bodyMD).foregroundStyle(SnoutTheme.onSurface)
+            }
+            .padding(SnoutTheme.Spacing.lg).frame(maxWidth: .infinity, alignment: .leading)
+            .background(SnoutTheme.surface).clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        }
+    }
+
+    private func advanceButton(_ next: (status: String, label: String)) -> some View {
+        Button {
+            Task { await vm.advance(current, to: next.status, organizationId: staff.organizationId ?? "", role: staff.role ?? .staff, profileId: staff.profileId) }
+        } label: {
+            HStack(spacing: SnoutTheme.Spacing.sm) {
+                if vm.busyId == current.id { ProgressView().tint(SnoutTheme.onAccent) }
+                Text(next.label).font(SnoutTheme.body(16, weight: .semibold))
+            }
+            .foregroundStyle(SnoutTheme.onAccent).frame(maxWidth: .infinity)
+            .padding(.vertical, SnoutTheme.Spacing.md).background(SnoutTheme.accent).clipShape(Capsule())
+        }
+        .buttonStyle(.plain).disabled(vm.busyId == current.id)
+    }
+
+    // Card scaffold with an uppercase section title.
+    private func card<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.sm) {
+            Text(title).font(SnoutTheme.labelSM).tracking(0.6).foregroundStyle(SnoutTheme.onSurfaceMuted)
+            content()
+        }
+        .padding(SnoutTheme.Spacing.lg).frame(maxWidth: .infinity, alignment: .leading)
+        .background(SnoutTheme.surface).clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+    }
+
     private func row(_ l: String, _ v: String) -> some View {
-        HStack {
+        HStack(alignment: .top) {
             Text(l).font(SnoutTheme.bodyMD).foregroundStyle(SnoutTheme.onSurfaceMuted)
             Spacer()
-            Text(v).font(SnoutTheme.body(15, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
+            Text(v).font(SnoutTheme.body(15, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface).multilineTextAlignment(.trailing)
         }
+    }
+
+    private var servicesText: String? {
+        guard let s = current.servicesRequested, !s.isEmpty else { return nil }
+        return s.joined(separator: ", ")
+    }
+    private var priceLabel: String? {
+        guard let cents = current.priceCents, cents > 0 else { return nil }
+        return String(format: "$%.2f", Double(cents) / 100)
+    }
+    private func timeString(_ date: Date?) -> String? {
+        guard let date else { return nil }
+        return date.formatted(.dateTime.hour().minute())
     }
 
     private var nextStep: (status: String, label: String)? {

@@ -80,7 +80,7 @@ struct StaffMessagingView: View {
             .scrollContentBackground(.hidden)
             .refreshable { await reload() }
         }
-        .task { await reload() }
+        .onAppear { Task { await reload() } }
     }
 
     private func reload() async {
@@ -250,5 +250,110 @@ struct StaffThreadView: View {
 
     private var canSend: Bool {
         !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !vm.isSending
+    }
+}
+
+// MARK: - Message owner (find-or-create the owner's 1:1 thread, then open it)
+
+@MainActor
+final class ConversationOpener: ObservableObject {
+    @Published var isOpening = false
+    @Published var ready: ConversationRow?
+    @Published var error: String?
+
+    private let client = SupabaseClientProvider.shared
+
+    private struct Row: Decodable {
+        let id: String
+        let last_message_at: Date?
+        let last_message_preview: String?
+        let unread_staff: Int
+    }
+
+    func open(organizationId: String, ownerId: String, firstName: String?, lastName: String?) async {
+        isOpening = true
+        defer { isOpening = false }
+        error = nil
+        do {
+            // Reuse the owner's existing conversation if there is one…
+            let existing: [Row] = try await client.from("conversations")
+                .select("id, last_message_at, last_message_preview, unread_staff")
+                .eq("organization_id", value: organizationId)
+                .eq("owner_id", value: ownerId)
+                .order("last_message_at", ascending: false)
+                .limit(1)
+                .execute().value
+
+            let row: Row
+            if let found = existing.first {
+                row = found
+            } else {
+                // …otherwise create the shell (staff insert is allowed by RLS).
+                struct NewConversation: Encodable {
+                    let organization_id: String
+                    let owner_id: String
+                }
+                let created: [Row] = try await client.from("conversations")
+                    .insert(NewConversation(organization_id: organizationId, owner_id: ownerId))
+                    .select("id, last_message_at, last_message_preview, unread_staff")
+                    .execute().value
+                guard let made = created.first else {
+                    error = "Couldn't open the conversation."
+                    return
+                }
+                row = made
+            }
+
+            ready = ConversationRow(
+                id: row.id,
+                lastMessageAt: row.last_message_at,
+                lastMessagePreview: row.last_message_preview,
+                unreadStaff: row.unread_staff,
+                owner: ConversationRow.OwnerRef(id: ownerId, firstName: firstName, lastName: lastName)
+            )
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+/// Reusable button that opens (or creates) the owner's 1:1 conversation and
+/// pushes the thread. Must live inside a NavigationStack.
+struct MessageOwnerButton: View {
+    let organizationId: String
+    let ownerId: String
+    let firstName: String?
+    let lastName: String?
+
+    @StateObject private var opener = ConversationOpener()
+    @State private var navigate = false
+
+    var body: some View {
+        Button {
+            Task {
+                await opener.open(organizationId: organizationId, ownerId: ownerId, firstName: firstName, lastName: lastName)
+                if opener.ready != nil { navigate = true }
+            }
+        } label: {
+            HStack(spacing: SnoutTheme.Spacing.sm) {
+                if opener.isOpening {
+                    ProgressView().tint(SnoutTheme.onSurface)
+                } else {
+                    Image(systemName: "message.fill")
+                }
+                Text("Message owner").font(SnoutTheme.body(15, weight: .semibold))
+            }
+            .foregroundStyle(SnoutTheme.onSurface)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, SnoutTheme.Spacing.md)
+            .background(SnoutTheme.surface)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(SnoutTheme.divider, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .disabled(opener.isOpening)
+        .navigationDestination(isPresented: $navigate) {
+            if let c = opener.ready { StaffThreadView(conversation: c) }
+        }
     }
 }

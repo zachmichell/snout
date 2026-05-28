@@ -156,7 +156,7 @@ struct StaffTrainingView: View {
             .scrollContentBackground(.hidden)
             .refreshable { await reload() }
         }
-        .task { await reload() }
+        .onAppear { Task { await reload() } }
     }
 
     private func reload() async {

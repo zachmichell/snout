@@ -50,16 +50,19 @@ final class StaffDashboardViewModel: ObservableObject {
     }
 
     var pending: [ScheduleReservation] { rows.filter { $0.status == .requested } }
+    var inHouse: [ScheduleReservation] { rows.filter { $0.status == .checkedIn } }
+    var arrivals: [ScheduleReservation] {
+        let cal = Calendar.current
+        return rows.filter { cal.isDateInToday($0.startAt) && ($0.status == .requested || $0.status == .confirmed) }
+    }
+    var departures: [ScheduleReservation] {
+        let cal = Calendar.current
+        return rows.filter { cal.isDateInToday($0.endAt) }
+    }
     var pendingCount: Int { pending.count }
-    var inHouseCount: Int { rows.filter { $0.status == .checkedIn }.count }
-    var arrivalsCount: Int {
-        let cal = Calendar.current
-        return rows.filter { cal.isDateInToday($0.startAt) && ($0.status == .requested || $0.status == .confirmed) }.count
-    }
-    var departuresCount: Int {
-        let cal = Calendar.current
-        return rows.filter { cal.isDateInToday($0.endAt) }.count
-    }
+    var inHouseCount: Int { inHouse.count }
+    var arrivalsCount: Int { arrivals.count }
+    var departuresCount: Int { departures.count }
 }
 
 struct StaffDashboardView: View {
@@ -81,7 +84,7 @@ struct StaffDashboardView: View {
             .scrollContentBackground(.hidden)
             .refreshable { await reload() }
         }
-        .task { await reload() }
+        .onAppear { Task { await reload() } }
     }
 
     private func reload() async {
@@ -104,11 +107,20 @@ struct StaffDashboardView: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: SnoutTheme.Spacing.md),
                             GridItem(.flexible(), spacing: SnoutTheme.Spacing.md)],
                   spacing: SnoutTheme.Spacing.md) {
-            statTile("Pending", vm.pendingCount, "tray.full.fill", SnoutTheme.vanilla)
-            statTile("Arrivals", vm.arrivalsCount, "arrow.down.circle.fill", SnoutTheme.frost)
-            statTile("In-house", vm.inHouseCount, "house.fill", SnoutTheme.mist)
-            statTile("Departures", vm.departuresCount, "arrow.up.circle.fill", SnoutTheme.cotton)
+            statLink("Pending", vm.pending, "tray.full.fill", SnoutTheme.vanilla)
+            statLink("Arrivals", vm.arrivals, "arrow.down.circle.fill", SnoutTheme.frost)
+            statLink("In-house", vm.inHouse, "house.fill", SnoutTheme.mist)
+            statLink("Departures", vm.departures, "arrow.up.circle.fill", SnoutTheme.cotton)
         }
+    }
+
+    private func statLink(_ label: String, _ rows: [ScheduleReservation], _ symbol: String, _ tint: Color) -> some View {
+        NavigationLink {
+            DashboardReservationListView(title: label, rows: rows)
+        } label: {
+            statTile(label, rows.count, symbol, tint)
+        }
+        .buttonStyle(.plain)
     }
 
     private func statTile(_ label: String, _ value: Int, _ symbol: String, _ tint: Color) -> some View {
@@ -148,5 +160,67 @@ struct StaffDashboardView: View {
                     .padding(.top, SnoutTheme.Spacing.xs)
             }
         }
+    }
+}
+
+// MARK: - Drill-down list from a stat tile
+
+private struct DashboardReservationListView: View {
+    let title: String
+    let rows: [ScheduleReservation]
+    @EnvironmentObject private var staff: CurrentStaffService
+    @StateObject private var scheduleVM = StaffScheduleViewModel()
+
+    var body: some View {
+        ZStack {
+            SnoutTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: SnoutTheme.Spacing.md) {
+                    if rows.isEmpty {
+                        VStack(spacing: SnoutTheme.Spacing.sm) {
+                            Image(systemName: "pawprint").font(.system(size: 26)).foregroundStyle(SnoutTheme.onSurfaceFaint)
+                            Text("Nothing here right now").font(SnoutTheme.bodyMD).foregroundStyle(SnoutTheme.onSurfaceMuted)
+                        }
+                        .frame(maxWidth: .infinity).padding(.top, SnoutTheme.Spacing.xxl)
+                    } else {
+                        ForEach(rows) { row in
+                            NavigationLink {
+                                StaffReservationDetailView(row: row, vm: scheduleVM)
+                            } label: {
+                                card(row)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    Spacer(minLength: SnoutTheme.Spacing.xxl)
+                }
+                .padding(SnoutTheme.Spacing.xl)
+            }
+            .scrollContentBackground(.hidden)
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            if scheduleVM.rows.isEmpty, let org = staff.organizationId {
+                await scheduleVM.load(organizationId: org)
+            }
+        }
+    }
+
+    private func card(_ row: ScheduleReservation) -> some View {
+        HStack(spacing: SnoutTheme.Spacing.md) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(row.petNames).font(SnoutTheme.body(16, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
+                Text([row.service?.name, row.ownerName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted).lineLimit(1)
+                Text("\(row.startAt.formatted(.dateTime.hour().minute())) – \(row.endAt.formatted(.dateTime.hour().minute()))")
+                    .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted)
+            }
+            Spacer()
+            StatusPill(status: row.status)
+        }
+        .padding(SnoutTheme.Spacing.lg)
+        .background(SnoutTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
     }
 }
