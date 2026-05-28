@@ -35,16 +35,20 @@
 		2D1FB062625F1B0994424D35 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489E8CA3A6903FF293A185CF /* Profile.swift */; };
 		2D7DB67B82D053B5B01B4036 /* PetsStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C245448E38C2E663F38AED4 /* PetsStep.swift */; };
 		2DC06B4B4492CA0EE3EA605C /* Reservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561CF4D5362FBF69D5AC668E /* Reservation.swift */; };
+		315EEFBA04893B3FEBD8E5C5 /* Config.plist in Resources */ = {isa = PBXBuildFile; fileRef = FC15079CB6F74B2383A2BC6D /* Config.plist */; };
+		3787B3DFB043BFF9D5DD6080 /* Montserrat-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9529ABDF697FAD5652D9B264 /* Montserrat-Medium.ttf */; };
 		3AE17A5AAFDBDA1BC47F020C /* ReviewStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5084FC94E419EEFB15C47FED /* ReviewStep.swift */; };
 		3FD0D30E838DAE87DB207186 /* StaffGroomingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BD803D891BBED72B2BDE1BA /* StaffGroomingView.swift */; };
 		41AF63DBCD2772378B3B4C79 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6566F57E37981E92EDDB0FD7 /* MainTabView.swift */; };
 		4551D068BA3198CAAA690D63 /* PaymentMethodsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3246EDE8E699B5A8B85FA58 /* PaymentMethodsView.swift */; };
 		47442157A4644A9301789BB3 /* Config.plist in Resources */ = {isa = PBXBuildFile; fileRef = FC15079CB6F74B2383A2BC6D /* Config.plist */; };
+		47CAF1EC403608C9E08A6F95 /* Montserrat-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FAFCC8BF123999927A4F93A3 /* Montserrat-Regular.ttf */; };
 		48392160F76F1E452FFA1BB0 /* Reservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561CF4D5362FBF69D5AC668E /* Reservation.swift */; };
 		4A2745F8C121208E41ABF47E /* UnreadMessagesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234EC242A4BD96B1FAE25D71 /* UnreadMessagesService.swift */; };
 		4A7E2C09E22F97868E1D708F /* Montserrat-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9529ABDF697FAD5652D9B264 /* Montserrat-Medium.ttf */; };
 		4A97D9FCB14D94945E14538D /* StaffLookupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDDFB28CF57E6B571881BDC /* StaffLookupView.swift */; };
 		4E9CB0AE51BB893E2E2E4189 /* SnoutStaffApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A2CD6751788F4B56C263E4 /* SnoutStaffApp.swift */; };
+		5018B8300B679EC1667B9875 /* GrandifloraOne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C70949BE448EC661E53E0047 /* GrandifloraOne-Regular.ttf */; };
 		5441B038AD6AEEBBEF08BC65 /* StaffLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B98052BFB9203374F6E5C15 /* StaffLoginView.swift */; };
 		5E616BEE967C0B1AE7089549 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25140E42F0D40D3CCC63B87F /* Money.swift */; };
 		5F0E91B8ADEF6D709DF4BB1C /* SnoutUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21E4034F5632E3A03B400C9B /* SnoutUITestsLaunchTests.swift */; };
@@ -53,6 +57,7 @@
 		687747FF46B4B95C80B5BDCB /* ReservationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5718ED3941AFC5BA90FA5BD9 /* ReservationDetailView.swift */; };
 		70EF5B4D3796E03E32E026B6 /* PushService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0178A791BE7BEF4D22C4A855 /* PushService.swift */; };
 		716E547A9EC7362CDDE78AC2 /* ReportCardListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD63E6AF045CA09BDC5A5F0 /* ReportCardListView.swift */; };
+		72098F071619B33EE08A1D7C /* Montserrat-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5E8E754B62B4ED5F854C5263 /* Montserrat-Bold.ttf */; };
 		724595BA44CCCE63DA01515A /* Pet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21052497D93C63199E50D8E /* Pet.swift */; };
 		72C1FABF06A98FB0D0FAF820 /* StaffMessagingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95245480B1CBC7EF754DD84 /* StaffMessagingView.swift */; };
 		7539C0655ADA03701864E643 /* AddCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C9AB4F8470E794507C7AFB2 /* AddCardView.swift */; };
@@ -66,6 +71,7 @@
 		88FEB03EA443711D37E8392D /* AgreementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45D71535692E2147C92526D6 /* AgreementsView.swift */; };
 		8983C3F970CC7BBED3DEB80A /* BuyCreditsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD09A9C25B5F21CE3F09BD6B /* BuyCreditsView.swift */; };
 		8AA8957DAC06646D290ED059 /* StorageDownloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04FA2E9482420226195959A2 /* StorageDownloadTests.swift */; };
+		8D6152DACA45B0C3F4F60CC1 /* Montserrat-Italic-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7273E187B94F83178E6EF88B /* Montserrat-Italic-VariableFont_wght.ttf */; };
 		8E8E00001762EAE0250ABA34 /* Location.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEA7B39535EB30BD63C3629 /* Location.swift */; };
 		92CB993FCFC68486A081C00E /* StaffRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7996AE790E3262A46B7FB36D /* StaffRootView.swift */; };
 		94675F7EFE18426FEAD1EEF6 /* WebcamPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54E114C51FDADD1185151FF3 /* WebcamPlayerView.swift */; };
@@ -80,8 +86,10 @@
 		A52377E80D292A51F1B8A88C /* Owner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6488B51BD6CB91E540D62E86 /* Owner.swift */; };
 		A6C8CA16674F63DCE3B3F6F2 /* Montserrat-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FB91B04834035FE119B4DD01 /* Montserrat-VariableFont_wght.ttf */; };
 		A72A2571AEC03F8D00D5C584 /* StaffReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5402D1B5C81DA947C7020289 /* StaffReportsView.swift */; };
+		A8154DD2C8AA6BF242601406 /* .gitkeep in Resources */ = {isa = PBXBuildFile; fileRef = FD92AE80746E46C0CBF75BC0 /* .gitkeep */; };
 		A8815847FB980C82ADFDAA4F /* ReportCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE319EB2102236C2C68D35F /* ReportCard.swift */; };
 		A951F7CD1D5EF6F5A609B1B7 /* SnoutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAD638D6923420E3CE34F8F /* SnoutApp.swift */; };
+		B18BF3E0C3ABDB20434F63A4 /* Montserrat-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 713226D2F77A4A805E95EBC4 /* Montserrat-SemiBold.ttf */; };
 		B2CF6DDA71CEB060A5A05B16 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9514D919EF95322F6BD880B6 /* HomeView.swift */; };
 		B3A1D3C0F106397C0762AB4E /* WebcamListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59441346B40044DEE6A626FC /* WebcamListView.swift */; };
 		B4106D31CF9D9F99F6744F3E /* SnoutTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC59E49D7967A4D071DEC62A /* SnoutTheme.swift */; };
@@ -89,11 +97,13 @@
 		B868217DCF63B014B83FEA6A /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F5A279A825B442007855F1 /* Format.swift */; };
 		BDCCCEB1784586598A5E811E /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B40A367CA69CD481A21400 /* AuthService.swift */; };
 		C179E26E86BDD23579F2BC01 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E445263623AE34747FDB5F2 /* CalendarView.swift */; };
+		C17E05E0AA92E51869E98BD4 /* Montserrat-VariableFont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FB91B04834035FE119B4DD01 /* Montserrat-VariableFont_wght.ttf */; };
 		C33C444ED28379A5027C5B93 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86510617A869D0A280071FBA /* RootView.swift */; };
 		C3BE5B104DAE6FC7CC554CD3 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0033A8FE50318339C4802FBE /* AppConfig.swift */; };
 		C4A42AB45C2E71F26FCDB7E8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBBABB053024509A3594B7B3 /* SettingsView.swift */; };
 		C4C6496658AF84895841ED2A /* StaffDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E12B0BD61570F9B5348B68 /* StaffDashboardView.swift */; };
 		CA48E70B94141C8D6E9B7B96 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489E8CA3A6903FF293A185CF /* Profile.swift */; };
+		CAAAAFA4A437FD423747046C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AB8E80F5405DC6C5687AD9C3 /* Assets.xcassets */; };
 		CB1C31C4A560AC5F3529F429 /* StaffScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA0AFE8B4CC73AAFEA79047 /* StaffScheduleView.swift */; };
 		CB920838EA5950BBDFDACB5F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AB8E80F5405DC6C5687AD9C3 /* Assets.xcassets */; };
 		CCD864FB19409A8A1A5FE616 /* Config.example.plist in Resources */ = {isa = PBXBuildFile; fileRef = BD24E49994534BA5FE289161 /* Config.example.plist */; };
@@ -696,6 +706,7 @@
 			buildConfigurationList = 0DF08F6992DF1188456755CD /* Build configuration list for PBXNativeTarget "SnoutStaff" */;
 			buildPhases = (
 				B9CBF49613613292A0D69D22 /* Sources */,
+				20C8D598FFE46F2671CBF8DE /* Resources */,
 				0C202983BB73F316228BEF5A /* Frameworks */,
 			);
 			buildRules = (
@@ -765,6 +776,23 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		20C8D598FFE46F2671CBF8DE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A8154DD2C8AA6BF242601406 /* .gitkeep in Resources */,
+				CAAAAFA4A437FD423747046C /* Assets.xcassets in Resources */,
+				315EEFBA04893B3FEBD8E5C5 /* Config.plist in Resources */,
+				5018B8300B679EC1667B9875 /* GrandifloraOne-Regular.ttf in Resources */,
+				72098F071619B33EE08A1D7C /* Montserrat-Bold.ttf in Resources */,
+				8D6152DACA45B0C3F4F60CC1 /* Montserrat-Italic-VariableFont_wght.ttf in Resources */,
+				3787B3DFB043BFF9D5DD6080 /* Montserrat-Medium.ttf in Resources */,
+				47CAF1EC403608C9E08A6F95 /* Montserrat-Regular.ttf in Resources */,
+				B18BF3E0C3ABDB20434F63A4 /* Montserrat-SemiBold.ttf in Resources */,
+				C17E05E0AA92E51869E98BD4 /* Montserrat-VariableFont_wght.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5BFEBC8F8116247959F21F71 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
