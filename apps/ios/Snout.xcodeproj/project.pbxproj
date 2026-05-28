@@ -91,6 +91,7 @@
 		C33C444ED28379A5027C5B93 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86510617A869D0A280071FBA /* RootView.swift */; };
 		C3BE5B104DAE6FC7CC554CD3 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0033A8FE50318339C4802FBE /* AppConfig.swift */; };
 		C4A42AB45C2E71F26FCDB7E8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBBABB053024509A3594B7B3 /* SettingsView.swift */; };
+		C4C6496658AF84895841ED2A /* StaffDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E12B0BD61570F9B5348B68 /* StaffDashboardView.swift */; };
 		CA48E70B94141C8D6E9B7B96 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489E8CA3A6903FF293A185CF /* Profile.swift */; };
 		CB1C31C4A560AC5F3529F429 /* StaffScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA0AFE8B4CC73AAFEA79047 /* StaffScheduleView.swift */; };
 		CB920838EA5950BBDFDACB5F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AB8E80F5405DC6C5687AD9C3 /* Assets.xcassets */; };
@@ -192,6 +193,7 @@
 		7273E187B94F83178E6EF88B /* Montserrat-Italic-VariableFont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Montserrat-Italic-VariableFont_wght.ttf"; sourceTree = "<group>"; };
 		73503668041819BEB8C03832 /* SlotPickerStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlotPickerStep.swift; sourceTree = "<group>"; };
 		7475C7805C44C2CA2BE866A2 /* StaffTrainingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffTrainingView.swift; sourceTree = "<group>"; };
+		77E12B0BD61570F9B5348B68 /* StaffDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffDashboardView.swift; sourceTree = "<group>"; };
 		7996AE790E3262A46B7FB36D /* StaffRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffRootView.swift; sourceTree = "<group>"; };
 		86510617A869D0A280071FBA /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		8B6931DE85CCC444D50B8172 /* PetAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetAvatar.swift; sourceTree = "<group>"; };
@@ -381,6 +383,7 @@
 		34C1B4A2EEF28B19D83B2CBB /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				34CF07593B74EC77570F4E47 /* Dashboard */,
 				FC597EB1A03E5FDD4028F313 /* Grooming */,
 				04E5AC31571AF1A4F0AAE6C1 /* Lookup */,
 				E4731C3030E0069C3F41D80D /* Messaging */,
@@ -393,6 +396,14 @@
 				7996AE790E3262A46B7FB36D /* StaffRootView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		34CF07593B74EC77570F4E47 /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				77E12B0BD61570F9B5348B68 /* StaffDashboardView.swift */,
+			);
+			path = Dashboard;
 			sourceTree = "<group>";
 		};
 		361F8CC2B19278E9F615C457 /* Reservations */ = {
@@ -866,6 +877,7 @@
 				4E9CB0AE51BB893E2E2E4189 /* SnoutStaffApp.swift in Sources */,
 				B4106D31CF9D9F99F6744F3E /* SnoutTheme.swift in Sources */,
 				E77FA9BD205D5ED63DD375AE /* StaffComponents.swift in Sources */,
+				C4C6496658AF84895841ED2A /* StaffDashboardView.swift in Sources */,
 				3FD0D30E838DAE87DB207186 /* StaffGroomingView.swift in Sources */,
 				0EFD1A785C3D4E36D6DBB5A8 /* StaffHomeShell.swift in Sources */,
 				5441B038AD6AEEBBEF08BC65 /* StaffLoginView.swift in Sources */,

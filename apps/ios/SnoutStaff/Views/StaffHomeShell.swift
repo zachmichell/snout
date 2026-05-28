@@ -58,6 +58,8 @@ struct StaffHomeShell: View {
     @ViewBuilder
     private func laneContent(_ lane: StaffCapability) -> some View {
         switch lane {
+        case .dashboard:
+            StaffDashboardView()
         case .schedule:
             StaffScheduleView()
         case .grooming:
