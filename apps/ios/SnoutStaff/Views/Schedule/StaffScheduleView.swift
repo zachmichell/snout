@@ -186,7 +186,7 @@ struct StaffScheduleView: View {
             .scrollContentBackground(.hidden)
             .refreshable { await reload() }
         }
-        .task { await reload() }
+        .onAppear { Task { await reload() } }
     }
 
     private func reload() async {
@@ -309,6 +309,14 @@ struct StaffReservationDetailView: View {
                     }
 
                     actionButton
+                    if let ownerId = current.owner?.id {
+                        MessageOwnerButton(
+                            organizationId: staff.organizationId ?? "",
+                            ownerId: ownerId,
+                            firstName: current.owner?.firstName,
+                            lastName: current.owner?.lastName
+                        )
+                    }
                     Spacer(minLength: SnoutTheme.Spacing.xxl)
                 }
                 .padding(SnoutTheme.Spacing.xl)
