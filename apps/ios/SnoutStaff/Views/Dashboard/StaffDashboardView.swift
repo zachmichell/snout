@@ -27,9 +27,13 @@ final class StaffDashboardViewModel: ObservableObject {
     func load(organizationId: String) async {
         isLoading = true
         defer { isLoading = false }
+        let key = "dashboard_\(organizationId)_\(StaffCache.todayKey())"
+        if rows.isEmpty, let cached = StaffCache.load([ScheduleReservation].self, key: key) {
+            rows = cached
+        }
         let iso = ISO8601DateFormatter()
         do {
-            rows = try await client.from("reservations")
+            let result: [ScheduleReservation] = try await client.from("reservations")
                 .select(Self.graph)
                 .eq("organization_id", value: organizationId)
                 .is("deleted_at", value: nil)
@@ -38,8 +42,10 @@ final class StaffDashboardViewModel: ObservableObject {
                 .gte("end_at", value: iso.string(from: startOfToday))
                 .order("start_at", ascending: true)
                 .execute().value
+            rows = result
+            StaffCache.save(result, key: key)
         } catch {
-            rows = []
+            // Offline: keep cached rows if we have them.
         }
     }
 

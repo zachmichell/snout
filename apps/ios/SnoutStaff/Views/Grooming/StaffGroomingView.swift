@@ -11,7 +11,7 @@
 import SwiftUI
 import Supabase
 
-struct GroomingAppt: Decodable, Identifiable, Hashable {
+struct GroomingAppt: Codable, Identifiable, Hashable {
     let id: String
     let appointmentDate: String
     let startTime: String?
@@ -28,12 +28,12 @@ struct GroomingAppt: Decodable, Identifiable, Hashable {
         case startTime = "start_time"
         case estimatedDurationMinutes = "estimated_duration_minutes"
     }
-    struct PetRef: Decodable, Hashable { let id: String; let name: String }
-    struct OwnerRef: Decodable, Hashable {
+    struct PetRef: Codable, Hashable { let id: String; let name: String }
+    struct OwnerRef: Codable, Hashable {
         let id: String; let firstName: String?; let lastName: String?
         enum CodingKeys: String, CodingKey { case id; case firstName = "first_name"; case lastName = "last_name" }
     }
-    struct GroomerRef: Decodable, Hashable { let id: String; let displayName: String? }
+    struct GroomerRef: Codable, Hashable { let id: String; let displayName: String? }
 
     var petName: String { pet?.name ?? "Pet" }
     var ownerName: String { [owner?.firstName, owner?.lastName].compactMap { $0 }.joined(separator: " ") }
@@ -63,6 +63,11 @@ final class StaffGroomingViewModel: ObservableObject {
         defer { isLoading = false }
         loadError = nil
 
+        let cacheKey = "grooming_\(organizationId)_\(role.rawValue)_\(StaffCache.todayKey())"
+        if appts.isEmpty, let cached = StaffCache.load([GroomingAppt].self, key: cacheKey) {
+            appts = cached
+        }
+
         let today = Self.ymd(Date())
         do {
             var query = client.from("grooming_appointments")
@@ -78,7 +83,9 @@ final class StaffGroomingViewModel: ObservableObject {
                 query = query.eq("groomer_id", value: groomerId)
             }
 
-            appts = try await query.order("start_time", ascending: true).execute().value
+            let result: [GroomingAppt] = try await query.order("start_time", ascending: true).execute().value
+            appts = result
+            StaffCache.save(result, key: cacheKey)
         } catch {
             loadError = error.localizedDescription
         }

@@ -55,7 +55,7 @@ struct CareLog: Decodable, Identifiable, Hashable {
 
 // MARK: - Today's pet visits
 
-struct PetVisit: Identifiable, Hashable {
+struct PetVisit: Codable, Identifiable, Hashable {
     let reservationId: String
     let petId: String
     let petName: String
@@ -78,6 +78,10 @@ final class StaffReportsViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         loadError = nil
+        let key = "reports_\(organizationId)_\(StaffCache.todayKey())"
+        if visits.isEmpty, let cached = StaffCache.load([PetVisit].self, key: key) {
+            visits = cached
+        }
         let cal = Calendar.current
         let start = cal.startOfDay(for: Date())
         guard let end = cal.date(byAdding: DateComponents(day: 1, second: -1), to: start) else { return }
@@ -94,13 +98,15 @@ final class StaffReportsViewModel: ObservableObject {
                 .order("start_at", ascending: true)
                 .execute()
                 .value
-            visits = rows.flatMap { r in
+            let flattened = rows.flatMap { r in
                 r.reservationPets.compactMap { join -> PetVisit? in
                     guard let pet = join.pet else { return nil }
                     return PetVisit(reservationId: r.id, petId: pet.id, petName: pet.name,
                                     ownerName: r.ownerName, serviceName: r.service?.name)
                 }
             }
+            visits = flattened
+            StaffCache.save(flattened, key: key)
         } catch {
             loadError = error.localizedDescription
         }
