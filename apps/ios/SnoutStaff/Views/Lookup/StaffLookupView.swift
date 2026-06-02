@@ -122,13 +122,20 @@ struct StaffLookupView: View {
     }
 
     private func petRow(_ pet: Pet) -> some View {
-        rowCard(title: pet.name, subtitle: [petSpecies(pet), pet.breed].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+        rowCard(name: pet.name,
+                title: pet.name,
+                subtitle: [petSpecies(pet), pet.breed].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
+                fallbackSymbol: "pawprint")
     }
     private func ownerRow(_ owner: Owner) -> some View {
-        rowCard(title: owner.fullName, subtitle: [owner.email, owner.phone].compactMap { $0 }.first ?? "")
+        rowCard(name: owner.fullName,
+                title: owner.fullName,
+                subtitle: [owner.email, owner.phone].compactMap { $0 }.first ?? "",
+                fallbackSymbol: "person.fill")
     }
-    private func rowCard(title: String, subtitle: String) -> some View {
-        HStack {
+    private func rowCard(name: String, title: String, subtitle: String, fallbackSymbol: String) -> some View {
+        HStack(spacing: SnoutTheme.Spacing.md) {
+            StaffAvatar(name: name, size: 40, symbolFallback: fallbackSymbol)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(SnoutTheme.body(16, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
                 if !subtitle.isEmpty { Text(subtitle).font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted) }
@@ -136,9 +143,7 @@ struct StaffLookupView: View {
             Spacer()
             Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(SnoutTheme.onSurfaceFaint)
         }
-        .padding(SnoutTheme.Spacing.lg)
-        .background(SnoutTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 
     private func petSpecies(_ pet: Pet) -> String {

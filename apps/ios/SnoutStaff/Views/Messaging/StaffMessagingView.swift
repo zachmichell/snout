@@ -90,6 +90,9 @@ struct StaffMessagingView: View {
 
     private func row(_ c: ConversationRow) -> some View {
         HStack(spacing: SnoutTheme.Spacing.md) {
+            StaffAvatar(name: c.ownerName.isEmpty ? nil : c.ownerName,
+                        size: 40,
+                        symbolFallback: "person.fill")
             VStack(alignment: .leading, spacing: 2) {
                 Text(c.ownerName.isEmpty ? "Pet parent" : c.ownerName)
                     .font(SnoutTheme.body(16, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
@@ -105,9 +108,7 @@ struct StaffMessagingView: View {
                     .background(SnoutTheme.accent).clipShape(Capsule())
             }
         }
-        .padding(SnoutTheme.Spacing.lg)
-        .background(SnoutTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 
     private var emptyState: some View {
