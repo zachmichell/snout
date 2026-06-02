@@ -196,6 +196,7 @@ struct StaffScheduleView: View {
 
     private func reservationCard(_ row: ScheduleReservation) -> some View {
         HStack(spacing: SnoutTheme.Spacing.md) {
+            StaffAvatar(name: row.petNames, size: 44, symbolFallback: "pawprint")
             VStack(alignment: .leading, spacing: 4) {
                 Text(row.petNames)
                     .font(SnoutTheme.body(16, weight: .semibold))
@@ -209,11 +210,9 @@ struct StaffScheduleView: View {
                     .foregroundStyle(SnoutTheme.onSurfaceMuted)
             }
             Spacer()
-            StatusPill(status: row.status)
+            StaffReservationBadge(status: row.status)
         }
-        .padding(SnoutTheme.Spacing.lg)
-        .background(SnoutTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 
     private func timeRange(_ row: ScheduleReservation) -> String {
@@ -291,7 +290,7 @@ struct StaffReservationDetailView: View {
                                 .font(SnoutTheme.bodyMD)
                                 .foregroundStyle(SnoutTheme.onSurfaceMuted)
                         }
-                        StatusPill(status: current.status)
+                        StaffReservationBadge(status: current.status)
                     }
 
                     infoCard

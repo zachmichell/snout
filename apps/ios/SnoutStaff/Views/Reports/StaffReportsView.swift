@@ -150,6 +150,7 @@ struct StaffReportsView: View {
 
     private func card(_ visit: PetVisit) -> some View {
         HStack(spacing: SnoutTheme.Spacing.md) {
+            StaffAvatar(name: visit.petName, size: 44, symbolFallback: "pawprint")
             VStack(alignment: .leading, spacing: 4) {
                 Text(visit.petName).font(SnoutTheme.body(16, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
                 Text([visit.serviceName, visit.ownerName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
@@ -158,9 +159,7 @@ struct StaffReportsView: View {
             Spacer()
             Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(SnoutTheme.onSurfaceFaint)
         }
-        .padding(SnoutTheme.Spacing.lg)
-        .background(SnoutTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 
     private var emptyState: some View {
@@ -295,8 +294,12 @@ struct StaffPetVisitView: View {
 
     private func logRow(_ log: CareLog) -> some View {
         HStack(spacing: SnoutTheme.Spacing.md) {
-            Image(systemName: log.type?.symbol ?? "note.text")
-                .font(.system(size: 16)).foregroundStyle(SnoutTheme.onSurfaceMuted).frame(width: 24)
+            ZStack {
+                Circle().fill(SnoutTheme.vanilla.opacity(0.7)).frame(width: 36, height: 36)
+                Image(systemName: log.type?.symbol ?? "note.text")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SnoutTheme.onSurface)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.type?.label ?? log.logType.capitalized)
                     .font(SnoutTheme.body(15, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
@@ -308,10 +311,8 @@ struct StaffPetVisitView: View {
             Text(log.loggedAt.formatted(.dateTime.hour().minute()))
                 .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceFaint)
         }
-        .padding(SnoutTheme.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SnoutTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 }
 
