@@ -42,6 +42,11 @@ struct SnoutStaffApp: App {
                 .environmentObject(auth)
                 .environmentObject(staff)
                 .environmentObject(lock)
+                .tint(SnoutTheme.accent)
+                // The Boho palette is light-only (matches the client app); without
+                // this, system chrome (tab bar, the >5-tab "More" overflow list)
+                // flips to dark mode and clashes with the cream theme.
+                .preferredColorScheme(.light)
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
