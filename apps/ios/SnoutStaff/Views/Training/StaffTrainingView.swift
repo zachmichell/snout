@@ -183,6 +183,12 @@ struct StaffTrainingView: View {
 
     private func card(_ c: ClassInstanceRow) -> some View {
         HStack(spacing: SnoutTheme.Spacing.md) {
+            ZStack {
+                Circle().fill(SnoutTheme.mist).frame(width: 40, height: 40)
+                Image(systemName: "graduationcap.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(SnoutTheme.onSurface)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text(c.title).font(SnoutTheme.body(16, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
                 Text(c.timeLabel).font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted)
@@ -194,9 +200,7 @@ struct StaffTrainingView: View {
             Spacer()
             SnoutGlyphChevron()
         }
-        .padding(SnoutTheme.Spacing.lg)
-        .background(SnoutTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 
     private var emptyState: some View {
@@ -259,6 +263,7 @@ struct ClassRosterView: View {
     private func rosterRow(_ e: EnrollmentRow) -> some View {
         let attended = e.attended ?? false
         return HStack(spacing: SnoutTheme.Spacing.md) {
+            StaffAvatar(name: e.petName, size: 38, symbolFallback: "pawprint")
             VStack(alignment: .leading, spacing: 2) {
                 Text(e.petName).font(SnoutTheme.body(15, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
                 if !e.ownerName.isEmpty {
@@ -283,9 +288,7 @@ struct ClassRosterView: View {
             .buttonStyle(.plain)
             .disabled(vm.busyId == e.id)
         }
-        .padding(SnoutTheme.Spacing.lg)
-        .background(SnoutTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 }
 
@@ -365,6 +368,12 @@ struct ClassSeriesView: View {
 
     private func sessionRow(_ s: ClassInstanceRow) -> some View {
         HStack(spacing: SnoutTheme.Spacing.md) {
+            ZStack {
+                Circle().fill(SnoutTheme.frost.opacity(0.65)).frame(width: 38, height: 38)
+                Text(s.sessionNumber.map(String.init) ?? "•")
+                    .font(SnoutTheme.body(14, weight: .bold))
+                    .foregroundStyle(SnoutTheme.onSurface)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(s.sessionNumber.map { "Session \($0)" } ?? "Session")
                     .font(SnoutTheme.body(15, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
@@ -375,9 +384,7 @@ struct ClassSeriesView: View {
             if let status = s.status { ClassSessionStatusPill(status: status) }
             SnoutGlyphChevron()
         }
-        .padding(SnoutTheme.Spacing.lg)
-        .background(SnoutTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 }
 

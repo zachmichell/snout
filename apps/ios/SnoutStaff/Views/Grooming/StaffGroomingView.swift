@@ -174,17 +174,16 @@ struct StaffGroomingView: View {
 
     private func card(_ appt: GroomingAppt) -> some View {
         HStack(spacing: SnoutTheme.Spacing.md) {
+            StaffAvatar(name: appt.petName, size: 44, symbolFallback: "pawprint")
             VStack(alignment: .leading, spacing: 4) {
                 Text(appt.petName).font(SnoutTheme.body(16, weight: .semibold)).foregroundStyle(SnoutTheme.onSurface)
                 Text([appt.ownerName, appt.timeLabel].filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(SnoutTheme.bodySM).foregroundStyle(SnoutTheme.onSurfaceMuted)
             }
             Spacer()
-            GroomingStatusPill(status: appt.status)
+            StaffGroomingBadge(status: appt.status)
         }
-        .padding(SnoutTheme.Spacing.lg)
-        .background(SnoutTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .snoutCard()
     }
 
     private var emptyState: some View {
@@ -248,7 +247,7 @@ struct StaffGroomingDetailView: View {
             if !current.ownerName.isEmpty {
                 Text(current.ownerName).font(SnoutTheme.bodyMD).foregroundStyle(SnoutTheme.onSurfaceMuted)
             }
-            GroomingStatusPill(status: current.status)
+            StaffGroomingBadge(status: current.status)
         }
     }
 
