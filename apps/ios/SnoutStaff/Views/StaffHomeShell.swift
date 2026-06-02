@@ -2,78 +2,145 @@
 //  StaffHomeShell.swift
 //  Snout Staff
 //
-//  The signed-in shell: a tab bar whose tabs are the lanes available to the
-//  user's role, opening on their default home. Lane content is placeholder
-//  for now — the real screens (schedule/check-in-out, grooming day, class
-//  day, report cards/care logs, messaging, pets/owners lookup) land in the
-//  feature-lanes task. This file owns the role→lane wiring + the account
-//  sheet (name, role, app-lock toggle, sign out).
+//  The signed-in shell — a ZStack tab-switcher (no stock SwiftUI TabView)
+//  with the floating cream `CustomTabBar` shared with the client app. The
+//  stock TabView's >5-tab "More" overflow was an unthemed system table that
+//  rendered black in dark mode; this replaces it with a styled
+//  `StaffMoreView` hub that lists the overflow lanes as Boho nav cards.
+//
+//  Role-aware tab split:
+//    • lanes ≤ 5  → show all directly.
+//    • lanes  > 5 → first 4 primary + a "More" tab (the styled hub) for the
+//                   rest. Owner/admin/manager have 7 lanes, so Reports /
+//                   Messages / Search land in More.
+//
+//  Tabs are lazy-loaded — only visited tabs are instantiated; visited tabs
+//  stay alive (opacity 0, hit-testing off) so their state persists across
+//  switches. Mirrors the client app's MainTabView pattern.
 //
 
 import SwiftUI
 
 struct StaffHomeShell: View {
     let role: StaffRole
-    @State private var selection: StaffCapability
+    @State private var selection: Int
+    @State private var visited: Set<Int>
     @State private var showAccount = false
 
     init(role: StaffRole) {
         self.role = role
-        _selection = State(initialValue: StaffPermissions.defaultHome(for: role))
+        let allLanes = StaffPermissions.capabilities(for: role)
+        let defaultIndex = allLanes.firstIndex(of: StaffPermissions.defaultHome(for: role)) ?? 0
+        _selection = State(initialValue: defaultIndex)
+        _visited = State(initialValue: [defaultIndex])
     }
+
+    // MARK: - Role-aware tab split
 
     private var lanes: [StaffCapability] { StaffPermissions.capabilities(for: role) }
+    private var primaryLanes: [StaffCapability] {
+        lanes.count <= 5 ? lanes : Array(lanes.prefix(4))
+    }
+    private var overflowLanes: [StaffCapability] {
+        lanes.count <= 5 ? [] : Array(lanes.dropFirst(4))
+    }
+    private var hasMore: Bool { !overflowLanes.isEmpty }
+    private var moreIndex: Int { primaryLanes.count }
+
+    private var tabItems: [SnoutTabItem] {
+        var items = primaryLanes.map { SnoutTabItem(icon: laneSymbol($0), label: laneTitle($0)) }
+        if hasMore {
+            items.append(SnoutTabItem(icon: "ellipsis.circle.fill", label: "More"))
+        }
+        return items
+    }
+
+    // MARK: - Body
 
     var body: some View {
-        TabView(selection: $selection) {
-            ForEach(lanes, id: \.self) { lane in
-                NavigationStack {
-                    laneContent(lane)
-                        .navigationTitle(laneTitle(lane))
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button {
-                                    showAccount = true
-                                } label: {
-                                    Image(systemName: "person.crop.circle")
-                                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
-                                }
-                            }
-                        }
+        ZStack(alignment: .bottom) {
+            SnoutTheme.background.ignoresSafeArea()
+
+            ZStack {
+                ForEach(primaryLanes.indices, id: \.self) { index in
+                    primaryTab(index)
                 }
-                .tabItem {
-                    Label(laneTitle(lane), systemImage: laneSymbol(lane))
-                }
-                .tag(lane)
+                if hasMore { moreTab }
             }
+            // Reserve room at the bottom for the floating bar so content
+            // doesn't slide under it. Matches the client's MainTabView.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Color.clear.frame(height: 70)
+            }
+
+            CustomTabBar(selection: $selection, items: tabItems)
+                .padding(.bottom, 8)
         }
-        .tint(SnoutTheme.accent)
-        .sheet(isPresented: $showAccount) {
-            AccountSheet()
+        .onChange(of: selection) { _, newValue in
+            visited.insert(newValue)
+        }
+        .sheet(isPresented: $showAccount) { AccountSheet() }
+    }
+
+    @ViewBuilder
+    private func primaryTab(_ index: Int) -> some View {
+        if visited.contains(index) {
+            NavigationStack {
+                laneContent(primaryLanes[index])
+                    .navigationTitle(laneTitle(primaryLanes[index]))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { accountToolbar }
+            }
+            .opacity(selection == index ? 1 : 0)
+            .allowsHitTesting(selection == index)
         }
     }
+
+    @ViewBuilder
+    private var moreTab: some View {
+        if visited.contains(moreIndex) {
+            NavigationStack {
+                StaffMoreView(
+                    lanes: overflowLanes,
+                    laneTitle: laneTitle,
+                    laneSymbol: laneSymbol,
+                    laneSubtitle: laneSubtitle,
+                    laneTint: laneTint,
+                    laneContent: { AnyView(laneContent($0)) }
+                )
+                .navigationTitle("More")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar { accountToolbar }
+            }
+            .opacity(selection == moreIndex ? 1 : 0)
+            .allowsHitTesting(selection == moreIndex)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var accountToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button { showAccount = true } label: {
+                Image(systemName: "person.crop.circle")
+                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
+            }
+        }
+    }
+
+    // MARK: - Lane → view + metadata
 
     /// Real screen for lanes that are built; placeholder for the rest.
     @ViewBuilder
     private func laneContent(_ lane: StaffCapability) -> some View {
         switch lane {
-        case .dashboard:
-            StaffDashboardView()
-        case .schedule:
-            StaffScheduleView()
-        case .grooming:
-            StaffGroomingView()
-        case .training:
-            StaffTrainingView()
-        case .reportCards:
-            StaffReportsView()
-        case .messaging:
-            StaffMessagingView()
-        case .petsOwners:
-            StaffLookupView()
-        default:
-            LanePlaceholderView(lane: lane)
+        case .dashboard:   StaffDashboardView()
+        case .schedule:    StaffScheduleView()
+        case .grooming:    StaffGroomingView()
+        case .training:    StaffTrainingView()
+        case .reportCards: StaffReportsView()
+        case .messaging:   StaffMessagingView()
+        case .petsOwners:  StaffLookupView()
+        default:           LanePlaceholderView(lane: lane)
         }
     }
 
@@ -106,9 +173,104 @@ struct StaffHomeShell: View {
         case .shifts:      return "clock.fill"
         }
     }
+
+    private func laneSubtitle(_ lane: StaffCapability) -> String {
+        switch lane {
+        case .dashboard:   return "Business overview"
+        case .schedule:    return "Today's pack"
+        case .grooming:    return "Grooming appointments"
+        case .training:    return "Classes and attendance"
+        case .reportCards: return "Write report cards and log care"
+        case .messaging:   return "Message pet parents"
+        case .petsOwners:  return "Look up pets and owners"
+        case .pos:         return "Point of sale"
+        case .analytics:   return "Trends and reports"
+        case .shifts:      return "Staff shifts"
+        }
+    }
+
+    private func laneTint(_ lane: StaffCapability) -> Color {
+        switch lane {
+        case .dashboard:   return SnoutTheme.cotton
+        case .schedule:    return SnoutTheme.blueberry
+        case .grooming:    return SnoutTheme.cotton
+        case .training:    return SnoutTheme.mist
+        case .reportCards: return SnoutTheme.vanilla
+        case .messaging:   return SnoutTheme.frost
+        case .petsOwners:  return SnoutTheme.mist
+        default:           return SnoutTheme.vanilla
+        }
+    }
 }
 
-/// Temporary per-lane placeholder until the real feature screens land.
+// MARK: - Styled More hub (mirrors the client's MoreView)
+
+private struct StaffMoreView: View {
+    let lanes: [StaffCapability]
+    let laneTitle: (StaffCapability) -> String
+    let laneSymbol: (StaffCapability) -> String
+    let laneSubtitle: (StaffCapability) -> String
+    let laneTint: (StaffCapability) -> Color
+    let laneContent: (StaffCapability) -> AnyView
+
+    var body: some View {
+        ZStack {
+            SnoutTheme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: SnoutTheme.Spacing.md) {
+                    VStack(spacing: 0) {
+                        ForEach(lanes.indices, id: \.self) { i in
+                            let lane = lanes[i]
+                            NavigationLink {
+                                laneContent(lane)
+                                    .navigationTitle(laneTitle(lane))
+                                    .navigationBarTitleDisplayMode(.inline)
+                            } label: {
+                                navRow(lane: lane)
+                            }
+                            .buttonStyle(.plain)
+                            if i < lanes.count - 1 {
+                                Divider()
+                                    .background(SnoutTheme.divider)
+                                    .padding(.leading, 76)
+                            }
+                        }
+                    }
+                    .snoutCard(padding: 0)
+                    Spacer(minLength: SnoutTheme.Spacing.xxl)
+                }
+                .padding(.horizontal, SnoutTheme.Spacing.xl)
+                .padding(.top, SnoutTheme.Spacing.md)
+            }
+            .scrollContentBackground(.hidden)
+        }
+    }
+
+    private func navRow(lane: StaffCapability) -> some View {
+        HStack(spacing: SnoutTheme.Spacing.lg) {
+            ZStack {
+                Circle().fill(laneTint(lane)).frame(width: 40, height: 40)
+                SnoutGlyph(laneSymbol(lane), size: 16, weight: .semibold)
+                    .foregroundStyle(SnoutTheme.onSurface)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(laneTitle(lane))
+                    .font(SnoutTheme.body(16, weight: .semibold))
+                    .foregroundStyle(SnoutTheme.onSurface)
+                Text(laneSubtitle(lane))
+                    .font(SnoutTheme.bodySM)
+                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
+            }
+            Spacer()
+            SnoutGlyph("chevron.right", size: 13, weight: .semibold)
+                .foregroundStyle(SnoutTheme.onSurfaceFaint)
+        }
+        .padding(SnoutTheme.Spacing.lg)
+    }
+}
+
+// MARK: - Placeholder for lanes that aren't built yet
+
 private struct LanePlaceholderView: View {
     let lane: StaffCapability
     @EnvironmentObject private var staff: CurrentStaffService
@@ -154,6 +316,8 @@ private struct LanePlaceholderView: View {
         }
     }
 }
+
+// MARK: - Account sheet
 
 private struct AccountSheet: View {
     @EnvironmentObject private var auth: AuthService

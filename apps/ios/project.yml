@@ -105,6 +105,12 @@ targets:
       - path: Snout/Services/AuthService.swift
       - path: Snout/Models
       - path: Snout/Utilities
+      # Custom tab bar chrome shared with the client app: the floating cream
+      # pill + branded SnoutGlyph icons. Replaces SwiftUI's stock TabView so
+      # the staff app no longer falls back to the system >5-tab "More" list
+      # or dark-mode chrome.
+      - path: Snout/Views/CustomTabBar.swift
+      - path: Snout/Views/Components/SnoutGlyph.swift
       # Resources are declared as per-file `sources` with buildPhase: resources
       # (NOT under a `resources:` block). The Snout target's `sources:[path:Snout]`
       # directory walk already claims these files, and XcodeGen will not duplicate
