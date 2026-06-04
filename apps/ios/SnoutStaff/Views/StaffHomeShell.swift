@@ -269,6 +269,131 @@ private struct StaffMoreView: View {
     }
 }
 
+// MARK: - Push diagnostics panel
+//
+// Surfaces the StaffPushService state so a tester can see whether the
+// push chain is reaching their phone without scraping device logs or
+// asking an engineer. Lives in More because it's a "tools" surface, not
+// a daily-use lane.
+
+private struct PushDiagnosticsPanel: View {
+    @StateObject private var push = StaffPushService.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.md) {
+            HStack(spacing: SnoutTheme.Spacing.md) {
+                ZStack {
+                    Circle().fill(SnoutTheme.frost).frame(width: 36, height: 36)
+                    SnoutGlyph("bell.fill", size: 14, weight: .semibold)
+                        .foregroundStyle(SnoutTheme.onSurface)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Push diagnostics")
+                        .font(SnoutTheme.body(15, weight: .semibold))
+                        .foregroundStyle(SnoutTheme.onSurface)
+                    Text("Notification permission, last APNs token, last server upsert")
+                        .font(SnoutTheme.bodySM)
+                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                }
+                Spacer()
+            }
+
+            Divider().background(SnoutTheme.divider)
+
+            row("Permission", value: permissionLabel, valueColor: permissionTint)
+            row("Registration attempts", value: "\(push.diagnostic.registrationAttempts)")
+            row("Last APNs token", value: tokenLabel)
+            row("Last server upsert", value: upsertLabel, valueColor: upsertTint)
+
+            if let err = push.diagnostic.lastError, !err.isEmpty {
+                Divider().background(SnoutTheme.divider)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Last error")
+                        .font(SnoutTheme.labelSM)
+                        .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                    Text(err)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(Color.red.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Button {
+                Task { await push.retryRegistration() }
+            } label: {
+                HStack(spacing: SnoutTheme.Spacing.sm) {
+                    SnoutGlyph("arrow.clockwise", size: 12, weight: .semibold)
+                    Text("Retry registration")
+                        .font(SnoutTheme.body(13, weight: .semibold))
+                }
+                .foregroundStyle(SnoutTheme.onSurface)
+                .padding(.horizontal, SnoutTheme.Spacing.md)
+                .padding(.vertical, SnoutTheme.Spacing.sm)
+                .background(SnoutTheme.vanilla)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, SnoutTheme.Spacing.xs)
+        }
+        .padding(SnoutTheme.Spacing.lg)
+        .snoutCard(padding: 0)
+    }
+
+    private func row(_ label: String, value: String, valueColor: Color = SnoutTheme.onSurface) -> some View {
+        HStack(alignment: .top) {
+            Text(label)
+                .font(SnoutTheme.bodySM)
+                .foregroundStyle(SnoutTheme.onSurfaceMuted)
+            Spacer(minLength: SnoutTheme.Spacing.md)
+            Text(value)
+                .font(SnoutTheme.body(13, weight: .medium))
+                .foregroundStyle(valueColor)
+                .multilineTextAlignment(.trailing)
+        }
+    }
+
+    private var permissionLabel: String {
+        switch push.diagnostic.permission {
+        case .authorized:   return "Allowed"
+        case .denied:       return "Denied (Settings → Snout Staff → Notifications)"
+        case .provisional:  return "Provisional"
+        case .ephemeral:    return "Ephemeral"
+        case .notDetermined: return "Not yet requested"
+        @unknown default:   return "Unknown"
+        }
+    }
+
+    private var permissionTint: Color {
+        switch push.diagnostic.permission {
+        case .authorized, .provisional: return SnoutTheme.onSurface
+        case .denied: return .red
+        default: return SnoutTheme.onSurfaceMuted
+        }
+    }
+
+    private var tokenLabel: String {
+        guard let received = push.diagnostic.lastTokenReceivedAt else { return "Never" }
+        let suffix = push.diagnostic.lastTokenSuffix ?? ""
+        return "\(received.formatted(.dateTime.hour().minute()))  …\(suffix)"
+    }
+
+    private var upsertLabel: String {
+        if let ok = push.diagnostic.lastUpsertSucceededAt {
+            return "OK · \(ok.formatted(.dateTime.hour().minute()))"
+        }
+        if let fail = push.diagnostic.lastUpsertFailureAt {
+            return "Failed · \(fail.formatted(.dateTime.hour().minute()))"
+        }
+        return "Never"
+    }
+
+    private var upsertTint: Color {
+        if push.diagnostic.lastUpsertSucceededAt != nil { return SnoutTheme.onSurface }
+        if push.diagnostic.lastUpsertFailureAt != nil { return .red }
+        return SnoutTheme.onSurfaceMuted
+    }
+}
+
 // MARK: - Placeholder for lanes that aren't built yet
 
 private struct LanePlaceholderView: View {
@@ -329,51 +454,59 @@ private struct AccountSheet: View {
         NavigationStack {
             ZStack {
                 SnoutTheme.background.ignoresSafeArea()
-                VStack(alignment: .leading, spacing: SnoutTheme.Spacing.lg) {
-                    VStack(alignment: .leading, spacing: SnoutTheme.Spacing.xs) {
-                        Text(staff.displayName.isEmpty ? "Signed in" : staff.displayName)
-                            .font(SnoutTheme.titleMD)
-                            .foregroundStyle(SnoutTheme.onSurface)
-                        if let role = staff.role {
-                            Text(role.label.uppercased())
-                                .font(SnoutTheme.labelSM)
-                                .tracking(0.8)
-                                .foregroundStyle(SnoutTheme.onSurfaceMuted)
-                        }
-                    }
-
-                    if lock.biometryAvailable {
-                        Toggle(isOn: $lock.enabled) {
-                            Text("Require Face ID / passcode to open")
-                                .font(SnoutTheme.bodyMD)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: SnoutTheme.Spacing.lg) {
+                        VStack(alignment: .leading, spacing: SnoutTheme.Spacing.xs) {
+                            Text(staff.displayName.isEmpty ? "Signed in" : staff.displayName)
+                                .font(SnoutTheme.titleMD)
                                 .foregroundStyle(SnoutTheme.onSurface)
+                            if let role = staff.role {
+                                Text(role.label.uppercased())
+                                    .font(SnoutTheme.labelSM)
+                                    .tracking(0.8)
+                                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                            }
                         }
-                        .tint(SnoutTheme.accent)
-                        .padding(SnoutTheme.Spacing.md)
-                        .background(SnoutTheme.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
-                    }
 
-                    Spacer()
-
-                    Button {
-                        Task {
-                            await auth.signOut()
-                            staff.reset()
-                        }
-                    } label: {
-                        Text("Sign out")
-                            .font(SnoutTheme.body(15, weight: .semibold))
-                            .foregroundStyle(SnoutTheme.destructive)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, SnoutTheme.Spacing.md)
+                        if lock.biometryAvailable {
+                            Toggle(isOn: $lock.enabled) {
+                                Text("Require Face ID / passcode to open")
+                                    .font(SnoutTheme.bodyMD)
+                                    .foregroundStyle(SnoutTheme.onSurface)
+                            }
+                            .tint(SnoutTheme.accent)
+                            .padding(SnoutTheme.Spacing.md)
                             .background(SnoutTheme.surface)
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(SnoutTheme.destructive.opacity(0.4), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+                        }
+
+                        // Visible to every role: shows whether push notifications
+                        // have permission, whether APNs has handed us a token,
+                        // and whether the device_tokens upsert succeeded. Lets
+                        // testers self-diagnose without scraping logs.
+                        PushDiagnosticsPanel()
+
+                        Button {
+                            Task {
+                                await auth.signOut()
+                                staff.reset()
+                            }
+                        } label: {
+                            Text("Sign out")
+                                .font(SnoutTheme.body(15, weight: .semibold))
+                                .foregroundStyle(SnoutTheme.destructive)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, SnoutTheme.Spacing.md)
+                                .background(SnoutTheme.surface)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(SnoutTheme.destructive.opacity(0.4), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, SnoutTheme.Spacing.md)
                     }
-                    .buttonStyle(.plain)
+                    .padding(SnoutTheme.Spacing.xl)
                 }
-                .padding(SnoutTheme.Spacing.xl)
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("Account")
             .navigationBarTitleDisplayMode(.inline)
