@@ -173,14 +173,33 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGN_IDENTITY: ""
-        CODE_SIGNING_REQUIRED: NO
-        CODE_SIGNING_ALLOWED: NO
         # Wires Push Notifications + aps-environment=production into the
         # signed app. Required for the staff iOS app to register an APNs
         # device token (the staff app upserts it into device_tokens, the
         # send-staff-push edge function delivers via api.push.apple.com).
         CODE_SIGN_ENTITLEMENTS: SnoutStaff/Resources/SnoutStaff.entitlements
+      configs:
+        Debug:
+          # Local Xcode builds skip signing so contributors can `xcodegen
+          # generate && Build` without provisioning-profile setup. The
+          # entitlement file is still listed above but is a no-op when
+          # signing is disabled.
+          CODE_SIGN_IDENTITY: ""
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
+        Release:
+          # Release builds (i.e. Xcode Cloud archives → TestFlight) must
+          # actually sign so the aps-environment entitlement gets baked
+          # into the binary. With CODE_SIGNING_ALLOWED=NO on Release,
+          # Xcode Cloud's distribution re-sign step inherits an unsigned
+          # archive with no entitlement metadata and ships an .ipa that
+          # iOS rejects with "no valid 'aps-environment' entitlement
+          # string found for application" at registerForRemoteNotifications
+          # time. Leaving the codesign-allowed defaults in place lets
+          # automatic signing pick up the W55RNZ9Q4Q distribution profile
+          # (push capability enabled on the App ID) and embed the
+          # entitlement file.
+          CODE_SIGN_STYLE: Automatic
     dependencies:
       - package: Supabase
         product: Supabase
