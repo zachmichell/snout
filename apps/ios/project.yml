@@ -11,7 +11,12 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    DEVELOPMENT_TEAM: ""
+    # Apple Developer Team that owns the org.snoutapp.snout / .snoutstaff App
+    # IDs and signs the TestFlight builds. Pinning it here (vs leaving "")
+    # stops Xcode from rewriting DevelopmentTeam in pbxproj whenever someone
+    # opens the project locally — the empty string was the source of the
+    # recurring git churn called out in #34.
+    DEVELOPMENT_TEAM: W55RNZ9Q4Q
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     MARKETING_VERSION: "0.1.0"
@@ -79,9 +84,11 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: NO
-        # Until a paid Apple Developer team is set up, skip signing entirely.
-        # When you do add a team, replace these with DEVELOPMENT_TEAM: "<TEAMID>"
-        # and remove the three lines below.
+        # Local Xcode builds skip signing entirely — Snout's distribution
+        # path is Xcode Cloud → TestFlight, which overrides these settings
+        # at archive time and signs with the W55RNZ9Q4Q distribution cert.
+        # Keeping this off here means contributors can open + build the
+        # project without any provisioning-profile setup.
         CODE_SIGN_IDENTITY: ""
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGNING_ALLOWED: NO
