@@ -207,3 +207,40 @@ struct StaffGroomingBadge: View {
         status == "cancelled" ? SnoutTheme.onSurfaceMuted : SnoutTheme.onSurface
     }
 }
+
+// MARK: - Load error banner
+//
+// Surfaces a load failure that would otherwise leave the view silently
+// empty. Tap-to-dismiss isn't enough on its own — the goal is for the
+// user to know "this isn't blank because there's nothing; it's blank
+// because the query failed, and here's why." Used by the Dashboard,
+// Messaging, and Lookup viewmodels.
+
+struct LoadErrorBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: SnoutTheme.Spacing.md) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.orange)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Couldn't load")
+                    .font(SnoutTheme.body(13, weight: .semibold))
+                    .foregroundStyle(SnoutTheme.onSurface)
+                Text(message)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(SnoutTheme.onSurfaceMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(SnoutTheme.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: SnoutTheme.radiusCard, style: .continuous)
+                .stroke(Color.orange.opacity(0.4), lineWidth: 1)
+        )
+    }
+}

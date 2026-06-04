@@ -160,17 +160,25 @@ struct StaffHomeShell: View {
     }
 
     private func laneSymbol(_ lane: StaffCapability) -> String {
+        // Names without ".fill" match the custom Boho imagesets in
+        // Assets.xcassets/Glyphs (house, doc.text, calendar, etc.) and
+        // SnoutGlyph prefers those over the SF Symbol. Earlier this
+        // function used the "<name>.fill" SF Symbol names, which had no
+        // custom asset → fell back to SF Symbols → some symbols (house.fill,
+        // doc.text.fill) rendered blank in the staff tab bar / More hub.
+        // Using the base names lets every site pick up the brand glyph
+        // automatically.
         switch lane {
-        case .dashboard:   return "house.fill"
+        case .dashboard:   return "house"
         case .schedule:    return "calendar"
         case .grooming:    return "scissors"
-        case .training:    return "graduationcap.fill"
-        case .reportCards: return "doc.text.fill"
-        case .messaging:   return "message.fill"
+        case .training:    return "graduationcap"
+        case .reportCards: return "doc.text"
+        case .messaging:   return "message"
         case .petsOwners:  return "magnifyingglass"
-        case .pos:         return "creditcard.fill"
-        case .analytics:   return "chart.bar.fill"
-        case .shifts:      return "clock.fill"
+        case .pos:         return "creditcard"
+        case .analytics:   return "chart.bar"
+        case .shifts:      return "clock"
         }
     }
 

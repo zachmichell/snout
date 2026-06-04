@@ -17,6 +17,7 @@ final class StaffLookupViewModel: ObservableObject {
     @Published var pets: [Pet] = []
     @Published var owners: [Owner] = []
     @Published var isLoading = false
+    @Published var loadError: String?
 
     private let client = SupabaseClientProvider.shared
     private var task: Task<Void, Never>?
@@ -53,8 +54,13 @@ final class StaffLookupViewModel: ObservableObject {
                 }
                 owners = try await query.order("last_name").limit(40).execute().value
             }
+            loadError = nil
         } catch {
-            // Non-fatal; leave previous results.
+            let raw = String(describing: error)
+            loadError = String(raw.prefix(220))
+            #if DEBUG
+            print("[StaffLookupViewModel] search failed: \(error)")
+            #endif
         }
     }
 }
@@ -76,6 +82,11 @@ struct StaffLookupView: View {
                 .onChange(of: vm.mode) { _, _ in runSearch() }
 
                 searchField
+
+                if let err = vm.loadError {
+                    LoadErrorBanner(message: err)
+                        .padding(.horizontal, SnoutTheme.Spacing.xl)
+                }
 
                 ScrollView {
                     LazyVStack(spacing: SnoutTheme.Spacing.sm) {
