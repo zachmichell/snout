@@ -3,15 +3,22 @@
 <plist version="1.0">
 <dict>
 	<!--
-	  Push Notifications capability for the staff app. Not yet wired into the
-	  target (CODE_SIGN_ENTITLEMENTS) because the project builds unsigned
-	  (no Apple Developer team configured). When signing is set up:
-	    1. Enable Push Notifications on the org.snoutapp.snoutstaff App ID.
-	    2. Add `CODE_SIGN_ENTITLEMENTS: SnoutStaff/Resources/SnoutStaff.entitlements`
-	       to the SnoutStaff target settings in project.yml.
-	    3. Switch aps-environment to "production" for App Store / TestFlight.
+	  Push Notifications capability for the staff app.
+
+	  aps-environment = "production" because the staff app's only distribution
+	  channel is TestFlight / App Store (Xcode Cloud signs with the
+	  distribution cert). Local Xcode dev builds against this entitlement
+	  will fail token registration — that's expected; debug push end-to-end
+	  through a TestFlight build instead.
+
+	  Wired into the SnoutStaff target via CODE_SIGN_ENTITLEMENTS in
+	  apps/ios/project.yml. Make sure Push Notifications is enabled on the
+	  org.snoutapp.snoutstaff App ID in the Apple Developer portal, and that
+	  an APNs Auth Key (.p8) is uploaded — the send-staff-push edge function
+	  needs APNS_KEY_ID, APNS_TEAM_ID, and APNS_PRIVATE_KEY as Supabase
+	  secrets to actually deliver pushes.
 	-->
 	<key>aps-environment</key>
-	<string>development</string>
+	<string>production</string>
 </dict>
 </plist>
