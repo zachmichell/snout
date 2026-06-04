@@ -16,13 +16,20 @@ import Supabase
 final class StaffDashboardViewModel: ObservableObject {
     @Published var rows: [ScheduleReservation] = []
     @Published var isLoading = false
+    @Published var loadError: String?
+    @Published var lastLoadedAt: Date?
 
     private let client = SupabaseClientProvider.shared
     private static let graph =
         "id, status, start_at, end_at, notes, service:services(id, name), owner:owners!primary_owner_id(id, first_name, last_name), reservation_pets(pet:pets(id, name, species))"
 
-    private var startOfToday = Calendar.current.startOfDay(for: Date())
-    private var endOfToday: Date { Calendar.current.date(byAdding: DateComponents(day: 1, second: -1), to: startOfToday) ?? Date() }
+    // Recomputed at every load() so a long-running app session doesn't
+    // freeze "today" on the date the viewmodel was first instantiated.
+    private func todayWindow() -> (start: Date, end: Date) {
+        let start = Calendar.current.startOfDay(for: Date())
+        let end = Calendar.current.date(byAdding: DateComponents(day: 1, second: -1), to: start) ?? Date()
+        return (start, end)
+    }
 
     func load(organizationId: String) async {
         isLoading = true
@@ -32,20 +39,30 @@ final class StaffDashboardViewModel: ObservableObject {
             rows = cached
         }
         let iso = ISO8601DateFormatter()
+        let window = todayWindow()
         do {
             let result: [ScheduleReservation] = try await client.from("reservations")
                 .select(Self.graph)
                 .eq("organization_id", value: organizationId)
                 .is("deleted_at", value: nil)
                 .in("status", values: ["requested", "confirmed", "checked_in", "checked_out"])
-                .lte("start_at", value: iso.string(from: endOfToday))
-                .gte("end_at", value: iso.string(from: startOfToday))
+                .lte("start_at", value: iso.string(from: window.end))
+                .gte("end_at", value: iso.string(from: window.start))
                 .order("start_at", ascending: true)
                 .execute().value
             rows = result
             StaffCache.save(result, key: key)
+            loadError = nil
+            lastLoadedAt = Date()
         } catch {
-            // Offline: keep cached rows if we have them.
+            // Surface the error so the user (and we) can see what's wrong
+            // instead of staring at an empty dashboard that "fails open"
+            // to a previous cache. Keeps cached rows on a transient blip.
+            let raw = String(describing: error)
+            loadError = String(raw.prefix(220))
+            #if DEBUG
+            print("[StaffDashboardViewModel] load failed: \(error)")
+            #endif
         }
     }
 
@@ -86,6 +103,7 @@ struct StaffDashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SnoutTheme.Spacing.lg) {
                     greeting
+                    if let err = vm.loadError { LoadErrorBanner(message: err) }
                     statGrid
                     pendingSection
                     Spacer(minLength: SnoutTheme.Spacing.xxl)

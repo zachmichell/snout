@@ -48,8 +48,15 @@ final class StaffMessagingViewModel: ObservableObject {
                 .eq("organization_id", value: organizationId)
                 .order("last_message_at", ascending: false)
                 .execute().value
+            loadError = nil
         } catch {
-            loadError = error.localizedDescription
+            // Surface the full error so the user (and we) can see why
+            // the lane is empty instead of getting a silent fall-through.
+            let raw = String(describing: error)
+            loadError = String(raw.prefix(220))
+            #if DEBUG
+            print("[StaffMessagingViewModel] load failed: \(error)")
+            #endif
         }
     }
 }
@@ -63,9 +70,12 @@ struct StaffMessagingView: View {
             SnoutTheme.background.ignoresSafeArea()
             ScrollView {
                 VStack(spacing: SnoutTheme.Spacing.sm) {
+                    if let err = vm.loadError {
+                        LoadErrorBanner(message: err)
+                    }
                     if vm.isLoading && vm.conversations.isEmpty {
                         ProgressView().tint(SnoutTheme.accent).frame(maxWidth: .infinity).padding(.top, SnoutTheme.Spacing.xxl)
-                    } else if vm.conversations.isEmpty {
+                    } else if vm.conversations.isEmpty && vm.loadError == nil {
                         emptyState
                     } else {
                         ForEach(vm.conversations) { c in
