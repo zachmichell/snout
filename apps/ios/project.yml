@@ -169,6 +169,11 @@ targets:
         CODE_SIGN_IDENTITY: ""
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGNING_ALLOWED: NO
+        # Wires Push Notifications + aps-environment=production into the
+        # signed app. Required for the staff iOS app to register an APNs
+        # device token (the staff app upserts it into device_tokens, the
+        # send-staff-push edge function delivers via api.push.apple.com).
+        CODE_SIGN_ENTITLEMENTS: SnoutStaff/Resources/SnoutStaff.entitlements
     dependencies:
       - package: Supabase
         product: Supabase

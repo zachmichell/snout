@@ -986,6 +986,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_ENTITLEMENTS = SnoutStaff/Resources/SnoutStaff.entitlements;
 				CODE_SIGN_IDENTITY = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SnoutStaff/Resources/Info.plist;
@@ -1223,6 +1224,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_ENTITLEMENTS = SnoutStaff/Resources/SnoutStaff.entitlements;
 				CODE_SIGN_IDENTITY = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SnoutStaff/Resources/Info.plist;
