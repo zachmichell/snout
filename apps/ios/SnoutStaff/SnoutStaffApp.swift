@@ -22,6 +22,10 @@ final class StaffAppDelegate: NSObject, UIApplicationDelegate {
     }
     func application(_ application: UIApplication,
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        // Surface the failure into the diagnostics panel — typically a
+        // provisioning-profile / push-capability mismatch and the most
+        // useful clue when no token ever arrives.
+        Task { @MainActor in StaffPushService.shared.didFailToRegister(error: error) }
         #if DEBUG
         print("[StaffAppDelegate] APNs registration failed: \(error.localizedDescription)")
         #endif

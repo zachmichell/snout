@@ -121,10 +121,28 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Service-role gate.
+    // Service-role gate. With verify_jwt: true Supabase already verified
+    // the JWT signature against the project's JWT secret before this
+    // handler runs, so it's safe to decode the payload without re-checking
+    // the signature. We just need to confirm the role claim — that's what
+    // distinguishes the DB trigger (service_role) from a regular signed-in
+    // user (authenticated). Doing this in-handler (vs trusting an env-var
+    // string match against SUPABASE_SERVICE_ROLE_KEY) survives service-role
+    // key rotations cleanly — the env var and vault can drift, but a
+    // freshly-rotated service-role JWT still carries role=service_role.
     const auth = req.headers.get("Authorization") ?? "";
-    if (auth.replace(/^Bearer\s+/i, "") !== SUPABASE_SERVICE_ROLE_KEY) {
-      return json({ error: "Forbidden" }, 403);
+    const callerJwt = auth.replace(/^Bearer\s+/i, "");
+    let role: string | undefined;
+    try {
+      const seg = callerJwt.split(".")[1] ?? "";
+      const padded = seg + "=".repeat((4 - (seg.length % 4)) % 4);
+      const payload = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+      role = (JSON.parse(payload) as { role?: string }).role;
+    } catch {
+      // malformed JWT — role stays undefined, request gets rejected below
+    }
+    if (role !== "service_role") {
+      return json({ error: "Forbidden", reason: "service_role required" }, 403);
     }
     if (!APNS_KEY_ID || !APNS_TEAM_ID || !APNS_PRIVATE_KEY) {
       return json(
