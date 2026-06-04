@@ -55,7 +55,12 @@ enum StaffPermissions {
     static func capabilities(for role: StaffRole) -> [StaffCapability] {
         switch role {
         case .owner, .admin, .manager:
-            return [.dashboard, .schedule, .grooming, .training, .reportCards, .messaging, .petsOwners]
+            // No standalone Schedule lane: Home (dashboard) already shows
+            // today's pending / arrivals / in-house / departures and each
+            // tile drills into the same list with check-in/out, so a Today
+            // tab would be a redundant view of the same data. Messaging
+            // takes the 2nd primary slot so it's one tap from any screen.
+            return [.dashboard, .messaging, .grooming, .training, .reportCards, .petsOwners]
         case .supervisor:
             return [.schedule, .grooming, .training, .reportCards, .messaging, .petsOwners]
         case .staff:
