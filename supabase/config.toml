@@ -1,5 +1,14 @@
 project_id = "empdnuzfjgfnphwauhah"
 
+# Disable the Logflare-backed analytics service (and its Vector dependency).
+# Without this, the Supabase CLI's `supabase start` exits with a 409
+# "FeatureNotEnabled: Vector service not configured" after containers come
+# up — it tries to provision Vector buckets even when the service isn't
+# usable. The integration tests don't read analytics; the Studio log views
+# stay disabled but everything else works.
+[analytics]
+enabled = false
+
 [functions.stripe-connect-webhook]
 verify_jwt = false
 

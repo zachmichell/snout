@@ -63,10 +63,17 @@ jobs:
           node-version: "20"
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: `latest` ships a `supabase start` that always runs an
+          # "Updating vector buckets" post-init step, even with `-x vector`
+          # and `[analytics] enabled = false` — it exits 409 in CI because
+          # Vector isn't reachable. 1.226.4 is a known-real release that
+          # predates that regression and starts cleanly with Postgres /
+          # PostgREST / GoTrue / Storage / Realtime — all the integration
+          # tests need.
+          version: 1.226.4
 
       - name: Start local Supabase
-        run: supabase start
+        run: supabase start -x vector,logflare,analytics,studio
 
       - name: Capture Supabase env
         id: supabase
