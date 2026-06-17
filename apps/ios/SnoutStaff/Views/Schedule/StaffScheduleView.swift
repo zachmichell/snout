@@ -21,7 +21,14 @@ struct ScheduleReservation: Codable, Identifiable, Hashable {
     let notes: String?
     let service: NamedRef?
     let owner: OwnerRef?
-    let reservationPets: [PetJoin]
+    // reservation_pets has a UNIQUE (reservation_id) constraint
+    // (`reservation_pets_one_per_reservation`), so PostgREST infers a
+    // one-to-one relationship and returns a single embedded object — not
+    // an array. Decoding as `[PetJoin]` silently failed every dashboard /
+    // schedule load with "Expected to decode Array<Any> but found a
+    // dictionary instead." Visible now only because the load-error
+    // banner from #89 surfaces what was being swallowed.
+    let reservationPets: PetJoin?
 
     enum CodingKeys: String, CodingKey {
         case id, status, notes, service, owner
@@ -41,8 +48,7 @@ struct ScheduleReservation: Codable, Identifiable, Hashable {
     struct PetRef: Codable, Hashable { let id: String; let name: String; let species: String? }
 
     var petNames: String {
-        let names = reservationPets.compactMap { $0.pet?.name }
-        return names.isEmpty ? "Pet" : names.joined(separator: ", ")
+        reservationPets?.pet?.name ?? "Pet"
     }
     var ownerName: String {
         guard let o = owner else { return "" }
