@@ -15,6 +15,8 @@ export function depositStatusLabel(s: string) {
   switch (s) {
     case "pending":
       return "Pending";
+    case "processing":
+      return "Processing";
     case "paid":
       return "Paid";
     case "refunded":

@@ -335,6 +335,18 @@ async function handlePaymentIntentSucceeded(
   // purchase as an invoice payment.
   if (intent.metadata?.package_id) return;
 
+  // Deposit charges (collect-deposit → charge-saved-card) carry
+  // reference_type='deposit'. Reconcile them here so a deposit whose
+  // collect-deposit record-write failed (or whose charge outcome was
+  // indeterminate) still finalizes to 'paid' — independent of any client
+  // retry or Stripe's idempotency-key retention window. This is the durable
+  // backstop for the at-most-once deposit flow. Webhook signature is already
+  // verified upstream, so the metadata is trustworthy.
+  if (intent.metadata?.reference_type === "deposit") {
+    await reconcileDeposit(intent);
+    return;
+  }
+
   const invoiceId = intent.metadata?.invoice_id;
   if (!invoiceId) return;
 
@@ -373,6 +385,47 @@ async function handlePaymentIntentSucceeded(
   });
   if (rpcErr) {
     console.error(`apply_stripe_payment failed for invoice ${invoice.id}:`, rpcErr);
+  }
+}
+
+// Finalize a deposit charge to 'paid'. The durable backstop for the
+// collect-deposit at-most-once flow: if collect-deposit charged the card but
+// failed to record (or the charge outcome was indeterminate), the deposit is
+// left 'processing'; this flips it to 'paid' by id when the PaymentIntent
+// succeeds. Idempotent (only acts on pending/processing) and tenant-checked
+// against the PI metadata org.
+async function reconcileDeposit(intent: Stripe.PaymentIntent) {
+  const depositId = intent.metadata?.reference_id;
+  const metaOrg = intent.metadata?.organization_id;
+  if (!depositId) return;
+
+  const { data: dep } = await admin
+    .from("deposits")
+    .select("id, organization_id, status")
+    .eq("id", depositId)
+    .maybeSingle();
+  if (!dep) return;
+
+  if (metaOrg && dep.organization_id !== metaOrg) {
+    console.warn(`reconcileDeposit: PI org mismatch for deposit ${depositId}; skipping`);
+    return;
+  }
+  // Idempotent: only finalize a non-terminal deposit. If it's already paid /
+  // refunded / forfeited, leave it (collect-deposit recorded it already).
+  if (!["pending", "processing"].includes(dep.status)) return;
+
+  const { error } = await admin
+    .from("deposits")
+    .update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      stripe_payment_intent_id: intent.id,
+      collected_via: "saved_card",
+    })
+    .eq("id", depositId)
+    .in("status", ["pending", "processing"]);
+  if (error) {
+    console.error(`reconcileDeposit: failed to finalize deposit ${depositId}:`, error);
   }
 }
 
