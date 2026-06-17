@@ -1135,7 +1135,9 @@ export type Database = {
       deposits: {
         Row: {
           amount_cents: number
+          collected_via: string | null
           created_at: string
+          currency: string
           forfeited_at: string | null
           id: string
           notes: string | null
@@ -1147,11 +1149,14 @@ export type Database = {
           reservation_id: string | null
           service_id: string | null
           status: string
+          stripe_payment_intent_id: string | null
           updated_at: string
         }
         Insert: {
           amount_cents?: number
+          collected_via?: string | null
           created_at?: string
+          currency?: string
           forfeited_at?: string | null
           id?: string
           notes?: string | null
@@ -1163,11 +1168,14 @@ export type Database = {
           reservation_id?: string | null
           service_id?: string | null
           status?: string
+          stripe_payment_intent_id?: string | null
           updated_at?: string
         }
         Update: {
           amount_cents?: number
+          collected_via?: string | null
           created_at?: string
+          currency?: string
           forfeited_at?: string | null
           id?: string
           notes?: string | null
@@ -1179,6 +1187,7 @@ export type Database = {
           reservation_id?: string | null
           service_id?: string | null
           status?: string
+          stripe_payment_intent_id?: string | null
           updated_at?: string
         }
         Relationships: [

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, RefreshCcw, XCircle } from "lucide-react";
+import { CheckCircle2, CreditCard, RefreshCcw, XCircle } from "lucide-react";
 import PortalLayout from "@/components/portal/PortalLayout";
 import PageHeader from "@/components/portal/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +33,7 @@ function money(cents: number) {
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   pending: "secondary",
+  processing: "secondary",
   paid: "default",
   refunded: "outline",
   forfeited: "destructive",
@@ -78,8 +79,14 @@ export default function Deposits() {
         paid_at?: string;
         refunded_at?: string;
         forfeited_at?: string;
+        collected_via?: string;
       } = { status: newStatus };
-      if (newStatus === "paid") patch.paid_at = new Date().toISOString();
+      // "Mark paid" here is the offline path (cash / e-transfer) — tag it as
+      // manual so it's distinguishable from a real card charge.
+      if (newStatus === "paid") {
+        patch.paid_at = new Date().toISOString();
+        patch.collected_via = "manual";
+      }
       if (newStatus === "refunded") patch.refunded_at = new Date().toISOString();
       if (newStatus === "forfeited") patch.forfeited_at = new Date().toISOString();
       const { error } = await supabase.from("deposits").update(patch).eq("id", id);
@@ -96,6 +103,59 @@ export default function Deposits() {
       qc.invalidateQueries({ queryKey: ["deposits-list"] });
     },
     onError: (e: any) => toast.error(e.message ?? "Update failed"),
+  });
+
+  // Charge the owner's saved card off-session via the collect-deposit edge
+  // function (which composes the charge-saved-card keystone). Declines and
+  // "no card on file" come back as a structured { ok:false } so we can tell
+  // staff exactly why and let them fall back to Mark paid (cash/e-transfer).
+  const chargeCard = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { data, error } = await supabase.functions.invoke("collect-deposit", {
+        body: { deposit_id: id },
+      });
+      // Non-2xx responses surface as a FunctionsHttpError whose `.context` is
+      // the raw Response — read the structured {code,error} body so staff get
+      // an accurate, non-retry-inviting message (mirrors QuickBooksTab /
+      // HelcimPanel error handling elsewhere in the app).
+      if (error) {
+        const bodyResp = (error as { context?: Response }).context;
+        const body = bodyResp ? await bodyResp.json().catch(() => null) : null;
+        const code = (body as { code?: string } | null)?.code;
+        const serverMsg = (body as { error?: string } | null)?.error;
+        if (code === "not_pending") {
+          qc.invalidateQueries({ queryKey: ["deposits-list"] });
+          throw new Error("This deposit is no longer pending — the list has been refreshed.");
+        }
+        if (code === "idempotency_conflict") {
+          throw new Error("A conflicting charge already exists — check Stripe before retrying.");
+        }
+        if (code === "charge_unavailable") {
+          throw new Error("Charge outcome unknown — do not re-charge; it will reconcile automatically.");
+        }
+        throw new Error(serverMsg ?? "Charge failed — please try again.");
+      }
+      const res = data as { ok?: boolean; status?: string; code?: string; error?: string; needs_reconciliation?: boolean };
+      if (!res?.ok) {
+        const msg =
+          res?.code === "no_card"
+            ? "No saved card on file — collect manually or send a payment link."
+            : res?.status === "requires_action"
+              ? "The card needs authentication — ask the owner to confirm, or collect manually."
+              : res?.error ?? "Card was declined.";
+        throw new Error(msg);
+      }
+      return res;
+    },
+    onSuccess: (res) => {
+      if (res?.needs_reconciliation) {
+        toast.warning("Card charged, but the record is finalizing — do not re-charge. It will reconcile shortly.");
+      } else {
+        toast.success("Deposit charged to saved card");
+      }
+      qc.invalidateQueries({ queryKey: ["deposits-list"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Charge failed"),
   });
 
   return (
@@ -169,9 +229,19 @@ export default function Deposits() {
                     </TableCell>
                     <TableCell className="text-right space-x-1">
                       {d.status === "pending" && (
-                        <Button variant="ghost" size="sm" onClick={() => updateStatus.mutate({ id: d.id, newStatus: "paid" })}>
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark Paid
-                        </Button>
+                        <>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            disabled={chargeCard.isPending}
+                            onClick={() => chargeCard.mutate({ id: d.id })}
+                          >
+                            <CreditCard className="h-3.5 w-3.5 mr-1" /> Charge card
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => updateStatus.mutate({ id: d.id, newStatus: "paid" })}>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark paid
+                          </Button>
+                        </>
                       )}
                       {d.status === "paid" && (
                         <Button variant="ghost" size="sm" onClick={() => updateStatus.mutate({ id: d.id, newStatus: "refunded" })}>
