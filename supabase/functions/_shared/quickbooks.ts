@@ -866,6 +866,31 @@ export async function listExpenseAccounts(ctx: QboTokenContext): Promise<QboResu
   };
 }
 
+/**
+ * List the operator's Accounts Receivable accounts so the QBO settings UI
+ * can show a dropdown for the Customer-Deposit "apply to invoice" leg. The
+ * deposit-apply Journal Entry credits A/R (with a Customer entity), settling
+ * the receivable the invoice created against the customer's prepayment.
+ */
+export async function listAccountsReceivableAccounts(
+  ctx: QboTokenContext,
+): Promise<QboResult<QboAccount[]>> {
+  const q = `select Id, Name, AccountType, AccountSubType, Active from Account where AccountType = 'Accounts Receivable' and Active = true MAXRESULTS 200`;
+  const res = await qboRequest<{ QueryResponse: { Account?: QboAccount[] } }>({
+    ctx,
+    method: "GET",
+    path: `/v3/company/${ctx.realmId}/query?query=${encodeURIComponent(q)}&minorversion=70`,
+  });
+  if (!res.ok) return res;
+  return {
+    ok: true,
+    status: 200,
+    data: (res.data?.QueryResponse?.Account ?? []).sort((a, b) =>
+      a.Name.localeCompare(b.Name)
+    ),
+  };
+}
+
 // ----- RefundReceipt (6.4b) ----------------------------------------------
 //
 // QBO's RefundReceipt records money returned to a customer. Unlike

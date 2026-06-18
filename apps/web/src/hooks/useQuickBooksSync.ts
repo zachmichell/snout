@@ -565,7 +565,7 @@ export function useQuickBooksAccountSettings() {
       const { data, error } = await supabase
         .from("quickbooks_accounts")
         .select(
-          "default_fee_account_id, default_fee_account_name, default_deposit_account_id, default_deposit_account_name, default_income_account_id, default_income_account_name, default_tips_payable_account_id, default_tips_payable_account_name, default_deferred_daycare_full_account_id, default_deferred_daycare_full_account_name, default_deferred_daycare_half_account_id, default_deferred_daycare_half_account_name, default_deferred_boarding_account_id, default_deferred_boarding_account_name, default_expired_credits_income_account_id, default_expired_credits_income_account_name, default_customer_deposit_liability_account_id, default_customer_deposit_liability_account_name, default_forfeited_deposit_income_account_id, default_forfeited_deposit_income_account_name",
+          "default_fee_account_id, default_fee_account_name, default_deposit_account_id, default_deposit_account_name, default_income_account_id, default_income_account_name, default_tips_payable_account_id, default_tips_payable_account_name, default_deferred_daycare_full_account_id, default_deferred_daycare_full_account_name, default_deferred_daycare_half_account_id, default_deferred_daycare_half_account_name, default_deferred_boarding_account_id, default_deferred_boarding_account_name, default_expired_credits_income_account_id, default_expired_credits_income_account_name, default_customer_deposit_liability_account_id, default_customer_deposit_liability_account_name, default_forfeited_deposit_income_account_id, default_forfeited_deposit_income_account_name, default_accounts_receivable_account_id, default_accounts_receivable_account_name",
         )
         .eq("organization_id", membership.organization_id)
         .is("deleted_at", null)
@@ -592,6 +592,8 @@ export function useQuickBooksAccountSettings() {
         default_customer_deposit_liability_account_name: string | null;
         default_forfeited_deposit_income_account_id: string | null;
         default_forfeited_deposit_income_account_name: string | null;
+        default_accounts_receivable_account_id: string | null;
+        default_accounts_receivable_account_name: string | null;
       } | null;
     },
   });
@@ -662,6 +664,29 @@ export function useQuickBooksLiabilityAccounts() {
       );
       if (error) throw error;
       return (data?.accounts ?? []) as QuickBooksLiabilityAccount[];
+    },
+  });
+}
+
+export type QuickBooksARAccount = {
+  id: string;
+  name: string;
+  type: string;
+  subType: string | null;
+};
+
+export function useQuickBooksARAccounts() {
+  const { membership } = useAuth();
+  return useQuery<QuickBooksARAccount[]>({
+    queryKey: ["quickbooks-ar-accounts", membership?.organization_id],
+    enabled: !!membership?.organization_id,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke(
+        "quickbooks-list-ar-accounts",
+        { body: {} },
+      );
+      if (error) throw error;
+      return (data?.accounts ?? []) as QuickBooksARAccount[];
     },
   });
 }
@@ -900,7 +925,8 @@ export type CreditAccountSlot =
   | "deferred_boarding"
   | "expired_credits_income"
   | "customer_deposit_liability"
-  | "forfeited_deposit_income";
+  | "forfeited_deposit_income"
+  | "accounts_receivable";
 
 export type QuickBooksIncomeAccount = {
   id: string;
