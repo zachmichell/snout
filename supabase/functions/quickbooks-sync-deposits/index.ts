@@ -1,47 +1,34 @@
-// Deposit-prepayment series (PR-3/4): sync deposit lifecycle events to QBO as
-// Journal Entries. Modeled on quickbooks-sync-credit-ledger.
+// Deposit-prepayment series: sync deposit lifecycle events to QBO as Journal
+// Entries. Modeled on quickbooks-sync-credit-ledger.
 //
 // A deposit collected before service is a customer PREPAYMENT — cash received
 // against a liability, recognized as income only when the booking is fulfilled
-// (the "apply" leg ships in PR-5 with invoice netting). This function posts the
-// self-contained legs that don't depend on netting:
+// (the invoice does that). Legs (each a balanced JE, tracked by a distinct
+// qbo_entity_type so one deposit can carry several):
 //
-//   DepositCollect  (deposit was paid):
-//     Debit  Undeposited Funds            (default_deposit_account)
-//     Credit Customer Deposits (liability) (default_customer_deposit_liability_account)
+//   DepositCollect (paid):
+//     Dr Undeposited Funds            / Cr Customer Deposits (liability)
+//   DepositApply (credited to an invoice — PR-5 netting):
+//     Dr Customer Deposits (liability) / Cr Accounts Receivable [Entity=customer]
+//       The invoice already booked the income (Dr A/R / Cr Income); the apply
+//       settles that receivable with the prepayment, so it credits A/R — NOT
+//       Income (that would double-count revenue).
+//   DepositApplyReverse (applied deposit later un-applied, e.g. refunded):
+//     Dr Accounts Receivable [Entity=customer] / Cr Customer Deposits (liability)
+//   DepositForfeit (paid deposit forfeited):
+//     Dr Customer Deposits (liability) / Cr Forfeited Deposit Income
+//   DepositRefund (paid deposit refunded):
+//     Dr Customer Deposits (liability) / Cr Undeposited Funds
 //
-//   DepositForfeit  (paid deposit forfeited):
-//     Debit  Customer Deposits (liability)
-//     Credit Forfeited Deposit Income      (default_forfeited_deposit_income_account)
+// All legs gated on paid_at IS NOT NULL (no cash => no JE). Candidates come from
+// deposits_needing_qbo_sync, which anti-joins the mapping table (only
+// outstanding legs, oldest-first). Release legs (apply/forfeit/refund/reverse)
+// only post once the collect leg is synced, so the liability is never released
+// before it is established. Missing accounts soft-fail (no mapping) and
+// auto-retry once configured — never auto-picked.
 //
-//   DepositRefund   (paid deposit refunded):
-//     Debit  Customer Deposits (liability)
-//     Credit Undeposited Funds             (default_deposit_account)
-//
-// Every leg is gated on paid_at IS NOT NULL: a deposit that was never collected
-// involved no cash, so it produces no GL entries.
-//
-// Ordering / coverage: candidates come from the deposits_needing_qbo_sync RPC,
-// which anti-joins the mapping table and returns ONLY deposits with at least one
-// outstanding leg, oldest-first. That drains a backlog deterministically and can
-// never let a fully-synced deposit crowd out — or an old unsynced leg be starved
-// by — newer activity.
-//
-// Invariant — release after collect: a forfeit/refund leg debits the
-// Customer-Deposit liability that the collect leg credited. We never post a
-// release leg unless the collect leg is already synced (a prior run) or syncs
-// earlier in this run; otherwise the release is deferred (skipped) and retried,
-// so the GL can never carry a one-sided release with no originating collect.
-//
-// Each leg is tracked by its own mapping row keyed by a distinct qbo_entity_type
-// (DepositCollect / DepositForfeit / DepositRefund); the unique index
-// (org, snout_table, snout_id, qbo_entity_type) guarantees one JE per leg.
-// Missing-account cases soft-fail (no mapping) so they auto-retry once the
-// operator configures the accounts — we never auto-pick an account.
-//
-// Currency: like the payouts and credit-ledger JE syncs, legs are posted in the
-// connection's home currency (no CurrencyRef). Multi-currency deposits share
-// that known limitation.
+// Currency: like the other JE syncs, legs post in the connection's home
+// currency (no CurrencyRef).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -64,16 +51,20 @@ const INTUIT_CLIENT_SECRET = Deno.env.get("INTUIT_CLIENT_SECRET");
 
 const PICKUP_LIMIT = 50;
 
-type Stage = "collect" | "forfeit" | "refund";
+type Stage = "collect" | "apply" | "apply_reverse" | "forfeit" | "refund";
 
 const QBO_ENTITY_TYPE: Record<Stage, string> = {
   collect: "DepositCollect",
+  apply: "DepositApply",
+  apply_reverse: "DepositApplyReverse",
   forfeit: "DepositForfeit",
   refund: "DepositRefund",
 };
 
 const DOC_SUFFIX: Record<Stage, string> = {
   collect: "C",
+  apply: "A",
+  apply_reverse: "V",
   forfeit: "F",
   refund: "R",
 };
@@ -87,15 +78,21 @@ type DepositRow = {
   forfeited_at: string | null;
   refunded_at: string | null;
   created_at: string;
+  invoice_id: string | null;
+  owner_id: string | null;
+  credited_to_invoice_cents: number;
+  has_live_credit: boolean;
+  applied_at: string | null;
 };
 
 type AccountSettings = {
   default_deposit_account_id: string | null;
   default_customer_deposit_liability_account_id: string | null;
   default_forfeited_deposit_income_account_id: string | null;
+  default_accounts_receivable_account_id: string | null;
 };
 
-type WorkItem = { deposit: DepositRow; stage: Stage; eventAt: string };
+type WorkItem = { deposit: DepositRow; stage: Stage; eventAt: string; amountCents: number };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -106,8 +103,7 @@ Deno.serve(async (req) => {
 
   // Resolve the caller. Cron invokes with the vault service_role_key, which can
   // drift from the env SUPABASE_SERVICE_ROLE_KEY — so after the fast string
-  // checks we fall back to verifying the JWT's role claim, which holds for any
-  // valid service-role token regardless of which key was used.
+  // checks we fall back to verifying the JWT's role claim.
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
   let isServiceRole =
@@ -137,9 +133,6 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  // Only deposits with at least one outstanding leg, oldest-first. The RPC
-  // anti-joins the mapping table so fully-synced deposits are never fetched and
-  // can't crowd out (or starve) work.
   const { data: deposits, error: depErr } = await admin.rpc(
     "deposits_needing_qbo_sync",
     { _org: orgIdFilter, _limit: PICKUP_LIMIT },
@@ -151,27 +144,30 @@ Deno.serve(async (req) => {
     return json({ ok: true, processed: 0, succeeded: 0, failed: 0, skipped: 0 });
   }
 
-  // Expand each deposit into its legs: collect first (so the liability is
-  // established before any release), then AT MOST ONE release leg. forfeit and
-  // refund are mutually exclusive (DB CHECK enforces it); the else-if is a
-  // belt-and-suspenders guard so we never double-debit the liability.
+  // Expand each deposit into its legs. collect first (establishes the
+  // liability); then exactly one of apply / apply_reverse (mutually exclusive
+  // by has_live_credit); then forfeit/refund.
   const allItems: WorkItem[] = [];
   for (const d of deposits as DepositRow[]) {
     if (!d.paid_at || (d.amount_cents ?? 0) <= 0) continue;
-    allItems.push({ deposit: d, stage: "collect", eventAt: d.paid_at });
+    allItems.push({ deposit: d, stage: "collect", eventAt: d.paid_at, amountCents: d.amount_cents });
+    if (d.has_live_credit) {
+      // Date the apply at the credit's posting time (== invoice finalization),
+      // not the deposit collection date, so the A/R settlement never predates
+      // the invoice that created the receivable.
+      allItems.push({ deposit: d, stage: "apply", eventAt: d.applied_at ?? d.paid_at, amountCents: d.credited_to_invoice_cents });
+    }
+    // apply_reverse is added below only when a DepositApply mapping exists
+    // (decided after we load existing mappings).
     if (d.forfeited_at) {
-      allItems.push({ deposit: d, stage: "forfeit", eventAt: d.forfeited_at });
-    } else if (d.refunded_at) {
-      allItems.push({ deposit: d, stage: "refund", eventAt: d.refunded_at });
+      allItems.push({ deposit: d, stage: "forfeit", eventAt: d.forfeited_at, amountCents: d.amount_cents });
+    }
+    if (d.refunded_at) {
+      allItems.push({ deposit: d, stage: "refund", eventAt: d.refunded_at, amountCents: d.amount_cents });
     }
   }
-  if (allItems.length === 0) {
-    return json({ ok: true, processed: 0, succeeded: 0, failed: 0, skipped: 0 });
-  }
 
-  // Existing synced legs for these deposits. Mappings are only written on a
-  // successful post, so any present mapping is a synced leg.
-  const depIds = Array.from(new Set(allItems.map((i) => i.deposit.id)));
+  const depIds = Array.from(new Set((deposits as DepositRow[]).map((d) => d.id)));
   const { data: existingMaps } = await admin
     .from("quickbooks_entity_mappings")
     .select("snout_id, qbo_entity_type")
@@ -180,18 +176,42 @@ Deno.serve(async (req) => {
     .in("snout_id", depIds)
     .is("deleted_at", null);
   const done = new Set<string>();
-  // Deposits whose collect leg is already on the books (prior run).
   const collectSynced = new Set<string>();
+  const applySynced = new Set<string>();
   for (const m of (existingMaps ?? []) as Array<{ snout_id: string; qbo_entity_type: string }>) {
     done.add(`${m.snout_id}:${m.qbo_entity_type}`);
     if (m.qbo_entity_type === QBO_ENTITY_TYPE.collect) collectSynced.add(m.snout_id);
+    if (m.qbo_entity_type === QBO_ENTITY_TYPE.apply) applySynced.add(m.snout_id);
   }
 
-  // Skip legs already synced. (collect is ordered before its release leg, so a
-  // collect posted this run is visible to the release leg via collectSynced.)
-  const pending = allItems.filter(
-    (i) => !done.has(`${i.deposit.id}:${QBO_ENTITY_TYPE[i.stage]}`),
-  );
+  // Add apply_reverse legs: deposit was applied (DepositApply synced) but is no
+  // longer applied (no live credit — it was reversed).
+  for (const d of deposits as DepositRow[]) {
+    if (!d.has_live_credit && applySynced.has(d.id) && d.credited_to_invoice_cents > 0) {
+      allItems.push({
+        deposit: d,
+        stage: "apply_reverse",
+        eventAt: d.refunded_at ?? d.paid_at ?? d.created_at,
+        amountCents: d.credited_to_invoice_cents,
+      });
+    }
+  }
+
+  // Order legs so collect precedes its releases, and reverse precedes refund.
+  const STAGE_ORDER: Record<Stage, number> = {
+    collect: 0, apply: 1, apply_reverse: 2, forfeit: 3, refund: 4,
+  };
+  const pending = allItems
+    .filter((i) => !done.has(`${i.deposit.id}:${QBO_ENTITY_TYPE[i.stage]}`))
+    .sort((a, b) =>
+      a.deposit.id === b.deposit.id
+        ? STAGE_ORDER[a.stage] - STAGE_ORDER[b.stage]
+        : 0
+    );
+
+  if (pending.length === 0) {
+    return json({ ok: true, processed: 0, succeeded: 0, failed: 0, skipped: 0 });
+  }
 
   let succeeded = 0;
   let failed = 0;
@@ -199,12 +219,12 @@ Deno.serve(async (req) => {
   const failures: Array<{ id: string; stage: Stage; reason: string }> = [];
   const tokenCache = new Map<string, QboTokenContext | null>();
   const accountCache = new Map<string, AccountSettings | null>();
+  const customerCache = new Map<string, string | null>();
 
   for (const item of pending) {
     const { deposit: d, stage } = item;
     try {
-      // Never release a liability the collect leg hasn't established. Defer
-      // (retry next run) rather than post a one-sided entry.
+      // Never release a liability the collect leg hasn't established.
       if (stage !== "collect" && !collectSynced.has(d.id)) {
         skipped += 1;
         failures.push({ id: d.id, stage, reason: "deposit collect leg not yet synced — deferred" });
@@ -232,7 +252,7 @@ Deno.serve(async (req) => {
         const { data: acct } = await admin
           .from("quickbooks_accounts")
           .select(
-            "default_deposit_account_id, default_customer_deposit_liability_account_id, default_forfeited_deposit_income_account_id",
+            "default_deposit_account_id, default_customer_deposit_liability_account_id, default_forfeited_deposit_income_account_id, default_accounts_receivable_account_id",
           )
           .eq("organization_id", d.organization_id)
           .is("deleted_at", null)
@@ -246,10 +266,43 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const built = buildJournalLines(stage, settings, d.amount_cents);
+      // Apply legs post against A/R with the customer as the JE-line Entity.
+      let customerId: string | null = null;
+      if (stage === "apply" || stage === "apply_reverse") {
+        if (!d.owner_id) {
+          failed += 1;
+          failures.push({ id: d.id, stage, reason: "deposit has no owner; cannot resolve QBO customer" });
+          continue;
+        }
+        customerId = customerCache.get(d.owner_id) ?? null;
+        if (!customerCache.has(d.owner_id)) {
+          const { data: ownerMap } = await admin
+            .from("quickbooks_entity_mappings")
+            .select("qbo_id, sync_state")
+            .eq("organization_id", d.organization_id)
+            .eq("snout_table", "owners")
+            .eq("snout_id", d.owner_id)
+            .is("deleted_at", null)
+            .maybeSingle();
+          customerId = (ownerMap && ownerMap.sync_state === "synced" && ownerMap.qbo_id)
+            ? (ownerMap.qbo_id as string)
+            : null;
+          customerCache.set(d.owner_id, customerId);
+        }
+        if (!customerId) {
+          failed += 1;
+          failures.push({ id: d.id, stage, reason: "owner not yet synced to QBO — deferred" });
+          continue;
+        }
+      }
+
+      const built = buildJournalLines({
+        stage,
+        amountCents: item.amountCents,
+        settings,
+        customerId,
+      });
       if (!built.ok) {
-        // Missing account: soft-fail with no mapping so it auto-retries once
-        // the operator configures the account. Never auto-pick.
         failed += 1;
         failures.push({ id: d.id, stage, reason: built.error });
         continue;
@@ -283,10 +336,6 @@ Deno.serve(async (req) => {
           last_synced_at: new Date().toISOString(),
         });
       if (mapErr) {
-        // The JE exists in QBO but we couldn't record the mapping. Surface it;
-        // the deterministic DocNumber lets an operator spot/avoid a duplicate.
-        // Do NOT mark collect as synced — a release leg must wait until the
-        // collect mapping is durably recorded.
         failed += 1;
         failures.push({
           id: d.id,
@@ -317,34 +366,42 @@ type LineBuildResult =
   | { ok: true; lines: QboJournalEntryLine[] }
   | { ok: false; error: string };
 
-function buildJournalLines(
-  stage: Stage,
-  s: AccountSettings,
-  amountCents: number,
-): LineBuildResult {
-  const amount = Number((amountCents / 100).toFixed(2));
-  if (amount <= 0) return { ok: false, error: "Deposit amount is zero" };
+function buildJournalLines(args: {
+  stage: Stage;
+  amountCents: number;
+  settings: AccountSettings;
+  customerId: string | null;
+}): LineBuildResult {
+  const { stage, settings: s, customerId } = args;
+  const amount = Number((args.amountCents / 100).toFixed(2));
+  if (amount <= 0) return { ok: false, error: "Leg amount is zero" };
 
   const uf = s.default_deposit_account_id;
   const liability = s.default_customer_deposit_liability_account_id;
   const forfeitIncome = s.default_forfeited_deposit_income_account_id;
+  const ar = s.default_accounts_receivable_account_id;
 
   const line = (
     side: "Debit" | "Credit",
     account: string,
     description: string,
+    entityCustomer?: string,
   ): QboJournalEntryLine => ({
     DetailType: "JournalEntryLineDetail",
     Amount: amount,
     Description: description,
-    JournalEntryLineDetail: { PostingType: side, AccountRef: { value: account } },
+    JournalEntryLineDetail: {
+      PostingType: side,
+      AccountRef: { value: account },
+      ...(entityCustomer
+        ? { Entity: { value: entityCustomer, type: "Customer" as const } }
+        : {}),
+    },
   });
 
   if (stage === "collect") {
     if (!uf) return { ok: false, error: "Undeposited Funds account not selected" };
-    if (!liability) {
-      return { ok: false, error: "Customer Deposits liability account not selected" };
-    }
+    if (!liability) return { ok: false, error: "Customer Deposits liability account not selected" };
     return {
       ok: true,
       lines: [
@@ -354,13 +411,35 @@ function buildJournalLines(
     };
   }
 
+  if (stage === "apply") {
+    if (!liability) return { ok: false, error: "Customer Deposits liability account not selected" };
+    if (!ar) return { ok: false, error: "Accounts Receivable account not selected" };
+    if (!customerId) return { ok: false, error: "QBO customer not resolved" };
+    return {
+      ok: true,
+      lines: [
+        line("Debit", liability, "Deposit applied — prepayment used"),
+        line("Credit", ar, "Deposit applied — invoice receivable settled", customerId),
+      ],
+    };
+  }
+
+  if (stage === "apply_reverse") {
+    if (!liability) return { ok: false, error: "Customer Deposits liability account not selected" };
+    if (!ar) return { ok: false, error: "Accounts Receivable account not selected" };
+    if (!customerId) return { ok: false, error: "QBO customer not resolved" };
+    return {
+      ok: true,
+      lines: [
+        line("Debit", ar, "Deposit application reversed — receivable restored", customerId),
+        line("Credit", liability, "Deposit application reversed — prepayment restored"),
+      ],
+    };
+  }
+
   if (stage === "forfeit") {
-    if (!liability) {
-      return { ok: false, error: "Customer Deposits liability account not selected" };
-    }
-    if (!forfeitIncome) {
-      return { ok: false, error: "Forfeited Deposit Income account not selected" };
-    }
+    if (!liability) return { ok: false, error: "Customer Deposits liability account not selected" };
+    if (!forfeitIncome) return { ok: false, error: "Forfeited Deposit Income account not selected" };
     return {
       ok: true,
       lines: [
@@ -371,9 +450,7 @@ function buildJournalLines(
   }
 
   // refund
-  if (!liability) {
-    return { ok: false, error: "Customer Deposits liability account not selected" };
-  }
+  if (!liability) return { ok: false, error: "Customer Deposits liability account not selected" };
   if (!uf) return { ok: false, error: "Undeposited Funds account not selected" };
   return {
     ok: true,

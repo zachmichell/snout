@@ -4709,6 +4709,8 @@ export type Database = {
           default_customer_deposit_liability_account_name: string | null
           default_expired_credits_income_account_id: string | null
           default_expired_credits_income_account_name: string | null
+          default_accounts_receivable_account_id: string | null
+          default_accounts_receivable_account_name: string | null
           default_fee_account_id: string | null
           default_fee_account_name: string | null
           default_forfeited_deposit_income_account_id: string | null
@@ -4747,6 +4749,8 @@ export type Database = {
           default_deposit_account_name?: string | null
           default_expired_credits_income_account_id?: string | null
           default_expired_credits_income_account_name?: string | null
+          default_accounts_receivable_account_id?: string | null
+          default_accounts_receivable_account_name?: string | null
           default_fee_account_id?: string | null
           default_fee_account_name?: string | null
           default_forfeited_deposit_income_account_id?: string | null
@@ -4785,6 +4789,8 @@ export type Database = {
           default_deposit_account_name?: string | null
           default_expired_credits_income_account_id?: string | null
           default_expired_credits_income_account_name?: string | null
+          default_accounts_receivable_account_id?: string | null
+          default_accounts_receivable_account_name?: string | null
           default_fee_account_id?: string | null
           default_fee_account_name?: string | null
           default_forfeited_deposit_income_account_id?: string | null

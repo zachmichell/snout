@@ -62,6 +62,7 @@ import {
   useSetQuickBooksTipsPayableAccount,
   useSyncQuickBooksTips,
   useQuickBooksIncomeAccounts,
+  useQuickBooksARAccounts,
   useSetQuickBooksCreditAccount,
   useSyncQuickBooksCreditLedger,
   type CreditAccountSlot,
@@ -689,17 +690,15 @@ function CreditAccountPicker({
   currentId: string;
   currentName: string | null;
   setCredit: ReturnType<typeof useSetQuickBooksCreditAccount>;
-  kind: "liability" | "income";
+  kind: "liability" | "income" | "receivable";
 }) {
+  const noun =
+    kind === "liability" ? "liability" : kind === "income" ? "income" : "Accounts Receivable";
   const placeholder = loading
     ? "Loading…"
     : accounts.length === 0
-      ? kind === "liability"
-        ? "No liability accounts in QBO"
-        : "No income accounts in QBO"
-      : kind === "liability"
-        ? "Pick a liability account"
-        : "Pick an income account";
+      ? `No ${noun} accounts in QBO`
+      : `Pick ${kind === "receivable" ? "an" : kind === "income" ? "an" : "a"} ${noun} account`;
   return (
     <div>
       <label className="mb-1.5 block text-xs font-semibold text-text-secondary">
@@ -757,6 +756,8 @@ function CustomerDepositsCard() {
     useQuickBooksLiabilityAccounts();
   const { data: incomeAccounts = [], isLoading: incomeLoading } =
     useQuickBooksIncomeAccounts();
+  const { data: arAccounts = [], isLoading: arLoading } =
+    useQuickBooksARAccounts();
   const setCredit = useSetQuickBooksCreditAccount();
 
   const liabilityId =
@@ -766,6 +767,8 @@ function CustomerDepositsCard() {
   const forfeitId = settings?.default_forfeited_deposit_income_account_id ?? "";
   const forfeitName =
     settings?.default_forfeited_deposit_income_account_name ?? null;
+  const arId = settings?.default_accounts_receivable_account_id ?? "";
+  const arName = settings?.default_accounts_receivable_account_name ?? null;
 
   return (
     <div className="rounded-md border border-border bg-background p-4">
@@ -805,10 +808,23 @@ function CustomerDepositsCard() {
           setCredit={setCredit}
           kind="income"
         />
+        <CreditAccountPicker
+          label="Accounts Receivable"
+          slot="accounts_receivable"
+          accounts={arAccounts}
+          loading={arLoading}
+          currentId={arId}
+          currentName={arName}
+          setCredit={setCredit}
+          kind="receivable"
+        />
       </div>
 
       <p className="mt-3 text-xs text-text-tertiary">
-        Deposit sync to QuickBooks activates once both accounts are chosen.
+        Collection, forfeiture, and refund posting needs the liability,
+        Undeposited Funds, and (for forfeits) income accounts. The Accounts
+        Receivable account is used only when a deposit is applied to an invoice
+        (netting) — it settles the invoice receivable with the prepayment.
       </p>
     </div>
   );
