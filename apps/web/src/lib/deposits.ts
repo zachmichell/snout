@@ -17,6 +17,8 @@ export function depositStatusLabel(s: string) {
       return "Pending";
     case "processing":
       return "Processing";
+    case "refunding":
+      return "Refunding";
     case "paid":
       return "Paid";
     case "refunded":
