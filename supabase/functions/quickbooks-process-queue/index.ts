@@ -161,6 +161,23 @@ Deno.serve(async (req) => {
           failed += 1;
         }
       } else if (row.snout_table === "payments") {
+        // Deposit-credit netting rows (source_deposit_id set) are internal
+        // entries with no Stripe PaymentIntent; their QBO accounting is posted
+        // by the dedicated quickbooks-sync-deposits path. Skip them here so the
+        // prepayment is never double-counted as ordinary invoice revenue. The
+        // enqueue trigger already excludes them — this guards rows enqueued
+        // before that trigger shipped, or via any manual/backfill path.
+        const { data: depRow } = await admin
+          .from("payments")
+          .select("source_deposit_id")
+          .eq("id", row.snout_id)
+          .maybeSingle();
+        if (depRow?.source_deposit_id) {
+          await admin.rpc("qbo_mark_queue_processed", { _id: row.id });
+          succeeded += 1;
+          continue;
+        }
+
         // Deposit account is OPTIONAL on QBO Payment. QBO's default is
         // "Undeposited Funds"; omitting the field sends payments there
         // automatically. We still try to discover and persist a
