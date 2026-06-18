@@ -35,6 +35,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   pending: "secondary",
   processing: "secondary",
   paid: "default",
+  refunding: "secondary",
   refunded: "outline",
   forfeited: "destructive",
 };
@@ -158,6 +159,42 @@ export default function Deposits() {
     onError: (e: any) => toast.error(e.message ?? "Charge failed"),
   });
 
+  // Refund a paid, card-collected deposit via the refund-deposit edge function
+  // (issues a real Stripe refund). Manual (cash/e-transfer) deposits return
+  // 'no_stripe_charge' — staff refund those outside Snout and mark them.
+  const refundDeposit = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { data, error } = await supabase.functions.invoke("refund-deposit", {
+        body: { deposit_id: id, reason: "requested_by_customer" },
+      });
+      if (error) {
+        const bodyResp = (error as { context?: Response }).context;
+        const body = bodyResp ? await bodyResp.json().catch(() => null) : null;
+        const code = (body as { code?: string } | null)?.code;
+        const serverMsg = (body as { error?: string } | null)?.error;
+        if (code === "no_stripe_charge") {
+          throw new Error("This deposit was collected manually — refund it outside Snout, then mark it refunded.");
+        }
+        if (code === "not_refundable") {
+          qc.invalidateQueries({ queryKey: ["deposits-list"] });
+          throw new Error("This deposit can no longer be refunded — the list has been refreshed.");
+        }
+        if (code === "refund_unavailable") {
+          throw new Error("Refund outcome unknown — check Stripe before retrying.");
+        }
+        throw new Error(serverMsg ?? "Refund failed — please try again.");
+      }
+      const res = data as { ok?: boolean; error?: string };
+      if (!res?.ok) throw new Error(res?.error ?? "Refund failed.");
+      return res;
+    },
+    onSuccess: () => {
+      toast.success("Deposit refunded");
+      qc.invalidateQueries({ queryKey: ["deposits-list"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Refund failed"),
+  });
+
   return (
     <PortalLayout>
       <div className="px-8 py-6">
@@ -244,7 +281,7 @@ export default function Deposits() {
                         </>
                       )}
                       {d.status === "paid" && (
-                        <Button variant="ghost" size="sm" onClick={() => updateStatus.mutate({ id: d.id, newStatus: "refunded" })}>
+                        <Button variant="ghost" size="sm" disabled={refundDeposit.isPending} onClick={() => refundDeposit.mutate({ id: d.id })}>
                           <RefreshCcw className="h-3.5 w-3.5 mr-1" /> Refund
                         </Button>
                       )}
