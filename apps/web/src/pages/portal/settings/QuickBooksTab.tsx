@@ -431,6 +431,10 @@ function SyncPanel() {
       <div className="mt-3">
         <CreditAccountsCard />
       </div>
+
+      <div className="mt-3">
+        <CustomerDepositsCard />
+      </div>
     </div>
   );
 }
@@ -736,6 +740,76 @@ function CreditAccountPicker({
           Currently <strong>{currentName}</strong>.
         </p>
       )}
+    </div>
+  );
+}
+
+// Deposit-prepayment series (PR-2): Customer Deposits. A deposit taken before
+// a reservation is a customer prepayment — cash received against a liability,
+// not earned revenue. The operator picks the Liability account the deposit
+// cash sits in until fulfillment, plus the Income account that captures a
+// forfeited (non-refundable) deposit. The dedicated deposit sync (shipping
+// next) posts a Journal Entry per deposit lifecycle event; collect/refund
+// reuse the existing Undeposited Funds account configured under Payouts.
+function CustomerDepositsCard() {
+  const { data: settings } = useQuickBooksAccountSettings();
+  const { data: liabilityAccounts = [], isLoading: liabLoading } =
+    useQuickBooksLiabilityAccounts();
+  const { data: incomeAccounts = [], isLoading: incomeLoading } =
+    useQuickBooksIncomeAccounts();
+  const setCredit = useSetQuickBooksCreditAccount();
+
+  const liabilityId =
+    settings?.default_customer_deposit_liability_account_id ?? "";
+  const liabilityName =
+    settings?.default_customer_deposit_liability_account_name ?? null;
+  const forfeitId = settings?.default_forfeited_deposit_income_account_id ?? "";
+  const forfeitName =
+    settings?.default_forfeited_deposit_income_account_name ?? null;
+
+  return (
+    <div className="rounded-md border border-border bg-background p-4">
+      <div className="mb-3">
+        <div className="font-medium text-foreground">Customer deposits</div>
+        <div className="mt-0.5 text-xs text-text-tertiary">
+          A deposit taken before a reservation is a customer prepayment — cash
+          received against a liability, not earned revenue. Pick the QBO
+          Liability account the deposit cash sits in until the booking is
+          fulfilled, plus the Income account that captures a forfeited
+          (non-refundable) deposit. Snout posts a Journal Entry per deposit:
+          collection debits Undeposited Funds and credits this liability;
+          forfeiture debits the liability and credits Forfeited Deposit Income;
+          a refund debits the liability and credits Undeposited Funds.
+          (Undeposited Funds is the account set under Processor payouts.)
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <CreditAccountPicker
+          label="Customer deposits liability"
+          slot="customer_deposit_liability"
+          accounts={liabilityAccounts}
+          loading={liabLoading}
+          currentId={liabilityId}
+          currentName={liabilityName}
+          setCredit={setCredit}
+          kind="liability"
+        />
+        <CreditAccountPicker
+          label="Forfeited deposit income"
+          slot="forfeited_deposit_income"
+          accounts={incomeAccounts}
+          loading={incomeLoading}
+          currentId={forfeitId}
+          currentName={forfeitName}
+          setCredit={setCredit}
+          kind="income"
+        />
+      </div>
+
+      <p className="mt-3 text-xs text-text-tertiary">
+        Deposit sync to QuickBooks activates once both accounts are chosen.
+      </p>
     </div>
   );
 }

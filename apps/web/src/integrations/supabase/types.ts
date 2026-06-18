@@ -4705,10 +4705,14 @@ export type Database = {
           default_deferred_daycare_half_account_name: string | null
           default_deposit_account_id: string | null
           default_deposit_account_name: string | null
+          default_customer_deposit_liability_account_id: string | null
+          default_customer_deposit_liability_account_name: string | null
           default_expired_credits_income_account_id: string | null
           default_expired_credits_income_account_name: string | null
           default_fee_account_id: string | null
           default_fee_account_name: string | null
+          default_forfeited_deposit_income_account_id: string | null
+          default_forfeited_deposit_income_account_name: string | null
           default_income_account_id: string | null
           default_income_account_name: string | null
           default_tips_payable_account_id: string | null
@@ -4738,11 +4742,15 @@ export type Database = {
           default_deferred_daycare_half_account_id?: string | null
           default_deferred_daycare_half_account_name?: string | null
           default_deposit_account_id?: string | null
+          default_customer_deposit_liability_account_id?: string | null
+          default_customer_deposit_liability_account_name?: string | null
           default_deposit_account_name?: string | null
           default_expired_credits_income_account_id?: string | null
           default_expired_credits_income_account_name?: string | null
           default_fee_account_id?: string | null
           default_fee_account_name?: string | null
+          default_forfeited_deposit_income_account_id?: string | null
+          default_forfeited_deposit_income_account_name?: string | null
           default_income_account_id?: string | null
           default_income_account_name?: string | null
           default_tips_payable_account_id?: string | null
@@ -4772,11 +4780,15 @@ export type Database = {
           default_deferred_daycare_half_account_id?: string | null
           default_deferred_daycare_half_account_name?: string | null
           default_deposit_account_id?: string | null
+          default_customer_deposit_liability_account_id?: string | null
+          default_customer_deposit_liability_account_name?: string | null
           default_deposit_account_name?: string | null
           default_expired_credits_income_account_id?: string | null
           default_expired_credits_income_account_name?: string | null
           default_fee_account_id?: string | null
           default_fee_account_name?: string | null
+          default_forfeited_deposit_income_account_id?: string | null
+          default_forfeited_deposit_income_account_name?: string | null
           default_income_account_id?: string | null
           default_income_account_name?: string | null
           default_tips_payable_account_id?: string | null

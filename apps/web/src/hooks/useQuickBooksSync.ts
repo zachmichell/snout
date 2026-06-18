@@ -565,7 +565,7 @@ export function useQuickBooksAccountSettings() {
       const { data, error } = await supabase
         .from("quickbooks_accounts")
         .select(
-          "default_fee_account_id, default_fee_account_name, default_deposit_account_id, default_deposit_account_name, default_income_account_id, default_income_account_name, default_tips_payable_account_id, default_tips_payable_account_name, default_deferred_daycare_full_account_id, default_deferred_daycare_full_account_name, default_deferred_daycare_half_account_id, default_deferred_daycare_half_account_name, default_deferred_boarding_account_id, default_deferred_boarding_account_name, default_expired_credits_income_account_id, default_expired_credits_income_account_name",
+          "default_fee_account_id, default_fee_account_name, default_deposit_account_id, default_deposit_account_name, default_income_account_id, default_income_account_name, default_tips_payable_account_id, default_tips_payable_account_name, default_deferred_daycare_full_account_id, default_deferred_daycare_full_account_name, default_deferred_daycare_half_account_id, default_deferred_daycare_half_account_name, default_deferred_boarding_account_id, default_deferred_boarding_account_name, default_expired_credits_income_account_id, default_expired_credits_income_account_name, default_customer_deposit_liability_account_id, default_customer_deposit_liability_account_name, default_forfeited_deposit_income_account_id, default_forfeited_deposit_income_account_name",
         )
         .eq("organization_id", membership.organization_id)
         .is("deleted_at", null)
@@ -588,6 +588,10 @@ export function useQuickBooksAccountSettings() {
         default_deferred_boarding_account_name: string | null;
         default_expired_credits_income_account_id: string | null;
         default_expired_credits_income_account_name: string | null;
+        default_customer_deposit_liability_account_id: string | null;
+        default_customer_deposit_liability_account_name: string | null;
+        default_forfeited_deposit_income_account_id: string | null;
+        default_forfeited_deposit_income_account_name: string | null;
       } | null;
     },
   });
@@ -894,7 +898,9 @@ export type CreditAccountSlot =
   | "deferred_daycare_full"
   | "deferred_daycare_half"
   | "deferred_boarding"
-  | "expired_credits_income";
+  | "expired_credits_income"
+  | "customer_deposit_liability"
+  | "forfeited_deposit_income";
 
 export type QuickBooksIncomeAccount = {
   id: string;
